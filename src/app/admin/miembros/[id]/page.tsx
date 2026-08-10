@@ -232,7 +232,8 @@ export default async function AdminMiembroDetailPage({
                 !m.nationality && "nacionalidad",
                 !address && "domicilio",
                 !m.phone && "teléfono",
-                ineDocs.length < 2 && "identificación (INE)",
+                /* El INE NO se cuenta como faltante: es opcional y se pide al
+                   solicitar el primer reintegro (decisión de Pablo, 10-ago) */
               ]
                 .filter(Boolean)
                 .join(" · ") || "revisar el perfil"}

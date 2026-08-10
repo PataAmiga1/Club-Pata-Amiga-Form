@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField } from "@/components/ui/Field";
+import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 
 import { validateCurp, curpCoincide } from "@/lib/curp";
@@ -172,16 +173,16 @@ export function ProfileForm({
   }, [cp]);
 
   // Nacionalidad y fecha de nacimiento son obligatorias para el 100%
-  // (decisión de Pablo, 5-ago). OJO con los Boolean(): sin ellos, un string
-  // en el && produce Number("Av...") = NaN (hallazgo del equipo).
+  // (decisión de Pablo, 5-ago). El INE es OPCIONAL y NO cuenta para el 100%
+  // (decisión de Pablo, 10-ago): pedirlo de entrada frenaba el registro.
+  // OJO con los Boolean(): sin ellos, un string en el && produce
+  // Number("Av...") = NaN (hallazgo del equipo).
   const completion =
-    15 * Number(firstName.trim().length > 0 && lastName.trim().length > 0) +
-    15 * Number(curpValid) +
-    10 * Number(/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) +
+    25 * Number(firstName.trim().length > 0 && lastName.trim().length > 0) +
+    25 * Number(curpValid) +
+    15 * Number(/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) +
     10 * Number(nationality.trim().length > 0) +
-    20 * Number(Boolean(cp.length === 5 && colony && street)) +
-    15 * Number(Boolean(frontFile)) +
-    15 * Number(Boolean(backFile));
+    25 * Number(Boolean(cp.length === 5 && colony && street));
 
   async function save(finalize: boolean) {
     setSaving(true);
@@ -295,13 +296,14 @@ export function ProfileForm({
           />
         </div>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-          <TextField
+          {/* Mismo componente que el registro: prefijo +52 fijo y solo 10
+              dígitos en la BD. Antes era un campo libre, así que el mismo
+              teléfono podía guardarse de cinco formas distintas. */}
+          <PhoneField
             label="Teléfono"
-            type="tel"
-            placeholder="+52 ··· ··· ····"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            autoComplete="tel"
+            onChange={setPhone}
+            hint="10 dígitos, sin lada internacional."
           />
           <TextField
             label="CURP"
@@ -409,9 +411,17 @@ export function ProfileForm({
       </section>
 
       <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
-        <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
+        <span className="flex flex-wrap items-center gap-2 text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
           TU IDENTIFICACIÓN (INE)
+          <span className="rounded-full bg-cream px-2.5 py-[3px] text-[10.5px] font-extrabold tracking-normal text-ink-tertiary">
+            OPCIONAL
+          </span>
         </span>
+        <p className="-mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
+          No la necesitas para completar tu perfil. Súbela si quieres dejarla
+          lista: el comité puede pedírtela al revisar un reintegro, para validar
+          que la transferencia va a la persona correcta.
+        </p>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
           <IneUpload
             side="ine_front"

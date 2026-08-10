@@ -22,31 +22,18 @@ export async function enviarRecordatoriosDatosFaltantes(admin: Admin) {
 
   if (!incompletos?.length) return { candidatos: 0, enviados: 0 };
 
-  // Documentos INE de todos los candidatos en una sola consulta
-  const ids = incompletos.map((p) => p.id);
-  const { data: docs } = await admin
-    .from("documents")
-    .select("user_id, document_type")
-    .in("user_id", ids)
-    .in("document_type", ["ine_front", "ine_back"]);
-  const docsPorUsuario = new Map<string, Set<string>>();
-  for (const d of docs ?? []) {
-    if (!docsPorUsuario.has(d.user_id))
-      docsPorUsuario.set(d.user_id, new Set());
-    docsPorUsuario.get(d.user_id)!.add(d.document_type);
-  }
-
+  // El INE ya NO se pide aquí: es opcional y no cuenta para el perfil
+  // completo (decisión de Pablo, 10-ago). Se solicita al pedir el primer
+  // reintegro, que es cuando de verdad hace falta.
   let enviados = 0;
   for (const p of incompletos) {
     if (!p.email) continue;
-    const ine = docsPorUsuario.get(p.id) ?? new Set();
     const faltantes = [
       !p.curp && "CURP",
       !p.birth_date && "fecha de nacimiento",
       !p.nationality && "nacionalidad",
       !(p.street && p.postal_code) && "domicilio",
       !p.phone && "teléfono",
-      ine.size < 2 && "identificación (INE)",
     ].filter(Boolean) as string[];
     if (faltantes.length === 0) continue;
 

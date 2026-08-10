@@ -300,11 +300,11 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       "Recordatorio periódico a miembros con el perfil incompleto: sin esos datos no se habilitan los reintegros. Se envía desde Comunicados → Envíos (o el cron semanal).",
     variables: {
       firstName: "Nombre del miembro",
-      missingList: "Lista de lo que falta (CURP, INE, etc.)",
+      missingList: "Lista de lo que falta (CURP, domicilio, etc.)",
     },
     sample: {
       firstName: "Cipatli",
-      missingList: "fecha de nacimiento · nacionalidad · identificación (INE)",
+      missingList: "fecha de nacimiento · nacionalidad · domicilio",
     },
     subject: "Te falta poco para habilitar tus reintegros 🐾",
     html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>

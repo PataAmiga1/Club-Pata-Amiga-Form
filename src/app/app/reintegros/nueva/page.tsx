@@ -102,7 +102,7 @@ export default async function NuevaSolicitudPage() {
           <Link href="/app/perfil" className="font-bold underline">
             completar tu perfil
           </Link>{" "}
-          (CURP, domicilio e INE).
+          (CURP y domicilio).
         </div>
       )}
       <RequestForm

@@ -289,7 +289,7 @@ export default async function AppHome() {
               Completa tu perfil
             </span>
             <span className="text-[11.5px] text-ink-tertiary">
-              CURP, domicilio e INE — habilita tus reintegros
+              CURP y domicilio — habilita tus reintegros
             </span>
           </div>
           <span className="font-extrabold text-teal-deep">→</span>
