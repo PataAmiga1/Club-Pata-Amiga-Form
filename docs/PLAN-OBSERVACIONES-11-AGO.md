@@ -1,9 +1,16 @@
 # Plan de trabajo — Observaciones 10/11-ago-2026
 
-> **ESTADO AL CERRAR EL 11-AGO:** planeación cerrada, todas las reglas confirmadas.
-> **No se escribió una sola línea de código todavía.** Se para por presupuesto de uso.
-> Se retoma con la **Etapa 2.1 fusionada** (ver §4). Nada de lo de abajo requiere
-> re-investigarse: las respuestas ya están.
+> **ESTADO AL CERRAR EL 11-AGO (NOCHE):** ✅ **CONSTRUIDO Y EN `staging`** (9
+> commits `eaa520c…0df7fa9`, cada uno verificado E2E en navegador):
+> · Fase 1 COMPLETA (1.2 espera-al-aprobar + fix "13 días" · 1.3 senior 8 ·
+>   1.4 reemplazo/contratante) · Etapa 2.1 COMPLETA (cuenta al aplicar,
+>   portales pendientes, campos nuevos) · catálogo SEPOMEX (158k filas en
+>   staging) · miembros sin INE / pasaporte extranjeros · leyenda "en
+>   revisión" · copy (peludos, rechazado) · apelación centros = 1.
+> Las 6 migraciones `20260811000001…6` YA corrieron en staging.
+> **Se retoma con:** popup de legales (Fase 3) — y al confirmar Jorge el
+> apagado de "Confirm email": flip de `email_confirm` + Fase 2.2.
+> Handoff completo: `juntas/00-HANDOFF-PROXIMA-SESION.md` (OneDrive).
 
 **Fuentes** (en orden de precedencia):
 1. `observationspablo.docx` — notas de Pablo. Manda sobre las demás.
