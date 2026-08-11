@@ -107,11 +107,14 @@ export function ProfileForm({
   userId,
   initial,
   passport,
+  avatarUrl,
 }: {
   userId: string;
   initial: Initial;
   /** Nombre de archivo del pasaporte ya subido (solo extranjeros). */
   passport: string | null;
+  /** Foto de perfil ya guardada (equipo, 11-ago). */
+  avatarUrl: string | null;
 }) {
   const router = useRouter();
   // Nombre desglosado (equipo, 5-ago): nombres, apellido paterno y materno
@@ -138,6 +141,39 @@ export function ProfileForm({
   const [passportFile, setPassportFile] = useState(passport);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // Foto de perfil (equipo, 11-ago): el círculo que el equipo marcó en rojo.
+  // OPCIONAL y no cuenta para el 100% (mismo criterio que el INE del 10-ago).
+  // Se guarda al momento de subirla — no espera al botón de guardar.
+  const [avatar, setAvatar] = useState(avatarUrl);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarBusy(true);
+    const supabase = createClient();
+    const path = `${userId}/avatar-${Date.now()}-${file.name}`;
+    const { error: upErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file);
+    if (upErr) {
+      setAvatarBusy(false);
+      setMessage("No pudimos subir tu foto. Intenta de nuevo.");
+      return;
+    }
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    const { error: saveErr } = await supabase
+      .from("profiles")
+      .update({ avatar_url: pub.publicUrl })
+      .eq("id", userId);
+    setAvatarBusy(false);
+    if (saveErr) {
+      setMessage("No pudimos guardar tu foto. Intenta de nuevo.");
+      return;
+    }
+    setAvatar(pub.publicUrl);
+  }
 
   // Extranjeros: suben PASAPORTE en lugar de CURP — no pueden tener CURP
   // (equipo, 11-ago). Nacionalidad vacía se trata como mexicana.
@@ -246,15 +282,42 @@ export function ProfileForm({
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-[28px] text-ink-title md:text-[34px]">
-            Completa tu perfil
-          </h1>
-          <p className="mt-1.5 text-[14.5px] text-ink-secondary">
-            Necesitamos estos datos para validar tu identidad y habilitar tus
-            reintegros.
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3.5">
+          {/* El círculo que el equipo marcó en rojo: ahora ES la foto de
+              perfil, opcional y subible aquí mismo (equipo, 11-ago) */}
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarBusy}
+            title="Foto de perfil (opcional) — toca para cambiarla"
+            className="grid size-16 flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[22px] transition-colors hover:border-teal"
+          >
+            {avatarBusy ? (
+              "…"
+            ) : avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatar} alt="Tu foto de perfil" className="size-full object-cover" />
+            ) : (
+              "📷"
+            )}
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarFile}
+          />
+          <div className="min-w-0">
+            <h1 className="font-display text-[28px] text-ink-title md:text-[34px]">
+              Completa tu perfil
+            </h1>
+            <p className="mt-1.5 text-[14.5px] text-ink-secondary">
+              Necesitamos estos datos para validar tu identidad y habilitar tus
+              reintegros. La foto es opcional.
+            </p>
+          </div>
         </div>
         <div className="grid size-16 flex-none place-items-center rounded-full bg-white shadow-[0_2px_10px_rgba(30,83,80,.08)]">
           <span className="font-display text-base text-teal-deep">

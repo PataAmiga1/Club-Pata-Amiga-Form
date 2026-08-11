@@ -35,7 +35,7 @@ export default async function AppLayout({
     await Promise.all([
       supabase
         .from("profiles")
-        .select("first_name, email, member_since, membership_status")
+        .select("first_name, email, member_since, membership_status, avatar_url")
         .eq("id", user.id)
         .single(),
       supabase
@@ -120,6 +120,7 @@ export default async function AppLayout({
           />
           <ProfileMenu
             initial={initial}
+            avatarUrl={profile?.avatar_url ?? null}
             entries={menuEntries}
             settingsHref="/app/cuenta"
           />

@@ -13,7 +13,7 @@ export default async function PerfilPage() {
     supabase
       .from("profiles")
       .select(
-        "first_name, last_name, mother_last_name, phone, curp, birth_date, nationality, postal_code, state, city, colony, street, number_ext, number_int",
+        "first_name, last_name, mother_last_name, phone, curp, birth_date, nationality, postal_code, state, city, colony, street, number_ext, number_int, avatar_url",
       )
       .eq("id", user.id)
       .single(),
@@ -32,6 +32,7 @@ export default async function PerfilPage() {
         userId={user.id}
         initial={profile ?? {}}
         passport={docs?.[0]?.file_name ?? null}
+        avatarUrl={profile?.avatar_url ?? null}
       />
     </div>
   );
