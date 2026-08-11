@@ -9,6 +9,7 @@ import { curpCoincide } from "@/lib/curp";
 import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
 import { PetThreadPanel } from "./PetThreadPanel";
 import { PetResolveButtons } from "../../mascotas/PetResolveButtons";
+import { NOTA_HEREDADO_ADMIN } from "@/lib/membresia";
 import { EditMemberButton, EditPetButton } from "./EditPanels";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
@@ -254,8 +255,17 @@ export default async function AdminMiembroDetailPage({
             Plan:{" "}
             {sub
               ? `${sub.plan === "annual" ? "Anual" : "Mensual"} · ${formatMxn(Number(sub.amount ?? 0))} MXN${sub.cancel_at_period_end ? " · CANCELA AL CORTE" : ""}`
-              : "sin suscripción activa"}
+              : m.membership_status === "active"
+                ? "cobro heredado (plataforma anterior)"
+                : "sin suscripción activa"}
           </span>
+          {/* Sin esta nota el comité leía "sin suscripción activa" y creía que
+              la persona no tenía membresía (auditoría 11-ago). */}
+          {!sub && m.membership_status === "active" && (
+            <span className="rounded-[10px] bg-info-bg px-3 py-2 text-[12px] leading-relaxed text-info-text">
+              {NOTA_HEREDADO_ADMIN}
+            </span>
+          )}
           {sub?.current_period_end && (
             <span>
               Próximo cobro:{" "}

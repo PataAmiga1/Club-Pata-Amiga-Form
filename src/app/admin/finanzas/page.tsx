@@ -37,7 +37,7 @@ export default async function AdminFinanzasPage() {
   // arrancaba a las 6 de la tarde del día anterior en Vercel.
   const monthStart = inicioDelMes();
 
-  const [subsQ, monthReimbs, payableReferrals] = await Promise.all([
+  const [subsQ, monthReimbs, payableReferrals, activosQ] = await Promise.all([
     admin.from("subscriptions").select("plan, amount").eq("status", "active"),
     admin
       .from("reimbursements")
@@ -49,9 +49,20 @@ export default async function AdminFinanzasPage() {
       .select("commission_amount")
       .eq("status", "pending")
       .lt("created_at", monthStart.toISOString()),
+    // Miembros activos TOTALES: el MRR solo puede ver a los que cobran por
+    // Stripe, y los migrados de Memberstack no tienen suscripción aquí. Sin
+    // este contraste el tablero daba a entender que el MRR era todo el negocio
+    // (auditoría 11-ago: 63 activos, 3 con cobro en la plataforma).
+    admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "member")
+      .eq("membership_status", "active"),
   ]);
 
   const subs = subsQ.data ?? [];
+  const activosTotales = activosQ.count ?? 0;
+  const sinCobroAqui = Math.max(0, activosTotales - subs.length);
   const mrr = subs.reduce(
     (acc, s) =>
       acc + (s.plan === "annual" ? Number(s.amount ?? 0) / 12 : Number(s.amount ?? 0)),
@@ -114,7 +125,11 @@ export default async function AdminFinanzasPage() {
     {
       label: "MRR · INGRESO RECURRENTE MENSUAL",
       value: `${formatMxn(Math.round(mrr))}`,
-      note: "lo que suman las membresías activas cada mes",
+      note:
+        sinCobroAqui > 0
+          ? `solo ${subs.length} de ${activosTotales} miembros activos ⚠`
+          : "lo que suman las membresías activas cada mes",
+      noteCls: sinCobroAqui > 0 ? "text-warning-text font-semibold" : undefined,
       detail: (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <DetailItem
@@ -129,6 +144,16 @@ export default async function AdminFinanzasPage() {
             label="TOTAL MRR"
             value={`${formatMxn(Math.round(mrr))} MXN`}
           />
+          <DetailItem
+            label="MIEMBROS ACTIVOS"
+            value={`${activosTotales} en total · ${subs.length} con cobro en la plataforma`}
+          />
+          {sinCobroAqui > 0 && (
+            <DetailItem
+              label="⚠ NO CONTADOS EN EL MRR"
+              value={`${sinCobroAqui} miembros activos migrados de la plataforma anterior. Su cobro no vive aquí, así que no tienen plan ni monto registrados y NO suman al MRR. Mientras no se les cree una suscripción, esta cifra es solo la parte que cobra la plataforma nueva.`}
+            />
+          )}
           <DetailItem
             label="QUÉ ES"
             value="Monthly Recurring Revenue: ingreso que se repite mes a mes con las membresías activas (los planes anuales se prorratean entre 12)."

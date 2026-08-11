@@ -8,6 +8,7 @@ import { markWelcomeShown } from "./actions";
 import { NotificationsBell } from "@/components/app/NotificationsBell";
 import { MAX_ACTIVE_PETS } from "@/lib/constants";
 import { formatDateEs, renewalDate, waitingProgress } from "@/lib/dates";
+import { situacionDeCobro, etiquetaDeCobro } from "@/lib/membresia";
 
 export default async function AppHome() {
   const supabase = await createClient();
@@ -49,12 +50,19 @@ export default async function AppHome() {
   const active = profile?.membership_status === "active";
   const name = profile?.first_name || profile?.email?.split("@")[0] || "";
   const petList = (pets ?? []) as (PetRow & { created_at: string })[];
-  const renews = renewalDate(
-    sub?.current_period_end ?? null,
-    profile?.member_since ?? null,
-    sub?.plan ?? null,
-  );
-  const planLabel = sub?.plan === "annual" ? "Plan anual" : "Plan mensual";
+  // Un miembro heredado de Memberstack no tiene plan ni período registrados:
+  // antes se le mostraba "Plan mensual" inventado y una fecha de renovación ya
+  // pasada (auditoría 11-ago). Ahora sale "Membresía activa" y sin fecha.
+  const situacion = situacionDeCobro(profile?.membership_status, sub);
+  const renews =
+    situacion.tipo === "stripe"
+      ? renewalDate(
+          sub?.current_period_end ?? null,
+          profile?.member_since ?? null,
+          sub?.plan ?? null,
+        )
+      : null;
+  const planLabel = etiquetaDeCobro(situacion);
 
   const availablePet = petList.find(
     (p) =>

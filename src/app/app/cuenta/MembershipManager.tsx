@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { switchPlan, cancelMembership, reactivateMembership } from "./actions";
 import { PLANS } from "@/lib/constants";
 import { formatMxn } from "@/lib/format";
+import { NOTA_HEREDADO_MIEMBRO } from "@/lib/membresia";
 
 const CANCEL_REASONS = [
   "Es muy costoso para mí",
@@ -28,11 +29,17 @@ export function MembershipManager({
   cancelAtPeriodEnd,
   renewsLabel,
   periodEndIso,
+  heredado = false,
+  bajaSolicitada = false,
 }: {
   plan: "monthly" | "annual";
   cancelAtPeriodEnd: boolean;
   renewsLabel: string | null;
   periodEndIso?: string | null;
+  /** Miembro migrado de Memberstack: activo, pero su cobro no vive aquí. */
+  heredado?: boolean;
+  /** Heredado que ya pidió su baja (el comité fija el corte a mano). */
+  bajaSolicitada?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -74,18 +81,38 @@ export function MembershipManager({
       <section className="relative flex flex-col gap-2 overflow-hidden rounded-[20px] bg-teal p-5 md:p-[26px]">
         <div className="blob absolute -bottom-[60px] -right-10 size-[170px] bg-white/[.14]" />
         <span className="relative text-[11px] font-bold tracking-[.06em] text-white/85">
-          MEMBRESÍA {cancelAtPeriodEnd ? "· CANCELACIÓN PROGRAMADA" : "ACTIVA"}
+          MEMBRESÍA{" "}
+          {heredado
+            ? bajaSolicitada
+              ? "· BAJA EN TRÁMITE"
+              : "ACTIVA"
+            : cancelAtPeriodEnd
+              ? "· CANCELACIÓN PROGRAMADA"
+              : "ACTIVA"}
         </span>
-        <span className="relative font-display text-[26px] text-white">
-          Plan {currentInfo.name} · {formatMxn(currentInfo.amountMxn)} MXN/
-          {plan === "annual" ? "año" : "mes"}
-        </span>
-        {renewsLabel && (
-          <span className="relative text-[12.5px] text-white/85">
-            {cancelAtPeriodEnd
-              ? `Tu protección termina el ${renewsLabel}`
-              : `Renueva el ${renewsLabel}`}
-          </span>
+        {heredado ? (
+          <>
+            <span className="relative font-display text-[26px] text-white">
+              Tu protección está activa
+            </span>
+            <span className="relative text-[12.5px] leading-relaxed text-white/85">
+              {NOTA_HEREDADO_MIEMBRO}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="relative font-display text-[26px] text-white">
+              Plan {currentInfo.name} · {formatMxn(currentInfo.amountMxn)} MXN/
+              {plan === "annual" ? "año" : "mes"}
+            </span>
+            {renewsLabel && (
+              <span className="relative text-[12.5px] text-white/85">
+                {cancelAtPeriodEnd
+                  ? `Tu protección termina el ${renewsLabel}`
+                  : `Renueva el ${renewsLabel}`}
+              </span>
+            )}
+          </>
         )}
       </section>
 
@@ -121,9 +148,33 @@ export function MembershipManager({
             {pending ? "Un momento…" : "Reactivar mi membresía"}
           </button>
         </section>
+      ) : heredado && bajaSolicitada ? (
+        /* Heredado que ya pidió su baja: no repetir el flujo de cancelación */
+        <section className="flex flex-col items-start gap-2 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
+          <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
+            BAJA EN TRÁMITE
+          </span>
+          <p className="text-sm leading-normal text-ink-body">
+            Recibimos tu solicitud de baja. Como tu cobro viene de nuestra
+            plataforma anterior, el equipo confirma por correo la fecha exacta en
+            que termina tu protección. Mientras tanto sigues cubierto.
+          </p>
+          <p className="text-[13px] text-ink-secondary">
+            ¿Cambiaste de opinión o tienes dudas? Escríbenos a{" "}
+            <a
+              href="mailto:soporte@pataamiga.mx"
+              className="font-bold text-teal-deep hover:underline"
+            >
+              soporte@pataamiga.mx
+            </a>
+            .
+          </p>
+        </section>
       ) : (
         <>
-          {/* Plan switch */}
+          {/* Plan switch — solo con cobro en la plataforma: sin suscripción de
+              Stripe no hay nada que prorratear (auditoría 11-ago). */}
+          {!heredado && (
           <section className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
             <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
               CAMBIAR DE PLAN
@@ -186,6 +237,7 @@ export function MembershipManager({
               </div>
             )}
           </section>
+          )}
 
           {/* Cancellation */}
           <section className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">

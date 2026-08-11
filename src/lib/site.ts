@@ -154,6 +154,11 @@ export const NOTIFY_EVENTS = [
     hint: "Aviso al llegar un registro de centro de bienestar.",
   },
   {
+    key: "notify_memberships",
+    label: "Baja de miembro con cobro heredado",
+    hint: "Aviso cuando cancela alguien migrado de la plataforma anterior: su cobro NO vive aquí y hay que detenerlo por fuera y fijar la fecha de corte. Configúralo o esas bajas pasan sin que nadie se entere.",
+  },
+  {
     key: "notify_pets",
     label: "Respuestas sobre mascotas",
     hint: "Aviso cuando un miembro responde una solicitud de información del comité.",
