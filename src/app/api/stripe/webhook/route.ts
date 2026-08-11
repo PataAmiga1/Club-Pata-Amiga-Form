@@ -91,6 +91,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // 3. Record the subscription.
   //    `plan_version_id` viaja en la metadata del checkout para que el webhook
   //    NUNCA tenga que adivinar de qué versión fue un pago.
+  // El período (inicio y fin) se pide a Stripe AQUÍ, en el alta.
+  //
+  // Por qué: Stripe NO dispara `customer.subscription.updated` al suscribirse
+  // (eso pasa en la primera renovación o en un cambio de plan), así que la fila
+  // se quedaba con `current_period_start/end` en NULL durante todo el primer
+  // período. Consecuencias que eso tenía: el comité no veía "Próximo cobro" en
+  // el expediente, el miembro veía una fecha ADIVINADA (`member_since` + 1 mes)
+  // en lugar de la real, y los recordatorios de renovación no tendrían de dónde
+  // leer. Detectado el 11-ago comparando la BD contra Stripe.
+  let periodoInicio: string | null = null;
+  let periodoFin: string | null = null;
+  if (session.subscription) {
+    try {
+      const suscripcion = await getStripe().subscriptions.retrieve(
+        session.subscription as string,
+      );
+      const item = suscripcion.items.data[0];
+      if (item?.current_period_start)
+        periodoInicio = new Date(item.current_period_start * 1000).toISOString();
+      if (item?.current_period_end)
+        periodoFin = new Date(item.current_period_end * 1000).toISOString();
+    } catch (e) {
+      // Si Stripe no responde, la fila se crea igual: el pago ya ocurrió y no
+      // se puede perder. Las fechas las rellenará el evento de renovación.
+      console.error("[webhook] no se pudo leer el período de la suscripción", e);
+    }
+  }
+
   const { data: subRow } = await supabase
     .from("subscriptions")
     .upsert(
@@ -102,6 +130,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         amount: session.amount_total ? session.amount_total / 100 : null,
         currency: (session.currency ?? "mxn").toUpperCase(),
         status: "active",
+        ...(periodoInicio ? { current_period_start: periodoInicio } : {}),
+        ...(periodoFin ? { current_period_end: periodoFin } : {}),
       },
       { onConflict: "stripe_subscription_id" },
     )
