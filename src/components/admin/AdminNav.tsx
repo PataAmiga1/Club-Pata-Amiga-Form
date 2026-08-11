@@ -30,20 +30,34 @@ export function AdminNav({
   const inMarketing = MARKETING_ITEMS.some((m) => pathname.startsWith(m.href));
   const [marketingOpen, setMarketingOpen] = useState(inMarketing);
 
-  // Apelaciones va después de Miembros y SOLO la ve el super admin.
-  // Marketing (Landings/Comunicados/Sitio web) va agrupado al final.
+  // Orden EXACTO pedido por el equipo (11-ago): Resumen · Notificaciones ·
+  // Miembros · Mascotas · Embajadores · Centros · Reintegros · Apelaciones
+  // (super admin) · Finanzas (super admin) · Vet · Conversaciones · Marketing.
+  // Notificaciones lleva el total de pendientes a la derecha (petición del
+  // equipo). Finanzas se oculta de la barra para admins normales según la
+  // lista; la PÁGINA sigue accesible como decidió el equipo el 16-jul (con
+  // desgloses solo para super admin) — pendiente de confirmar con Pablo si
+  // también se restringe la página.
+  const notifTotal =
+    petsPending +
+    reimbursementsPending +
+    ambassadorsPending +
+    centersPending +
+    appealsPending;
   const items = [
     { href: "/admin", icon: "📊", label: "Resumen" },
-    { href: "/admin/notificaciones", icon: "🔔", label: "Notificaciones" },
+    { href: "/admin/notificaciones", icon: "🔔", label: "Notificaciones", badge: notifTotal, badgeCls: "bg-orange" },
+    { href: "/admin/miembros", icon: "👥", label: "Miembros" },
     { href: "/admin/mascotas", icon: "🐾", label: "Mascotas", badge: petsPending, badgeCls: "bg-orange" },
-    { href: "/admin/reintegros", icon: "💚", label: "Reintegros", badge: reimbursementsPending, badgeCls: "bg-pink" },
     { href: "/admin/embajadores", icon: "🤝", label: "Embajadores", badge: ambassadorsPending, badgeCls: "bg-white/20" },
     { href: "/admin/centros", icon: "📍", label: "Centros", badge: centersPending, badgeCls: "bg-white/20" },
-    { href: "/admin/miembros", icon: "👥", label: "Miembros" },
+    { href: "/admin/reintegros", icon: "💚", label: "Reintegros", badge: reimbursementsPending, badgeCls: "bg-pink" },
     ...(isSuper
-      ? [{ href: "/admin/apelaciones", icon: "⚖️", label: "Apelaciones", badge: appealsPending, badgeCls: "bg-pink" }]
+      ? [
+          { href: "/admin/apelaciones", icon: "⚖️", label: "Apelaciones", badge: appealsPending, badgeCls: "bg-pink" },
+          { href: "/admin/finanzas", icon: "💰", label: "Finanzas" },
+        ]
       : []),
-    { href: "/admin/finanzas", icon: "💰", label: "Finanzas" },
     { href: "/admin/vet", icon: "💬", label: "Vet 24/7" },
     { href: "/admin/conversaciones", icon: "📨", label: "Conversaciones" },
   ];
@@ -131,18 +145,27 @@ export function AdminNavMobile(props: {
   isSuper?: boolean;
 }) {
   const pathname = usePathname();
+  // Mismo orden que la barra de escritorio (equipo, 11-ago)
+  const notifTotal =
+    props.petsPending +
+    props.reimbursementsPending +
+    props.ambassadorsPending +
+    (props.centersPending ?? 0) +
+    (props.appealsPending ?? 0);
   const items = [
     { href: "/admin", icon: "📊", label: "Resumen", badge: 0 },
-    { href: "/admin/notificaciones", icon: "🔔", label: "Notificaciones", badge: 0 },
+    { href: "/admin/notificaciones", icon: "🔔", label: "Notificaciones", badge: notifTotal },
+    { href: "/admin/miembros", icon: "👥", label: "Miembros", badge: 0 },
     { href: "/admin/mascotas", icon: "🐾", label: "Mascotas", badge: props.petsPending },
-    { href: "/admin/reintegros", icon: "💚", label: "Reintegros", badge: props.reimbursementsPending },
     { href: "/admin/embajadores", icon: "🤝", label: "Embajadores", badge: props.ambassadorsPending },
     { href: "/admin/centros", icon: "📍", label: "Centros", badge: props.centersPending ?? 0 },
-    { href: "/admin/miembros", icon: "👥", label: "Miembros", badge: 0 },
+    { href: "/admin/reintegros", icon: "💚", label: "Reintegros", badge: props.reimbursementsPending },
     ...(props.isSuper
-      ? [{ href: "/admin/apelaciones", icon: "⚖️", label: "Apelaciones", badge: props.appealsPending ?? 0 }]
+      ? [
+          { href: "/admin/apelaciones", icon: "⚖️", label: "Apelaciones", badge: props.appealsPending ?? 0 },
+          { href: "/admin/finanzas", icon: "💰", label: "Finanzas", badge: 0 },
+        ]
       : []),
-    { href: "/admin/finanzas", icon: "💰", label: "Finanzas", badge: 0 },
     { href: "/admin/vet", icon: "💬", label: "Vet 24/7", badge: 0 },
     { href: "/admin/conversaciones", icon: "📨", label: "Conversaciones", badge: 0 },
     // Marketing (en móvil los chips van planos; el orden los agrupa al final)
