@@ -94,7 +94,8 @@ export default async function AdminEmbajadoresPage({
     .select(
       "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, referrals(commission_amount, status, created_at)",
     )
-    .order("created_at", { ascending: true });
+    // Solicitudes de la más reciente a la más antigua (equipo, 11-ago)
+    .order("created_at", { ascending: false });
 
   const rows = ((data ?? []) as Row[]).filter(
     (a) => !estado || a.status === estado,

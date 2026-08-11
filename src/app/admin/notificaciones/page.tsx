@@ -63,7 +63,9 @@ export default async function AdminNotificacionesPage() {
       id: `e-${a.id}`,
       icon: "🤝",
       text: `${a.first_name} solicitó ser embajador`,
-      href: "/admin/embajadores",
+      // Al detalle del embajador, no a la lista general (equipo, 11-ago:
+      // "tiene que mandar a lo particular y no a lo general")
+      href: `/admin/embajadores/${a.id}`,
       created_at: a.created_at,
     })),
     ...(evCenters.data ?? []).map((c) => ({
