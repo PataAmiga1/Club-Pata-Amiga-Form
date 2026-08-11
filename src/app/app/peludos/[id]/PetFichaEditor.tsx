@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField, SelectField } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { PET_GALLERY_MAX } from "@/lib/constants";
+import { PET_GALLERY_MAX, SENIOR_PET_AGE_YEARS } from "@/lib/constants";
 import { updatePetFicha, replyPetThread, deactivatePet } from "./actions";
 
 export type PetFicha = {
@@ -267,7 +267,7 @@ export function PetFichaEditor({
             <span className="text-[13px] font-semibold text-warning-text">
               {certUrl
                 ? "Certificado veterinario recibido ✓"
-                : `${pet.name} es senior (10+): sube su certificado veterinario`}
+                : `${pet.name} es senior (${SENIOR_PET_AGE_YEARS}+): sube su certificado veterinario`}
             </span>
             <button
               type="button"

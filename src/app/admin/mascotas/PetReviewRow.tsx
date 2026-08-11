@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import { SENIOR_PET_AGE_YEARS } from "@/lib/constants";
 import { PetResolveButtons } from "./PetResolveButtons";
 
 export function PetReviewRow({
@@ -44,7 +45,7 @@ export function PetReviewRow({
           <span
             className={`text-xs font-semibold ${pet.hasCertificate ? "text-success-text" : "text-warning-text"}`}
           >
-            Senior (10+):{" "}
+            Senior ({SENIOR_PET_AGE_YEARS}+):{" "}
             {pet.hasCertificate
               ? "certificado veterinario recibido ✓"
               : "falta certificado veterinario"}

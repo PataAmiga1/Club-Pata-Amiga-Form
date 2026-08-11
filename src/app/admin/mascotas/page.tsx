@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminRole } from "@/lib/admin-guard";
 import { formatDateEs } from "@/lib/dates";
+import { SENIOR_PET_AGE_YEARS } from "@/lib/constants";
 import {
   DetailModal,
   DetailItem,
@@ -164,7 +165,7 @@ export default async function AdminMascotasPage({
                     <div className="flex flex-wrap gap-2">
                       {p.is_senior && !p.vet_certificate_url && (
                         <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
-                          ⚠ Falta certificado veterinario (senior 10+)
+                          ⚠ Falta certificado veterinario (senior {SENIOR_PET_AGE_YEARS}+)
                         </span>
                       )}
                       {!p.photo_url && (
@@ -198,13 +199,25 @@ export default async function AdminMascotasPage({
                     <DetailItem label="COLOR DE OJOS" value={p.eye_color} />
                     <DetailItem label="COLOR DE NARIZ" value={p.nose_color} />
                     <DetailItem label="ADOPTADO" value={p.is_adopted ? "Sí 🏠" : "No"} />
-                    <DetailItem label="SENIOR (10+)" value={p.is_senior ? "Sí 👴" : "No"} />
+                    <DetailItem
+                      label={`SENIOR (${SENIOR_PET_AGE_YEARS}+)`}
+                      value={
+                        p.is_senior
+                          ? "Sí 👴"
+                          : // Vinculación edad ↔ clasificación (equipo, 11-ago): si la
+                            // edad guardada indica senior pero la ficha dice que no, el
+                            // comité lo ve — la ficha NO se recalcula sola (Regla X).
+                            (p.age_years ?? 0) >= SENIOR_PET_AGE_YEARS && !p.age_months
+                            ? "No ⚠ (la edad indica senior)"
+                            : "No"
+                      }
+                    />
                     <DetailItem
                       label="PERÍODO DE ESPERA"
                       value={
                         p.waiting_period_end_date
                           ? `termina el ${formatDateEs(p.waiting_period_end_date)}`
-                          : "se fija al pagar"
+                          : "empieza al aprobarse"
                       }
                     />
                     <DetailItem label="REGISTRADA" value={formatDateEs(new Date(p.created_at))} />
@@ -351,7 +364,7 @@ export default async function AdminMascotasPage({
                         value={p.is_adopted ? "Sí" : null}
                       />
                       <DetailItem
-                        label="SENIOR (10+)"
+                        label={`SENIOR (${SENIOR_PET_AGE_YEARS}+)`}
                         value={p.is_senior ? "Sí" : null}
                       />
                       <DetailItem

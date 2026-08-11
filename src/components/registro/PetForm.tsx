@@ -44,7 +44,8 @@ const AGE_OPTIONS: {
  *   (sin stepper ni plan; su período de espera corre desde hoy).
  *
  * Reglas del sitio vivo: raza y colores con autocompletado (se puede escribir
- * un valor libre si no aparece), edad por rangos, aviso senior a los 10+.
+ * un valor libre si no aparece), edad por rangos, aviso senior a los
+ * SENIOR_PET_AGE_YEARS o más (8 desde el 11-ago-2026).
  */
 export function PetForm({ mode }: { mode: "registro" | "member" }) {
   const router = useRouter();
@@ -91,7 +92,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
   const ageOption = AGE_OPTIONS.find((o) => o.value === ageKey) ?? null;
   // Aviso transparente por raza (copy aprobado por el cliente, 16-jul-2026)
   const breedConditions = BREED_CONDITIONS[breed.trim()] ?? null;
-  // El aviso de senior aparece en cuanto se elige 10 años o más
+  // El aviso de senior aparece en cuanto se elige SENIOR_PET_AGE_YEARS o más
   const showsSeniorNote =
     !!ageOption && ageOption.years >= SENIOR_PET_AGE_YEARS;
 

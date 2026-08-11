@@ -53,7 +53,14 @@ export const APPEAL_MAX_PER_SUBJECT = 2;
  * Los embajadores NO pueden apelar — por eso no aparecen aquí.
  */
 export const CENTER_APPEAL_MAX = 1;
-export const SENIOR_PET_AGE_YEARS = 10; // requiere certificado veterinario
+/**
+ * Edad senior (pide certificado veterinario). 10 → 8 el 11-ago-2026 (equipo).
+ * Es una regla GLOBAL, no un beneficio versionado: aplica a cualquier mascota
+ * registrada desde el cambio, incluidas las de miembros que ya existían
+ * (Regla X, decisión de Pablo). Las mascotas ya registradas conservan su
+ * `is_senior` guardado — no se recalculan.
+ */
+export const SENIOR_PET_AGE_YEARS = 8;
 export const REIMBURSEMENT_SLA_HOURS = 72; // compromiso de transferencia
 
 /** Las 5 características de la membresía — SIEMPRE en este orden. */

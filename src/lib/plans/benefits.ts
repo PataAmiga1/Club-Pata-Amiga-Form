@@ -3,7 +3,6 @@ import {
   MAX_ACTIVE_PETS,
   REIMBURSEMENT_CAPS_MXN,
   REIMBURSEMENT_SLA_HOURS,
-  SENIOR_PET_AGE_YEARS,
   WAITING_PERIOD_DAYS,
   AMBASSADOR_COMMISSION_MXN,
 } from "@/lib/constants";
@@ -171,16 +170,12 @@ export const CATALOGO_BENEFICIOS = {
     mejorSi: "mayor",
     porOmision: MAX_ACTIVE_PETS,
   },
-  edad_senior_anios: {
-    label: "Edad senior (pide certificado veterinario)",
-    tipo: "entero",
-    unidad: "años",
-    consumidoPor: ["alta de mascota"],
-    editablePor: "super_admin",
-    vinculante: false,
-    mejorSi: "mayor",
-    porOmision: SENIOR_PET_AGE_YEARS,
-  },
+  // `edad_senior_anios` se QUITÓ del catálogo el 11-ago-2026: la edad senior
+  // es una regla GLOBAL (SENIOR_PET_AGE_YEARS, hoy 8), no un beneficio
+  // versionado — aplica a toda mascota nueva sin importar cuándo contrató el
+  // miembro (Regla X, decisión de Pablo). Tenerla aquí permitía que cada plan
+  // guardara su propia edad y el sistema se contradijera. Los snapshots viejos
+  // que aún traen la llave simplemente la ignoran (migración 20260811000004).
 
   // --- Servicios ------------------------------------------------------------
   orientacion_vet_24_7: {
