@@ -72,7 +72,7 @@ export async function executeSupportTool(
     const [{ data: profile }, { data: sub }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("membership_status, member_since, waiting_period_end_date")
+        .select("membership_status, member_since")
         .eq("id", userId)
         .single(),
       supabase
@@ -82,7 +82,8 @@ export async function executeSupportTool(
         .eq("status", "active")
         .maybeSingle(),
     ]);
-    const remaining = daysUntil(profile?.waiting_period_end_date ?? null);
+    // El contratante NO tiene período de espera (PM, 11-ago): el bot no debe
+    // reportar una espera que ya no existe. La espera es por mascota.
     return JSON.stringify(
       {
         estatus_membresia: profile?.membership_status ?? "sin membresía",
@@ -91,8 +92,7 @@ export async function executeSupportTool(
         monto_mxn: sub?.amount ?? null,
         proxima_renovacion: sub?.current_period_end ?? null,
         se_cancela_al_final_del_periodo: sub?.cancel_at_period_end ?? false,
-        periodo_de_espera_contratante_termina: profile?.waiting_period_end_date ?? null,
-        dias_restantes_de_espera_contratante: remaining !== null && remaining > 0 ? remaining : 0,
+        periodo_de_espera_contratante: "no aplica — la espera es por mascota",
       },
       null,
       2,

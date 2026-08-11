@@ -384,6 +384,8 @@ Antes de que Jorge mergee `staging` → `main`, hay que correr EN PRODUCCIÓN
 1. `20260811000001_embajador_campos_registro.sql`
 2. `20260811000002_catalogo_sepomex.sql`
 3. `20260811000003_espera_arranca_al_aprobar.sql`
+4. `20260811000004_senior_regla_global.sql` *(limpieza de datos, segura)*
+5. `20260811000005_contratante_sin_espera.sql` *(limpieza de datos, segura)*
 
 **Por qué es obligatorio:** el código nuevo consulta columnas que estas
 migraciones crean. Se comprobó en staging el 11-ago: con el código nuevo y sin

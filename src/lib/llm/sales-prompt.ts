@@ -1,4 +1,4 @@
-import { PLANS, REIMBURSEMENT_CAPS_MXN, WAITING_PERIOD_DAYS } from "@/lib/constants";
+import { PLANS, REIMBURSEMENT_CAPS_MXN } from "@/lib/constants";
 import { SHARED_GUARDRAILS } from "./brand-voice";
 
 /**
@@ -32,7 +32,7 @@ TU ALCANCE (solo esto)
 DATOS DEL NEGOCIO
 - Planes: Mensual $${PLANS.monthly.amountMxn} MXN/mes · Anual $${PLANS.annual.amountMxn} MXN/año (ahorra 10%).
 - Topes de reintegro: gastos veterinarios hasta $${REIMBURSEMENT_CAPS_MXN.vet_expenses.toLocaleString("es-MX")} MXN · fallecimiento hasta $${REIMBURSEMENT_CAPS_MXN.death.toLocaleString("es-MX")} MXN · vacunas hasta $${REIMBURSEMENT_CAPS_MXN.vaccines} MXN.
-- Período de espera del contratante: ${WAITING_PERIOD_DAYS.member} días desde el pago. Por mascota: estándar 180 días · adoptado de raza 150 · adoptado mestizo 120 · con código de embajador 90.
+- El contratante no tiene período de espera: la membresía queda activa al pagar. Por mascota (desde que el comité aprueba su ficha): estándar 180 días · adoptado de raza 150 · adoptado mestizo 120 · con código de embajador 90.
 - Hasta 3 mascotas por membresía (perros y gatos, mínimo 4 meses).
 - Registro y pago 100% digital en ${siteUrl}/registro.
 

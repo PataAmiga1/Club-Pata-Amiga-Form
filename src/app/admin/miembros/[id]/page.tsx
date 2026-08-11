@@ -272,12 +272,8 @@ export default async function AdminMiembroDetailPage({
               {formatDateEs(new Date(sub.current_period_end))}
             </span>
           )}
-          <span>
-            Período de espera (contratante):{" "}
-            {m.waiting_period_end_date
-              ? `termina el ${formatDateEs(m.waiting_period_end_date)}`
-              : "—"}
-          </span>
+          {/* El contratante ya no tiene período de espera (PM, 11-ago): la
+              espera es por mascota y se ve en cada ficha. */}
         </div>
 
         {/* Cancelaciones con motivo (equipo, 5-ago) */}

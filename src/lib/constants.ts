@@ -14,9 +14,13 @@ export const PLANS = {
  * variable (adopción, raza, código de embajador, reemplazo) — ver
  * src/lib/waiting-period.ts (reglas del sitio vivo, confirmadas 15-jul-2026).
  */
-export const WAITING_PERIOD_DAYS = {
-  member: 90,
-} as const;
+/**
+ * ELIMINADO el 11-ago-2026 (PM): el contratante NO tiene período de espera —
+ * al pagar es miembro, sin aprobación ni espera. La espera es POR MASCOTA
+ * (src/lib/waiting-period.ts) y arranca cuando el comité aprueba la ficha.
+ * `profiles.waiting_period_end_date` quedó como columna huérfana con fechas
+ * viejas; ya nadie la escribe ni la lee.
+ */
 
 /** Topes de reintegro en MXN por categoría. */
 export const REIMBURSEMENT_CAPS_MXN = {

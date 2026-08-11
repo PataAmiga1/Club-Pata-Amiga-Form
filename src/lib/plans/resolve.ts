@@ -222,9 +222,9 @@ export function esperasDe(beneficios: Beneficios) {
     espera_mascota_con_embajador_dias: Number(
       beneficios.espera_mascota_con_embajador_dias,
     ),
-    espera_mascota_reemplazo_dias: Number(
-      beneficios.espera_mascota_reemplazo_dias,
-    ),
+    // Sin `espera_mascota_reemplazo_dias`: el reemplazo dejó de tener días
+    // propios el 11-ago (se evalúa con las condiciones normales, sin el
+    // beneficio del embajador).
   };
 }
 

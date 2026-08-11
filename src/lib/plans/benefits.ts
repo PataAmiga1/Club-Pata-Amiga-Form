@@ -3,7 +3,6 @@ import {
   MAX_ACTIVE_PETS,
   REIMBURSEMENT_CAPS_MXN,
   REIMBURSEMENT_SLA_HOURS,
-  WAITING_PERIOD_DAYS,
   AMBASSADOR_COMMISSION_MXN,
 } from "@/lib/constants";
 
@@ -48,16 +47,12 @@ export type DefinicionBeneficio = {
 
 export const CATALOGO_BENEFICIOS = {
   // --- Períodos de espera ---------------------------------------------------
-  espera_contratante_dias: {
-    label: "Período de espera del contratante",
-    tipo: "entero",
-    unidad: "días desde el pago",
-    consumidoPor: ["reintegros"],
-    editablePor: "super_admin",
-    vinculante: true,
-    mejorSi: "menor",
-    porOmision: WAITING_PERIOD_DAYS.member,
-  },
+  // `espera_contratante_dias` se QUITÓ el 11-ago-2026: el contratante NO tiene
+  // período de espera — al pagar es miembro, sin aprobación ni espera (PM).
+  // `espera_mascota_reemplazo_dias` se QUITÓ el mismo día: el reemplazo ya no
+  // tiene días propios — se evalúa con las condiciones normales (120/150/180),
+  // solo que sin el beneficio del embajador (PM). Los snapshots viejos que aún
+  // traen estas llaves las ignoran (migración 20260811000005).
   espera_mascota_estandar_dias: {
     label: "Período de espera por mascota — estándar",
     tipo: "entero",
@@ -98,17 +93,6 @@ export const CATALOGO_BENEFICIOS = {
     mejorSi: "menor",
     porOmision: 90,
   },
-  espera_mascota_reemplazo_dias: {
-    label: "Período de espera — mascota de reemplazo",
-    tipo: "entero",
-    unidad: "días",
-    consumidoPor: ["alta de mascota"],
-    editablePor: "super_admin",
-    vinculante: true,
-    mejorSi: "menor",
-    porOmision: 180,
-  },
-
   // --- Topes de reintegro ---------------------------------------------------
   tope_gastos_veterinarios_mxn: {
     label: "Tope anual — gastos veterinarios",

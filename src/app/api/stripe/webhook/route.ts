@@ -4,7 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { reportError } from "@/lib/alerts";
-import { AMBASSADOR_COMMISSION_MXN, WAITING_PERIOD_DAYS } from "@/lib/constants";
+import { AMBASSADOR_COMMISSION_MXN } from "@/lib/constants";
 import { petWaitingPeriodDays } from "@/lib/waiting-period";
 import { crmEventoDeUsuario, marcarComoMiembro } from "@/lib/crm/sync";
 import {
@@ -12,16 +12,6 @@ import {
   esperasDe,
   tomarSnapshot,
 } from "@/lib/plans/resolve";
-import { diaEnMexicoMasDias } from "@/lib/zona-horaria";
-
-/**
- * Fecha a `days` días de hoy, en hora de México. Este webhook corre en Vercel
- * (UTC), donde "hoy" empieza a las 6 de la tarde del día anterior: con el reloj
- * del proceso, un pago de las 8 de la noche fechaba todo un día adelante.
- */
-function addDays(days: number): string {
-  return diaEnMexicoMasDias(days);
-}
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
@@ -35,10 +25,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     session.metadata?.plan_version_id,
   );
 
-  // 1. Member is ACTIVE immediately on payment
+  // 1. Member is ACTIVE immediately on payment.
+  // El contratante NO tiene período de espera (PM, 11-ago): quien compra la
+  // membresía se vuelve miembro automáticamente, sin aprobación ni espera.
+  // Antes aquí se escribía profiles.waiting_period_end_date (90 días); las
+  // fechas viejas se quedan en la columna pero ya nadie las lee.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("email, first_name, waiting_period_end_date")
+    .select("email, first_name")
     .eq("id", userId)
     .single();
 
@@ -47,14 +41,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     .update({
       membership_status: "active",
       member_since: new Date().toISOString(),
-      ...(profile?.waiting_period_end_date
-        ? {}
-        : {
-            waiting_period_end_date: addDays(
-              Number(beneficios.espera_contratante_dias) ||
-                WAITING_PERIOD_DAYS.member,
-            ),
-          }),
       ...(session.metadata?.ambassador_code
         ? { ambassador_code_used: session.metadata.ambassador_code }
         : {}),
