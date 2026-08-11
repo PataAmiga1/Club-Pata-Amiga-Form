@@ -22,7 +22,7 @@ const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
 const PET_CHIP: Record<string, { text: string; cls: string }> = {
   approved: { text: "APROBADA", cls: "bg-success-bg text-success-text" },
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
-  rejected: { text: "DENEGADA", cls: "bg-error-bg text-error-text" },
+  rejected: { text: "RECHAZADA", cls: "bg-error-bg text-error-text" },
 };
 
 /** Expediente del miembro: contacto, fiscal, mascotas, reintegros, apelaciones. */

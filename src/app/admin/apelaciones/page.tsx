@@ -77,7 +77,7 @@ export default async function AdminApelacionesPage({
     a.reimbursement_id
       ? (a.reimbursements?.rejection_reason ?? "Rechazado")
       : a.pet_id
-        ? (a.pets?.approval_notes ?? "Ficha denegada")
+        ? (a.pets?.approval_notes ?? "Ficha rechazada")
         : (a.wellness_centers?.rejection_reason ?? "Solicitud rechazada");
 
   return (

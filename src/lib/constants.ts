@@ -71,7 +71,9 @@ export const REIMBURSEMENT_SLA_HOURS = 72; // compromiso de transferencia
 export const MEMBERSHIP_FEATURES = [
   "Disponible en todo México",
   "Mantienes a tu veterinario",
-  "Incluye hasta 3 mascotas",
+  // "peludos" en vez de "mascotas" en la banda (equipo, 11-ago) — mismo
+  // orden vinculante de las 5 características.
+  "Incluye hasta 3 peludos",
   "Orientación veterinaria 24/7",
   "100% digital",
 ] as const;
