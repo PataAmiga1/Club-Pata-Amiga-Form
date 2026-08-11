@@ -160,21 +160,13 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     };
 
     if (mode === "member") {
-      // Miembro activo: nueva mascota, período de espera variable desde hoy.
-      // Si antes dio de baja una, la nueva cuenta como reemplazo (180 días).
-      const [{ count: activeCount }, { count: inactiveCount }] =
-        await Promise.all([
-          supabase
-            .from("pets")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", userId)
-            .eq("is_active", true),
-          supabase
-            .from("pets")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", userId)
-            .eq("is_active", false),
-        ]);
+      // Miembro activo: solo se valida el cupo; el período de espera (incluido
+      // el caso de reemplazo) lo determina el comité al aprobar la ficha.
+      const { count: activeCount } = await supabase
+        .from("pets")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_active", true);
       if ((activeCount ?? 0) >= MAX_ACTIVE_PETS) {
         setError(`Ya tienes ${MAX_ACTIVE_PETS} peludos activos en tu membresía.`);
         setLoading(false);
@@ -231,14 +223,16 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="grid size-[84px] flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[26px] text-teal"
+          className="relative grid size-[84px] flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[26px] text-teal"
         >
           {photoPreview ? (
+            // Absoluta: height 100% en fila auto de grid se resuelve como
+            // auto y el círculo muestra la franja superior, no el centro
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photoPreview}
               alt="Foto de tu peludo"
-              className="size-full object-cover"
+              className="absolute inset-0 size-full object-cover"
             />
           ) : (
             "+"

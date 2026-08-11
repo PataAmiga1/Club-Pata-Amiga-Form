@@ -55,11 +55,14 @@ export function ProfileMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label="Tu cuenta"
         aria-expanded={open}
-        className={`grid size-[38px] place-items-center overflow-hidden rounded-full text-sm font-bold text-white ${color}`}
+        className={`relative grid size-[38px] place-items-center overflow-hidden rounded-full text-sm font-bold text-white ${color}`}
       >
         {avatarUrl ? (
+          // La foto va absoluta: con height 100% dentro de un grid de fila
+          // auto, el alto se resuelve como auto y el círculo muestra solo la
+          // franja superior de la foto en lugar del recorte centrado.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="size-full object-cover" />
+          <img src={avatarUrl} alt="" className="absolute inset-0 size-full object-cover" />
         ) : (
           initial
         )}

@@ -135,7 +135,9 @@ export function PetFichaEditor({
             title="Foto principal — toca para cambiarla"
           >
             {photoUrl ? (
-              <img src={photoUrl} alt={pet.name} className="size-full object-cover" />
+              // Absoluta: height 100% en fila auto de grid se resuelve como
+              // auto y la foto muestra la franja superior en vez del centro
+              <img src={photoUrl} alt={pet.name} className="absolute inset-0 size-full object-cover" />
             ) : (
               "+"
             )}

@@ -291,13 +291,15 @@ export function ProfileForm({
             onClick={() => avatarInputRef.current?.click()}
             disabled={avatarBusy}
             title="Foto de perfil (opcional) — toca para cambiarla"
-            className="grid size-16 flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[22px] transition-colors hover:border-teal"
+            className="relative grid size-16 flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[22px] transition-colors hover:border-teal"
           >
             {avatarBusy ? (
               "…"
             ) : avatar ? (
+              // Absoluta: height 100% en fila auto de grid se resuelve como
+              // auto y el círculo muestra la franja superior, no el centro
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatar} alt="Tu foto de perfil" className="size-full object-cover" />
+              <img src={avatar} alt="Tu foto de perfil" className="absolute inset-0 size-full object-cover" />
             ) : (
               "📷"
             )}

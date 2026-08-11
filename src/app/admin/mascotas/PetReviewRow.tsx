@@ -24,9 +24,11 @@ export function PetReviewRow({
 }) {
   return (
     <div className="flex flex-col gap-3 rounded-[18px] bg-white p-4 shadow-[0_2px_10px_rgba(30,83,80,.05)] sm:flex-row sm:items-center">
-      <div className="grid size-14 flex-none place-items-center overflow-hidden rounded-[14px] bg-info-bg text-xl">
+      <div className="relative grid size-14 flex-none place-items-center overflow-hidden rounded-[14px] bg-info-bg text-xl">
         {pet.photoUrl ? (
-          <img src={pet.photoUrl} alt={pet.name} className="size-full object-cover" />
+          // Absoluta: height 100% en fila auto de grid se resuelve como auto
+          // y la miniatura muestra la franja superior en vez del centro
+          <img src={pet.photoUrl} alt={pet.name} className="absolute inset-0 size-full object-cover" />
         ) : pet.species === "dog" ? (
           "🐕"
         ) : (

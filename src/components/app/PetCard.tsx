@@ -70,13 +70,15 @@ export function PetCard({ pet }: { pet: PetRow }) {
       }`}
     >
       <div
-        className={`grid size-16 flex-none place-items-center overflow-hidden rounded-[16px] border-2 border-dashed text-center text-[11px] font-bold sm:size-[86px] sm:rounded-[20px] ${photoTone}`}
+        className={`relative grid size-16 flex-none place-items-center overflow-hidden rounded-[16px] border-2 border-dashed text-center text-[11px] font-bold sm:size-[86px] sm:rounded-[20px] ${photoTone}`}
       >
         {pet.photo_url ? (
+          // Absoluta: height 100% en fila auto de grid se resuelve como auto
+          // y el recorte deja de estar centrado (muestra la franja superior)
           <img
             src={pet.photo_url}
             alt={pet.name}
-            className="size-full object-cover"
+            className="absolute inset-0 size-full object-cover"
           />
         ) : (
           <>
