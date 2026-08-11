@@ -306,7 +306,7 @@ export function CentersExplorer({
               <img
                 src={selected.logoUrl}
                 alt={selected.name}
-                className="mb-3 h-[180px] w-full rounded-[14px] object-cover"
+                className="mb-3 h-[180px] w-full rounded-[14px] bg-cream object-contain"
               />
             )}
 

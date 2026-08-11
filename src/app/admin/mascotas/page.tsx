@@ -180,7 +180,9 @@ export default async function AdminMascotasPage({
                     <img
                       src={p.photo_url}
                       alt={p.name}
-                      className="h-[180px] w-full rounded-[14px] object-cover"
+                      // object-contain: el comité necesita VER la foto completa,
+                      // no un recorte (equipo: "la foto sale cortada")
+                      className="h-[180px] w-full rounded-[14px] bg-cream object-contain"
                     />
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -349,7 +351,7 @@ export default async function AdminMascotasPage({
                       <img
                         src={p.photo_url}
                         alt={p.name}
-                        className="h-40 w-full rounded-[14px] object-cover"
+                        className="h-40 w-full rounded-[14px] bg-cream object-contain"
                       />
                     )}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">

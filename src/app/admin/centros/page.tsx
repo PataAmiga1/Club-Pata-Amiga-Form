@@ -145,7 +145,7 @@ export default async function AdminCentrosPage({
                     <img
                       src={c.logo_url}
                       alt={c.name}
-                      className="h-[140px] w-full rounded-[14px] object-cover"
+                      className="h-[140px] w-full rounded-[14px] bg-cream object-contain"
                     />
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -274,7 +274,7 @@ export default async function AdminCentrosPage({
                     <img
                       src={c.logo_url}
                       alt={c.name}
-                      className="h-[140px] w-full rounded-[14px] object-cover"
+                      className="h-[140px] w-full rounded-[14px] bg-cream object-contain"
                     />
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
