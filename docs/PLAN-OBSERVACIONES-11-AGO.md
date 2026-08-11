@@ -376,6 +376,27 @@ mayor que cualquier cosa de la Fase 1. Escalar al owner de inmediato.
 
 ---
 
+## 11-bis. 🔴 ORDEN OBLIGATORIO para el merge a producción
+
+Antes de que Jorge mergee `staging` → `main`, hay que correr EN PRODUCCIÓN
+(SQL Editor del proyecto live) las migraciones del 11-ago **en este orden**:
+
+1. `20260811000001_embajador_campos_registro.sql`
+2. `20260811000002_catalogo_sepomex.sql`
+3. `20260811000003_espera_arranca_al_aprobar.sql`
+
+**Por qué es obligatorio:** el código nuevo consulta columnas que estas
+migraciones crean. Se comprobó en staging el 11-ago: con el código nuevo y sin
+la migración 3, **todos los miembros ven cero mascotas** (el select truena en
+silencio). Las tres son aditivas (`if not exists`) — no tocan ni borran datos.
+
+Aparte y SIN urgencia: el **import de los 158,034 CP** a la tabla
+`postal_codes` de producción. Si falta, no rompe nada — la ruta cae a las
+fuentes externas como hoy (sin alcaldía). Se corre con el script del repo
+cuando se quiera.
+
+---
+
 ## 12. Lo único que sigue abierto
 - **¿Hostinger todavía manda algún correo?** Define si al arreglar el SPF se quita o se deja.
 - **¿Quién administra `pataamiga.mx` en Google Workspace?** Ahí se crean los buzones.

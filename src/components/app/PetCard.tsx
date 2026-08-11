@@ -12,6 +12,7 @@ export type PetRow = {
   photo_url: string | null;
   approval_status: "pending" | "approved" | "rejected";
   waiting_period_end_date: string | null;
+  waiting_period_start_date?: string | null;
   waiting_period_bypassed: boolean;
   created_at: string;
   is_active?: boolean;
@@ -38,7 +39,11 @@ export function PetCard({ pet }: { pet: PetRow }) {
     pet.created_at,
     pet.waiting_period_end_date,
     pet.waiting_period_bypassed,
+    pet.waiting_period_start_date,
   );
+  // La espera arranca cuando el comité aprueba (PM, 11-ago): una ficha en
+  // revisión no muestra un conteo corriendo.
+  const enRevision = pet.approval_status === "pending" && !pet.waiting_period_bypassed;
   const photoTone =
     pet.approval_status === "approved"
       ? "border-[#C9E9E4] bg-info-bg text-teal"
@@ -90,6 +95,15 @@ export function PetCard({ pet }: { pet: PetRow }) {
               : "Ya no está en la manada."}{" "}
             Su recuerdo se queda contigo. 💛
           </span>
+        ) : enRevision ? (
+        <div className="flex flex-col gap-[5px]">
+          <span className="text-[11.5px] text-ink-tertiary">
+            Su período de espera empieza cuando el comité apruebe su ficha ·{" "}
+            <Link href="/app/peludos" className="font-semibold text-teal-deep">
+              Completar documentos
+            </Link>
+          </span>
+        </div>
         ) : (
         <div className="flex flex-col gap-[5px]">
           <div className="flex justify-between text-[11.5px] text-ink-tertiary">

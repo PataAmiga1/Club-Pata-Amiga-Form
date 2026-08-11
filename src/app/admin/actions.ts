@@ -20,6 +20,7 @@ import { sendTemplatedEmail } from "@/lib/email/send";
 import { getStripe } from "@/lib/stripe";
 import { getTemplateDef } from "@/lib/email/templates";
 import { crmEventoDeUsuario, marcarComoMiembro } from "@/lib/crm/sync";
+import { iniciarEsperaDeMascota } from "@/lib/pets/iniciar-espera";
 
 async function requireAdmin(superOnly = false) {
   const supabase = await createClient();
@@ -155,6 +156,11 @@ export async function resolvePet(
         : { approval_status: "rejected", approval_notes: decision.notes },
     )
     .eq("id", petId);
+
+  // El reloj de la espera arranca AQUÍ, con la aprobación del comité (regla
+  // de la PM, 11-ago) — no al registrar ni al pagar. Guarda inicio y fin
+  // reales; la pantalla ya no adivina el inicio con created_at.
+  if (decision.approve) await iniciarEsperaDeMascota(admin, petId);
 
   // CRM: con la mascota aprobada y la suscripción activa, la tarjeta llega a
   // "Miembro activo" — la etapa que en LynSales está en cero. Va sin actorId
@@ -779,6 +785,9 @@ export async function resolveAppeal(
         .from("pets")
         .update({ approval_status: "approved", approval_notes: null })
         .eq("id", appeal.pet_id);
+      // Aprobada por apelación = aprobada: su espera arranca hoy, igual que
+      // en resolvePet (los dos caminos comparten la misma regla).
+      await iniciarEsperaDeMascota(admin, appeal.pet_id);
       outcome = `la ficha de ${pet?.name ?? "tu mascota"} quedó aprobada`;
     } else if (appeal.center_id) {
       await admin
@@ -1149,6 +1158,8 @@ export async function bypassWaitingPeriod(petId: string) {
       // Hoy en México: forzar el fin de la espera no puede dejar una fecha de
       // mañana solo porque se hizo después de las 6 de la tarde.
       waiting_period_end_date: hoyEnMexico(),
+      // Consistencia con la regla nueva: si nunca corrió espera, inicio = fin.
+      waiting_period_start_date: hoyEnMexico(),
     })
     .eq("id", petId);
   revalidatePath("/admin");

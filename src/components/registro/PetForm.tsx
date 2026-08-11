@@ -13,10 +13,6 @@ import {
   PET_COLORS,
   BREED_CONDITIONS,
 } from "@/data/pet-catalogs";
-import {
-  petWaitingPeriodDays,
-  waitingPeriodEndDate,
-} from "@/lib/waiting-period";
 
 type Species = "dog" | "cat";
 
@@ -183,15 +179,10 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
         setLoading(false);
         return;
       }
-      const days = petWaitingPeriodDays({
-        isAdopted: adopted,
-        breed,
-        isReplacement: (inactiveCount ?? 0) > 0,
-      });
-      const { error: saveError } = await supabase.from("pets").insert({
-        ...petData,
-        waiting_period_end_date: waitingPeriodEndDate(days),
-      });
+      // La espera arranca cuando el COMITÉ APRUEBA la ficha (PM, 11-ago), no
+      // al registrar: la fecha la fija resolvePet vía iniciarEsperaDeMascota.
+      // Mientras la ficha está en revisión no corre ningún conteo.
+      const { error: saveError } = await supabase.from("pets").insert(petData);
       if (saveError) {
         setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
         setLoading(false);

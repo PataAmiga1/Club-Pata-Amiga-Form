@@ -28,7 +28,7 @@ export default async function PetFichaPage({
     supabase
       .from("pets")
       .select(
-        "id, user_id, name, species, breed, sex, age_years, age_months, coat_color, nose_color, eye_color, is_adopted, adoption_story, photo_url, gallery_photos, is_senior, vet_certificate_url, approval_status, approval_notes, info_requested, waiting_period_end_date, waiting_period_bypassed, created_at, is_active, deactivation_reason, deactivated_at",
+        "id, user_id, name, species, breed, sex, age_years, age_months, coat_color, nose_color, eye_color, is_adopted, adoption_story, photo_url, gallery_photos, is_senior, vet_certificate_url, approval_status, approval_notes, info_requested, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at, is_active, deactivation_reason, deactivated_at",
       )
       .eq("id", id)
       .eq("user_id", user.id)
@@ -45,6 +45,7 @@ export default async function PetFichaPage({
     pet.created_at,
     pet.waiting_period_end_date,
     pet.waiting_period_bypassed,
+    pet.waiting_period_start_date,
   );
   const chip = STATUS_CHIP[pet.approval_status] ?? STATUS_CHIP.pending;
   const isMixed = isMixedBreedName(pet.breed);

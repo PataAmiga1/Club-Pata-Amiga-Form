@@ -34,23 +34,36 @@ export type WaitingProgress = {
 
 /**
  * Progress of a pet's waiting period shown as "38 / 180 días".
- * El período es variable por mascota (ver src/lib/waiting-period.ts), así que
- * el total se deriva de sus propias fechas: registro → waiting_period_end_date.
+ * El período es variable por mascota (ver src/lib/waiting-period.ts).
+ *
+ * El inicio sale de `waiting_period_start_date` — el día en que el comité
+ * APROBÓ la ficha (regla de la PM, 11-ago). `createdAt` queda solo como
+ * respaldo para mascotas aprobadas antes de esa regla (sin backfill).
+ *
+ * Por qué existe el inicio guardado: antes se adivinaba con `created_at`, y
+ * si la fecha fin se fijaba días después de crear la ficha (p. ej. al pagar),
+ * esa brecha aparecía como días "transcurridos" fantasma — el bug de los
+ * "13 días" en una mascota recién registrada.
  */
 export function waitingProgress(
   createdAt: string | null,
   endDate: string | null,
   bypassed: boolean,
+  startDate?: string | null,
 ): WaitingProgress {
   const FALLBACK_TOTAL = 180;
   if (!endDate) {
-    // Sin fecha aún (pre-pago): mostrar el estándar sin avance
+    // Sin fecha aún (la espera arranca cuando el comité aprueba)
     return bypassed
       ? { total: FALLBACK_TOTAL, elapsed: FALLBACK_TOTAL, done: true, pct: 100 }
       : { total: FALLBACK_TOTAL, elapsed: 0, done: false, pct: 0 };
   }
   const end = new Date(`${endDate}T12:00:00`).getTime();
-  const start = createdAt ? new Date(createdAt).getTime() : end - FALLBACK_TOTAL * MS_PER_DAY;
+  const start = startDate
+    ? new Date(`${startDate}T12:00:00`).getTime()
+    : createdAt
+      ? new Date(createdAt).getTime()
+      : end - FALLBACK_TOTAL * MS_PER_DAY;
   const total = Math.max(1, Math.round((end - start) / MS_PER_DAY));
   if (bypassed) return { total, elapsed: total, done: true, pct: 100 };
   const remaining = Math.ceil((end - Date.now()) / MS_PER_DAY);

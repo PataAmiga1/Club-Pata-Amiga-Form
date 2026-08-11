@@ -23,7 +23,7 @@ export default async function ReviewPage({
   const { data: req } = await admin
     .from("reimbursements")
     .select(
-      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
+      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
     )
     .eq("id", id)
     .single();
@@ -42,6 +42,7 @@ export default async function ReviewPage({
     age_years: number | null;
     approval_status: string;
     waiting_period_end_date: string | null;
+    waiting_period_start_date: string | null;
     waiting_period_bypassed: boolean;
     created_at: string;
   };
@@ -68,6 +69,7 @@ export default async function ReviewPage({
     pet.created_at,
     pet.waiting_period_end_date,
     pet.waiting_period_bypassed,
+    pet.waiting_period_start_date,
   );
   const cap = REIMBURSEMENT_CAPS_MXN[req.category as keyof typeof REIMBURSEMENT_CAPS_MXN];
 

@@ -61,9 +61,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     })
     .eq("id", userId);
 
-  // 2. Start waiting periods for pets that don't have one yet.
-  // Días variables por mascota (reglas del sitio vivo): adoptado mestizo 120,
-  // adoptado de raza 150, estándar 180; con código de embajador válido, 90.
+  // 2. Los días de espera de cada mascota — SOLO para informarlos en el
+  // correo de bienvenida. La fecha real ya NO se escribe aquí: el reloj
+  // arranca cuando el comité APRUEBA la ficha (regla de la PM, 11-ago;
+  // lo fija resolvePet vía iniciarEsperaDeMascota). Escribirla al pagar era
+  // parte del bug de los "13 días transcurridos": si el pago llegaba días
+  // después de crear la ficha, esa brecha aparecía como avance fantasma.
   const hasReferral = Boolean(session.metadata?.ambassador_code);
   const { data: pets } = await supabase
     .from("pets")
@@ -82,10 +85,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       esperasDe(beneficios),
     );
     petDays.set(pet.id, days);
-    await supabase
-      .from("pets")
-      .update({ waiting_period_end_date: addDays(days) })
-      .eq("id", pet.id);
   }
 
   // 3. Record the subscription.
@@ -197,7 +196,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     await sendTemplatedEmail("welcome", profile.email, {
       firstName: profile.first_name ?? "",
       petNotice: firstPet
-        ? `<strong>${firstPet.name}</strong> entra a revisión del comité y su período de espera de ${petDays.get(firstPet.id) ?? 180} días corre desde hoy.`
+        ? `<strong>${firstPet.name}</strong> entra a revisión del comité. En cuanto su ficha sea aprobada empezará su período de espera de ${petDays.get(firstPet.id) ?? 180} días.`
         : "",
     });
   }

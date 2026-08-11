@@ -34,7 +34,7 @@ export default async function AppHome() {
     supabase
       .from("pets")
       .select(
-        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_bypassed, created_at",
+        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
@@ -67,8 +67,12 @@ export default async function AppHome() {
   const availablePet = petList.find(
     (p) =>
       p.approval_status === "approved" &&
-      waitingProgress(p.created_at, p.waiting_period_end_date, p.waiting_period_bypassed)
-        .done,
+      waitingProgress(
+        p.created_at,
+        p.waiting_period_end_date,
+        p.waiting_period_bypassed,
+        p.waiting_period_start_date,
+      ).done,
   );
 
   // Activity feed derived from real records — cronológico, de lo más
