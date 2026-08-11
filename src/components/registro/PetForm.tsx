@@ -304,18 +304,27 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           <option value="female">Hembra</option>
         </SelectField>
       </div>
+      {/* Párrafos separados (equipo, 11-ago). El TEXTO no se toca: el tono lo
+          está revisando Cipa con Fer Fierro — aquí solo cambia el formato. */}
       {breedConditions && (
-        <div className="rounded-[12px] bg-info-bg px-4 py-3 text-[13px] leading-relaxed text-info-text">
-          💙 Sabemos que, como muchas otras razas, los {breed.trim()} pueden
-          tener mayor predisposición a desarrollar algunas condiciones de
-          salud, como {breedConditions}. En Pata Amiga creemos que la
-          confianza comienza con la transparencia. Por eso, es importante que
-          sepas que nuestra membresía está diseñada para acompañarte ante
-          imprevistos y accidentes. Actualmente, no contempla reintegros
-          relacionados con enfermedades genéticas o hereditarias. Nuestro
-          compromiso es brindarte claridad desde el primer día para que
-          siempre sepas cómo funciona tu membresía y puedas aprovecharla al
-          máximo.
+        <div className="flex flex-col gap-2.5 rounded-[12px] bg-info-bg px-4 py-3 text-[13px] leading-relaxed text-info-text">
+          <p>
+            💙 Sabemos que, como muchas otras razas, los {breed.trim()} pueden
+            tener mayor predisposición a desarrollar algunas condiciones de
+            salud, como {breedConditions}.
+          </p>
+          <p>
+            En Pata Amiga creemos que la confianza comienza con la
+            transparencia. Por eso, es importante que sepas que nuestra
+            membresía está diseñada para acompañarte ante imprevistos y
+            accidentes. Actualmente, no contempla reintegros relacionados con
+            enfermedades genéticas o hereditarias.
+          </p>
+          <p>
+            Nuestro compromiso es brindarte claridad desde el primer día para
+            que siempre sepas cómo funciona tu membresía y puedas aprovecharla
+            al máximo.
+          </p>
         </div>
       )}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
