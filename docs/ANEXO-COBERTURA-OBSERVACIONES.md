@@ -14,7 +14,7 @@ reglas de negocio ya cerradas.
 
 | # | Observación | Fuente | Dónde entra |
 |---|---|---|---|
-| A1 | **El certificado de mascota senior no se puede subir durante el alta.** Hay que "guardar peludo" y luego editarlo para poder subirlo. | Doc equipo | Fase 2 · flujo de miembro (2.2) — es parte del alta de mascota |
+| A1 | ~~El certificado senior no se puede subir durante el alta~~ → ✅ **YA EXISTE** (verificado 11-ago: el aviso senior del alta dice "Puedes subirlo aquí mismo o después" y trae la subida). Se arregló el 5-ago; **reprobar**, no reconstruir. | Doc equipo | — |
 | A2 | **Falta poder subir foto de perfil** del usuario (el círculo marcado en rojo en edición de información personal). | Doc equipo | Fase 3 |
 | A3 | **Falta la opción "cambiar contraseña"** en el perfil del usuario. | Doc equipo | Fase 2 · va junto con el trabajo de cuentas (2.1) |
 | A4 | **Revisar qué documentos de perfil se exigen realmente** — el sistema dice "faltan" sin que quede claro cuáles. | Doc equipo | Fase 2 · junto con "completar documentos" → "en revisión" |
