@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { RegistroHeader } from "@/components/registro/Header";
 import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
@@ -12,6 +13,13 @@ import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
 
+// Los textos legales pesan miles de líneas: el popup se carga SOLO cuando
+// alguien lo abre, no viaja con la página de registro.
+const LegalPopup = dynamic(
+  () => import("@/components/legal/LegalPopup").then((m) => m.LegalPopup),
+  { ssr: false },
+);
+
 export default function RegistroPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -21,6 +29,8 @@ export default function RegistroPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmEmail, setConfirmEmail] = useState(false);
+  // Popup de legales (equipo, 10-ago): null = cerrado
+  const [legalSlug, setLegalSlug] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -199,25 +209,33 @@ export default function RegistroPage() {
                   <GoogleIcon />
                   Continuar con Google
                 </button>
+                {/* Popup, no navegación: los legales se leen aquí mismo y
+                    traen todos los documentos (equipo, 10-ago) */}
                 <p className="text-center text-[12.5px] leading-normal text-ink-tertiary">
                   Al continuar aceptas los{" "}
-                  <a
-                    href="/legales/terminos-y-condiciones"
-                    target="_blank"
+                  <button
+                    type="button"
+                    onClick={() => setLegalSlug("terminos-y-condiciones")}
                     className="underline"
                   >
                     Términos y condiciones
-                  </a>{" "}
+                  </button>{" "}
                   y el{" "}
-                  <a
-                    href="/legales/aviso-de-privacidad"
-                    target="_blank"
+                  <button
+                    type="button"
+                    onClick={() => setLegalSlug("aviso-de-privacidad")}
                     className="underline"
                   >
                     Aviso de privacidad
-                  </a>
+                  </button>
                   .
                 </p>
+                {legalSlug && (
+                  <LegalPopup
+                    initialSlug={legalSlug}
+                    onClose={() => setLegalSlug(null)}
+                  />
+                )}
               </>
             )}
           </form>
