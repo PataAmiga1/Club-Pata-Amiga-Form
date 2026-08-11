@@ -12,7 +12,7 @@ import { RedesCard } from "./RedesCard";
 import { BajaVoluntariaCard } from "./BajaVoluntariaCard";
 import { ProfileMenu, type DashboardEntry } from "@/components/app/ProfileMenu";
 import { AppealButton } from "@/components/app/AppealButton";
-import { APPEAL_MAX_PER_SUBJECT } from "@/lib/constants";
+import { CENTER_APPEAL_MAX } from "@/lib/constants";
 
 export const metadata = { title: "Dashboard de centro aliado · Club Pata Amiga" };
 
@@ -155,21 +155,87 @@ export default async function CentroDashboardPage() {
     const pendingAppeal = (centerAppeals ?? []).find(
       (a) => a.status === "pending",
     );
+    // En revisión: el centro ya puede completar su perfil (logo, beneficio,
+    // servicios, sucursales, redes, contraseña). Solo no aparece en el
+    // directorio. Antes esta pantalla era un callejón sin salida (equipo, 11-ago).
+    const enRevision = center.status === "pending";
+    const { data: pendingLocations } = enRevision
+      ? await admin
+          .from("wellness_center_locations")
+          .select("id, address, colony, city, state, postal_code, phone")
+          .eq("center_id", center.id)
+          .order("created_at", { ascending: true })
+      : { data: null };
+
     return (
-      <div className="min-h-dvh bg-cream">
+      <div className="min-h-dvh bg-cream pb-12">
         {header}
-        <div className="flex flex-col items-center gap-4 px-5 py-12">
+        <div className="mx-auto flex w-full max-w-[980px] flex-col items-center gap-5 px-5 py-8 sm:px-8">
           <StatusScreen
             name={center.name}
             status={center.status as "pending" | "rejected" | "deactivated"}
             reason={center.rejection_reason}
           />
+          {enRevision && (
+            <>
+              <p className="text-center text-[13.5px] text-ink-secondary">
+                Mientras tanto puedes dejar listo el perfil de tu centro — así,
+                en cuanto te aprobemos, apareces completo en el directorio.
+              </p>
+              <div className="grid w-full items-start gap-4 lg:grid-cols-2">
+                <CenterInfoCard
+                  initialLogoUrl={center.logo_url}
+                  initialBenefit={center.member_benefit}
+                  initialPhone={center.phone}
+                  initialWebsite={center.website}
+                />
+                <ServiciosCard
+                  initialServices={center.services ?? []}
+                  locations={(pendingLocations ?? []) as LocationRow[]}
+                />
+                <RedesCard
+                  initial={
+                    (center.social_links ?? null) as Record<
+                      string,
+                      string
+                    > | null
+                  }
+                />
+                <ChangePasswordCard />
+              </div>
+              <div className="w-full rounded-[18px] border-[1.5px] border-dashed border-border-input bg-white/60 p-5">
+                <span className="text-[13px] font-semibold text-ink-title">
+                  Se activa cuando el comité apruebe tu centro
+                </span>
+                <ul className="mt-3 flex flex-col gap-2">
+                  {[
+                    { icon: "📍", label: "Aparecer en el directorio de centros" },
+                    { icon: "🎁", label: "Publicar promociones para miembros" },
+                    { icon: "💳", label: "Pagos de Pata Amiga por servicios" },
+                  ].map((l) => (
+                    <li
+                      key={l.label}
+                      className="flex items-center gap-2.5 text-[14px] text-ink-placeholder"
+                    >
+                      <span className="opacity-40" aria-hidden>
+                        {l.icon}
+                      </span>
+                      {l.label}
+                      <span className="ml-auto text-[11px] font-semibold uppercase tracking-wide text-ink-placeholder">
+                        Bloqueado
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
           {center.status === "rejected" &&
             (pendingAppeal ? (
               <span className="rounded-full bg-info-bg px-3 py-1 text-[11px] font-extrabold tracking-[.04em] text-info-text">
                 APELACIÓN {pendingAppeal.folio} EN REVISIÓN
               </span>
-            ) : (centerAppeals ?? []).length < APPEAL_MAX_PER_SUBJECT ? (
+            ) : (centerAppeals ?? []).length < CENTER_APPEAL_MAX ? (
               <div className="w-full max-w-[520px]">
                 <AppealButton
                   centerId={center.id}

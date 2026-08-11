@@ -6,6 +6,32 @@
   --foreground: #3d524f;
 }
 
+/**
+ * Campos de fecha en iOS (equipo, "alinear la caja" de fecha de nacimiento).
+ *
+ * En Chrome de escritorio el input[type=date] mide exactamente igual que los
+ * demás campos (287×48, mismo padding) — ahí no se reproduce. En Safari de iOS
+ * el valor se centra dentro de la caja mientras todos los demás campos van a la
+ * izquierda, y además iOS le mete su propio estilo nativo: se ve desalineado
+ * aunque la caja esté en su lugar.
+ *
+ * `::-webkit-date-and-time-value` es el que alinea el TEXTO; `appearance:none`
+ * quita el estilo nativo para que respete el alto de los demás campos.
+ */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+/* iOS centra verticalmente el contenido: lo empuja al mismo eje que el resto. */
+input[type="date"]::-webkit-datetime-edit {
+  display: flex;
+  align-items: center;
+}
+
 @theme {
   /* Backgrounds */
   --color-cream: #faf7f1;

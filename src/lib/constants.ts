@@ -47,6 +47,12 @@ export const MAX_ACTIVE_PETS = 3;
 export const PET_GALLERY_MAX = 5;
 /** Apelaciones máximas por sujeto (regla del sistema anterior). */
 export const APPEAL_MAX_PER_SUBJECT = 2;
+/**
+ * Centros de bienestar: UNA sola apelación (junta 10-ago 01:37:40, confirmado
+ * por Pablo el 11-ago). Distinto de miembros y mascotas, que conservan 2.
+ * Los embajadores NO pueden apelar — por eso no aparecen aquí.
+ */
+export const CENTER_APPEAL_MAX = 1;
 export const SENIOR_PET_AGE_YEARS = 10; // requiere certificado veterinario
 export const REIMBURSEMENT_SLA_HOURS = 72; // compromiso de transferencia
 

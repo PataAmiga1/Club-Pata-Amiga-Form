@@ -24,6 +24,14 @@ export type CenterRegistrationInput = {
   services: string[];
   memberBenefit: string;
   locations: CenterLocationInput[];
+  /**
+   * Contraseña de la cuenta que se crea AL APLICAR (equipo, 11-ago).
+   * Antes la solicitud se guardaba sin cuenta: el centro no podía entrar a su
+   * perfil mientras estaba en revisión, y su "recuperar contraseña" no mandaba
+   * nada porque no existía usuario que recuperar. Solo es opcional cuando ya
+   * hay sesión iniciada.
+   */
+  password?: string;
 };
 
 const VALID_SERVICES = new Set(Object.keys(WELLNESS_SERVICES));
@@ -76,9 +84,9 @@ export async function registerCenter(input: CenterRegistrationInput) {
     };
   }
 
-  // Con sesión iniciada, el centro queda ligado a la cuenta para que su
-  // dashboard (/centro) abra tras la aprobación. Sin sesión, se liga por
-  // correo al iniciar sesión (login-destination).
+  // Con sesión iniciada, el centro queda ligado a esa cuenta. Sin sesión, la
+  // cuenta se CREA aquí mismo (equipo, 11-ago) para que el centro pueda entrar
+  // a su perfil aunque el comité aún no resuelva.
   const supabase = await createClient();
   const {
     data: { user },
@@ -102,10 +110,58 @@ export async function registerCenter(input: CenterRegistrationInput) {
     }
   }
 
+  // ===== Cuenta al aplicar (equipo, 11-ago) =====
+  let centerUserId = user?.id ?? null;
+
+  if (!centerUserId) {
+    const password = input.password ?? "";
+    if (password.length < 8)
+      return { error: "Tu contraseña debe tener al menos 8 caracteres." };
+
+    // ¿Ese correo ya tiene cuenta? No la ligamos en automático: sería
+    // apropiarse de la cuenta de alguien más con solo escribir su correo.
+    const { data: existingProfile } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .maybeSingle();
+    if (existingProfile) {
+      return {
+        error:
+          "Ese correo ya tiene una cuenta en Pata Amiga. Inicia sesión y vuelve a enviar tu solicitud desde ahí.",
+      };
+    }
+
+    const { data: created, error: createError } =
+      await admin.auth.admin.createUser({
+        email,
+        password,
+        // Confirmado de entrada: la verificación de correo no debe trabar el
+        // acceso al perfil. El filtro real es la revisión del comité.
+        email_confirm: true,
+        user_metadata: { phone, first_name: contactName },
+      });
+    if (createError || !created?.user) {
+      await notifyTeam(
+        "notify_centers",
+        "Falló crear la cuenta de un centro ⚠️",
+        `<p>No se pudo crear la cuenta de <strong>${email}</strong> al enviar su solicitud.</p>
+         <p>${createError?.message ?? "sin detalle"}</p>`,
+      );
+      return { error: "No pudimos crear tu cuenta. Intenta de nuevo." };
+    }
+    centerUserId = created.user.id;
+  }
+
+  /** Deshace la cuenta recién creada si la solicitud no llega a guardarse. */
+  const rollbackAccount = async () => {
+    if (!user && centerUserId) await admin.auth.admin.deleteUser(centerUserId);
+  };
+
   const { data: center, error } = await admin
     .from("wellness_centers")
     .insert({
-      user_id: user?.id ?? null,
+      user_id: centerUserId,
       name,
       contact_name: contactName,
       email,
@@ -117,14 +173,17 @@ export async function registerCenter(input: CenterRegistrationInput) {
     })
     .select("id")
     .single();
-  if (error || !center)
+  if (error || !center) {
+    await rollbackAccount();
     return { error: "No pudimos guardar tu solicitud. Intenta de nuevo." };
+  }
 
   const { error: locError } = await admin
     .from("wellness_center_locations")
     .insert(locations.map((l) => ({ ...l, center_id: center.id })));
   if (locError) {
     await admin.from("wellness_centers").delete().eq("id", center.id);
+    await rollbackAccount();
     return { error: "No pudimos guardar las ubicaciones. Intenta de nuevo." };
   }
 

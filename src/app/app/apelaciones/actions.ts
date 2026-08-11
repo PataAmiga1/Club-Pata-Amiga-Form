@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
-import { APPEAL_MAX_PER_SUBJECT } from "@/lib/constants";
+import { APPEAL_MAX_PER_SUBJECT, CENTER_APPEAL_MAX } from "@/lib/constants";
 import { beneficiosDeUsuario } from "@/lib/plans/resolve";
 
 export type AppealInput = {
@@ -85,11 +85,18 @@ export async function submitAppeal(input: AppealInput) {
   if ((previous ?? []).some((a) => a.status === "pending"))
     return { error: "Ya hay una apelación en revisión para este caso." };
 
-  // El máximo sale del plan que contrató este miembro, no de una constante
-  // global: quien contrató 2 apelaciones conserva 2 aunque el plan cambie.
-  const beneficios = await beneficiosDeUsuario(admin, user.id);
-  const maxApelaciones =
-    Number(beneficios.apelaciones_max) || APPEAL_MAX_PER_SUBJECT;
+  // Los centros de bienestar apelan UNA sola vez y no dependen de un plan
+  // contratado (junta 10-ago). Para miembros y mascotas el máximo sale del plan
+  // que contrató esa persona, no de una constante global: quien contrató 2
+  // apelaciones conserva 2 aunque el plan cambie.
+  let maxApelaciones: number;
+  if (input.centerId) {
+    maxApelaciones = CENTER_APPEAL_MAX;
+  } else {
+    const beneficios = await beneficiosDeUsuario(admin, user.id);
+    maxApelaciones =
+      Number(beneficios.apelaciones_max) || APPEAL_MAX_PER_SUBJECT;
+  }
   if ((previous ?? []).length >= maxApelaciones)
     return {
       error: `Este caso ya agotó sus ${maxApelaciones} apelaciones. Escríbenos a soporte si tienes información nueva.`,
