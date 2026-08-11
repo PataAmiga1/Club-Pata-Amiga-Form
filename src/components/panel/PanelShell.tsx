@@ -18,6 +18,7 @@ export function PanelShell({
   session,
   nav,
   navMobile,
+  bell,
   children,
 }: {
   portal: Portal;
@@ -26,6 +27,11 @@ export function PanelShell({
   nav: React.ReactNode;
   /** Menú móvil (chips horizontales bajo la barra superior). */
   navMobile: React.ReactNode;
+  /**
+   * Campanita de notificaciones, arriba a la derecha (equipo 07-ago; Pablo
+   * 11-ago: vive aquí Y en la barra). Opcional — ventas no la usa todavía.
+   */
+  bell?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const meta = PORTALS[portal];
@@ -49,6 +55,7 @@ export function PanelShell({
             <span className="truncate text-[10px] font-extrabold tracking-[.1em] text-white/50">
               {meta.label}
             </span>
+            {bell}
             <ProfileMenu
               displayName={session.displayName}
               roleLabel={session.roleLabel}
@@ -91,7 +98,16 @@ export function PanelShell({
 
       {/* min-w-0: sin esto las tablas anchas empujan la retícula y el menú
           lateral se encima con el contenido al achicar la ventana. */}
-      <main className="min-w-0">{children}</main>
+      <main className="relative min-w-0">
+        {/* En escritorio (sin barra superior) la campanita flota arriba a la
+            derecha del contenido — donde la pidió el equipo. */}
+        {bell && (
+          <div className="absolute right-5 top-4 z-40 hidden rounded-full bg-teal-dark p-1 shadow-[0_2px_10px_rgba(30,83,80,.25)] md:block">
+            {bell}
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }
