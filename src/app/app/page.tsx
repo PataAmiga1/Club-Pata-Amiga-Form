@@ -34,7 +34,7 @@ export default async function AppHome() {
     supabase
       .from("pets")
       .select(
-        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at",
+        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at, is_senior, vet_certificate_url, info_requested",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
@@ -87,7 +87,9 @@ export default async function AppHome() {
     activityRaw.push({
       icon: "🐾",
       tone: "bg-info-bg",
-      text: `Registraste a ${pet.name} — su período de espera comenzó`,
+      // La espera ya NO comienza al registrar: arranca cuando el comité
+      // aprueba la ficha (PM, 11-ago).
+      text: `Registraste a ${pet.name} — su ficha entró a revisión del comité`,
       at: new Date(pet.created_at),
     });
   }
