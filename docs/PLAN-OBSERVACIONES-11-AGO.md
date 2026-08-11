@@ -394,6 +394,7 @@ Antes de que Jorge mergee `staging` → `main`, hay que correr EN PRODUCCIÓN
 4. `20260811000004_senior_regla_global.sql` *(limpieza de datos, segura)*
 5. `20260811000005_contratante_sin_espera.sql` *(limpieza de datos, segura)*
 6. `20260811000006_pasaporte_documento.sql` *(valor 'passport' en el enum — sin él, subir pasaporte truena)*
+7. `20260811000007_avatar_miembro.sql` *(columna avatar_url + bucket `avatars` con sus políticas — sin él, subir la foto de perfil truena)*
 
 **Por qué es obligatorio:** el código nuevo consulta columnas que estas
 migraciones crean. Se comprobó en staging el 11-ago: con el código nuevo y sin
