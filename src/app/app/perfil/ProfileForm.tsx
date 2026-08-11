@@ -26,14 +26,14 @@ type Initial = {
   number_int?: string | null;
 };
 
-function IneUpload({
+function DocUpload({
   side,
   label,
   fileName,
   onUploaded,
   userId,
 }: {
-  side: "ine_front" | "ine_back";
+  side: "ine_front" | "ine_back" | "passport";
   label: string;
   fileName: string | null;
   onUploaded: (name: string) => void;
@@ -106,13 +106,12 @@ function IneUpload({
 export function ProfileForm({
   userId,
   initial,
-  ineFront,
-  ineBack,
+  passport,
 }: {
   userId: string;
   initial: Initial;
-  ineFront: string | null;
-  ineBack: string | null;
+  /** Nombre de archivo del pasaporte ya subido (solo extranjeros). */
+  passport: string | null;
 }) {
   const router = useRouter();
   // Nombre desglosado (equipo, 5-ago): nombres, apellido paterno y materno
@@ -136,10 +135,22 @@ export function ProfileForm({
   const [street, setStreet] = useState(initial.street ?? "");
   const [numExt, setNumExt] = useState(initial.number_ext ?? "");
   const [numInt, setNumInt] = useState(initial.number_int ?? "");
-  const [frontFile, setFrontFile] = useState(ineFront);
-  const [backFile, setBackFile] = useState(ineBack);
+  const [passportFile, setPassportFile] = useState(passport);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Extranjeros: suben PASAPORTE en lugar de CURP — no pueden tener CURP
+  // (equipo, 11-ago). Nacionalidad vacía se trata como mexicana.
+  const esExtranjero = (() => {
+    const n = nationality
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+    return (
+      n.length > 0 && !["mexicana", "mexicano", "mexico", "mx"].includes(n)
+    );
+  })();
 
   const curpValid = validateCurp(curp).isValid;
   // Cruce CURP ↔ datos: SOLO MARCA, no bloquea (decisión de Pablo, 5-ago)
@@ -173,13 +184,15 @@ export function ProfileForm({
   }, [cp]);
 
   // Nacionalidad y fecha de nacimiento son obligatorias para el 100%
-  // (decisión de Pablo, 5-ago). El INE es OPCIONAL y NO cuenta para el 100%
-  // (decisión de Pablo, 10-ago): pedirlo de entrada frenaba el registro.
+  // (decisión de Pablo, 5-ago). El INE se dejó de pedir a miembros por
+  // completo (equipo, 11-ago). La identificación vale 25%: CURP válida para
+  // mexicanos, pasaporte subido para extranjeros.
   // OJO con los Boolean(): sin ellos, un string en el && produce
   // Number("Av...") = NaN (hallazgo del equipo).
+  const identidadOk = esExtranjero ? Boolean(passportFile) : curpValid;
   const completion =
     25 * Number(firstName.trim().length > 0 && lastName.trim().length > 0) +
-    25 * Number(curpValid) +
+    25 * Number(identidadOk) +
     15 * Number(/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) +
     10 * Number(nationality.trim().length > 0) +
     25 * Number(Boolean(cp.length === 5 && colony && street));
@@ -197,7 +210,9 @@ export function ProfileForm({
         birth_date: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
         nationality: nationality.trim() || null,
         phone: phone || null,
-        curp: curp ? curp.toUpperCase() : null,
+        // Extranjeros no tienen CURP: si cambió su nacionalidad después de
+        // haber tecleado una, no se guarda basura.
+        curp: esExtranjero ? null : curp ? curp.toUpperCase() : null,
         postal_code: cp || null,
         state: stateMx || null,
         city: city || null,
@@ -305,33 +320,36 @@ export function ProfileForm({
             onChange={setPhone}
             hint="10 dígitos, sin lada internacional."
           />
-          <TextField
-            label="CURP"
-            placeholder="18 caracteres"
-            value={curp}
-            maxLength={18}
-            onChange={(e) => setCurp(e.target.value.toUpperCase())}
-            style={{ letterSpacing: ".06em" }}
-            rightSlot={
-              curp.length > 0 ? (
-                curpValid ? (
-                  <span className="text-sm text-success-text">✓</span>
-                ) : (
-                  <span className="text-xs text-error-text">
-                    {curp.length}/18
-                  </span>
-                )
-              ) : undefined
-            }
-            hint={
-              curp.length > 0 && !curpValid
-                ? "Revisa el formato de tu CURP."
-                : undefined
-            }
-          />
+          {/* Extranjeros no tienen CURP: en su lugar suben pasaporte (abajo) */}
+          {!esExtranjero && (
+            <TextField
+              label="CURP"
+              placeholder="18 caracteres"
+              value={curp}
+              maxLength={18}
+              onChange={(e) => setCurp(e.target.value.toUpperCase())}
+              style={{ letterSpacing: ".06em" }}
+              rightSlot={
+                curp.length > 0 ? (
+                  curpValid ? (
+                    <span className="text-sm text-success-text">✓</span>
+                  ) : (
+                    <span className="text-xs text-error-text">
+                      {curp.length}/18
+                    </span>
+                  )
+                ) : undefined
+              }
+              hint={
+                curp.length > 0 && !curpValid
+                  ? "Revisa el formato de tu CURP."
+                  : undefined
+              }
+            />
+          )}
         </div>
         {/* El cruce CURP ↔ datos solo avisa, nunca bloquea (Pablo, 5-ago) */}
-        {cruceCurp && !cruceCurp.coincide && (
+        {!esExtranjero && cruceCurp && !cruceCurp.coincide && (
           <div className="rounded-[12px] bg-warning-bg px-4 py-3 text-[12.5px] leading-normal text-warning-text">
             ⚠ Tu CURP no parece coincidir con{" "}
             {cruceCurp.discrepancias.join(" ni con ")}. Revísalos por favor —
@@ -410,35 +428,30 @@ export function ProfileForm({
         </div>
       </section>
 
-      <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
-        <span className="flex flex-wrap items-center gap-2 text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
-          TU IDENTIFICACIÓN (INE)
-          <span className="rounded-full bg-cream px-2.5 py-[3px] text-[10.5px] font-extrabold tracking-normal text-ink-tertiary">
-            OPCIONAL
+      {/* El INE se dejó de pedir a los miembros (equipo, 11-ago). Los
+          embajadores lo conservan — su formulario es aparte. Los extranjeros
+          suben PASAPORTE: no pueden tener CURP. */}
+      {esExtranjero && (
+        <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
+          <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
+            TU PASAPORTE
           </span>
-        </span>
-        <p className="-mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
-          No la necesitas para completar tu perfil. Súbela si quieres dejarla
-          lista: el comité puede pedírtela al revisar un reintegro, para validar
-          que la transferencia va a la persona correcta.
-        </p>
-        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-          <IneUpload
-            side="ine_front"
-            label="INE — frente"
-            fileName={frontFile}
-            onUploaded={setFrontFile}
-            userId={userId}
-          />
-          <IneUpload
-            side="ine_back"
-            label="INE — reverso"
-            fileName={backFile}
-            onUploaded={setBackFile}
-            userId={userId}
-          />
-        </div>
-      </section>
+          <p className="-mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
+            Como tu nacionalidad no es mexicana, tu identificación es tu
+            pasaporte (en lugar de la CURP). Lo usamos para validar tu
+            identidad al habilitar tus reintegros.
+          </p>
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+            <DocUpload
+              side="passport"
+              label="Pasaporte — página de datos"
+              fileName={passportFile}
+              onUploaded={setPassportFile}
+              userId={userId}
+            />
+          </div>
+        </section>
+      )}
 
       {message && (
         <div className="rounded-[12px] bg-info-bg px-4 py-3 text-sm text-info-text">
