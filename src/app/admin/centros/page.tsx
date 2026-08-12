@@ -4,6 +4,7 @@ import { formatDateEs } from "@/lib/dates";
 import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
 import { DetailModal, DetailItem } from "@/components/panel/DetailModal";
 import { FilterChips } from "@/components/panel/FilterChips";
+import { SocialLinks } from "@/components/panel/SocialLinks";
 import { CenterReviewRow } from "./CenterReviewRow";
 import { CenterResolveButtons } from "./CenterResolveButtons";
 
@@ -20,6 +21,7 @@ type Row = {
   status: string;
   rejection_reason: string | null;
   created_at: string;
+  social_links: Record<string, string> | null;
   wellness_center_locations: {
     address: string | null;
     colony: string | null;
@@ -58,7 +60,7 @@ export default async function AdminCentrosPage({
     admin
       .from("wellness_centers")
       .select(
-        "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, created_at, wellness_center_locations(address, colony, city, state, postal_code), center_promotions(title, discount_label, is_active, valid_until)",
+        "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, created_at, social_links, wellness_center_locations(address, colony, city, state, postal_code), center_promotions(title, discount_label, is_active, valid_until)",
       )
       .order("created_at", { ascending: true }),
     admin
@@ -189,6 +191,12 @@ export default async function AdminCentrosPage({
                         📍 {locationLabel(l)}
                       </span>
                     ))}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                      REDES SOCIALES
+                    </span>
+                    <SocialLinks links={c.social_links} />
                   </div>
                   {/* Resolver sin salir del popup (equipo, 5-ago) */}
                   <div className="border-t border-border-divider pt-3">
@@ -325,6 +333,12 @@ export default async function AdminCentrosPage({
                       ))}
                     </div>
                   )}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                      REDES SOCIALES
+                    </span>
+                    <SocialLinks links={c.social_links} />
+                  </div>
                   {(c.center_promotions ?? []).length > 0 && (
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">

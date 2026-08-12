@@ -10,46 +10,13 @@ import {
   SensitiveBlock,
 } from "@/components/panel/DetailModal";
 import { FilterChips } from "@/components/panel/FilterChips";
+import { SocialLinks } from "@/components/panel/SocialLinks";
 import { AmbassadorReviewRow } from "./AmbassadorReviewRow";
 import {
   AmbassadorResolveButtons,
   AmbassadorDeactivateButton,
 } from "./AmbassadorResolveButtons";
 import { PayCutButton } from "./PayCutButton";
-
-/** Redes del embajador, una línea por red para ver cuál falta (equipo, 5-ago). */
-const REDES = [
-  { key: "instagram", label: "Instagram" },
-  { key: "facebook", label: "Facebook" },
-  { key: "tiktok", label: "TikTok" },
-] as const;
-
-function SocialLinks({ links }: { links: Record<string, string> | null }) {
-  return (
-    <div className="flex flex-col gap-1">
-      {REDES.map((r) => {
-        const url = links?.[r.key];
-        return (
-          <span key={r.key} className="text-[13px] text-ink-body">
-            {r.label}:{" "}
-            {url ? (
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-teal-deep hover:underline"
-              >
-                {url.replace(/^https?:\/\/(www\.)?/, "")} ↗
-              </a>
-            ) : (
-              <span className="text-ink-tertiary">— sin registrar</span>
-            )}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
 
 type Row = {
   id: string;
