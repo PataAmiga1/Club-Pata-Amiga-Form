@@ -5,6 +5,7 @@ import Script from "next/script";
 import { PLANS } from "@/lib/constants";
 import { COMPANY_LINE, LEGAL_DOCS, fetchSiteAssets, fetchSiteSettings } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
+import { LEGAL_TEXTS } from "@/data/legal-texts";
 import { Faq } from "@/components/landing/Faq";
 import { NewsletterForm } from "@/components/landing/NewsletterForm";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
@@ -294,7 +295,7 @@ export default async function Home() {
               {HOW_IT_WORKS.map((step, i) => (
                 <li key={step} className="flex items-center gap-4">
                   <span className="grid size-12 flex-none place-items-center rounded-full bg-teal-dark font-display text-[17px] text-white">
-                    0{i + 1}
+                    {i + 1}
                   </span>
                   <span className="text-[16px] font-semibold text-ink-body sm:text-[17px]">
                     {step}
@@ -418,7 +419,11 @@ export default async function Home() {
             <span className="text-[11px] font-extrabold tracking-[.08em] text-white/50">
               LEGAL
             </span>
-            {LEGAL_DOCS.map((doc) => (
+            {/* Solo los que ya tienen texto: el pie enlazaba "Convenio
+                asociado", que sigue en manos de legal, y el visitante caía en
+                un aviso de "en preparación" (hallazgo 7-ago). Cuando llegue
+                su texto a legal-texts.ts aparece solo, sin tocar esto. */}
+            {LEGAL_DOCS.filter((doc) => LEGAL_TEXTS[doc.slug]).map((doc) => (
               <Link
                 key={doc.slug}
                 href={`/legales/${doc.slug}`}

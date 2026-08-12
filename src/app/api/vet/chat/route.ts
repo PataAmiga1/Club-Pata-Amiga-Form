@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getLLMProvider, isUrgent, type ChatMessage } from "@/lib/llm";
+import { puedeResponderIA, registrarUso } from "@/lib/llm/gobierno";
 import { reportError } from "@/lib/alerts";
 
 const HISTORY_LIMIT = 20;
@@ -82,6 +84,19 @@ export async function POST(request: Request) {
   }));
   const messages: ChatMessage[] = [...history, { role: "user", content: message }];
 
+  const admin = createAdminClient();
+  const veredicto = await puedeResponderIA(admin, {
+    canal: "vet",
+    conversationId: convId,
+    humanTakeover: false,
+  });
+  if (!veredicto.puede) {
+    return NextResponse.json(
+      { error: "La orientación no está disponible en este momento. Intenta más tarde." },
+      { status: 429 },
+    );
+  }
+
   const urgent = isUrgent(message);
   const context = {
     memberName: profile?.first_name ?? null,
@@ -113,6 +128,16 @@ export async function POST(request: Request) {
     { conversation_id: convId, role: "user", content: message },
     { conversation_id: convId, role: "assistant", content: reply },
   ]);
+
+  // Sin conversationId/assistantConversationId: esas columnas apuntan a las
+  // conversaciones de canal y del asistente; las de vet viven en otra tabla y
+  // la llave foránea rechazaría la fila en silencio.
+  await registrarUso(admin, {
+    agent: "vet",
+    model: process.env.LLM_MODEL ?? process.env.LLM_PROVIDER ?? "demo",
+    tokensIn: Math.ceil(messages.reduce((s, m) => s + m.content.length, 0) / 4),
+    tokensOut: Math.ceil(reply.length / 4),
+  });
 
   return NextResponse.json({ conversationId: convId, reply, urgent });
 }

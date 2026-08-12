@@ -18,11 +18,14 @@ export type DashboardEntry = {
  */
 export function ProfileMenu({
   initial,
+  avatarUrl = null,
   color = "bg-teal",
   entries,
   settingsHref,
 }: {
   initial: string;
+  /** Foto de perfil (equipo, 11-ago) — si no hay, se muestra la inicial. */
+  avatarUrl?: string | null;
   color?: string;
   /** Otros paneles disponibles para esta cuenta */
   entries: DashboardEntry[];
@@ -52,9 +55,17 @@ export function ProfileMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label="Tu cuenta"
         aria-expanded={open}
-        className={`grid size-[38px] place-items-center rounded-full text-sm font-bold text-white ${color}`}
+        className={`relative grid size-[38px] place-items-center overflow-hidden rounded-full text-sm font-bold text-white ${color}`}
       >
-        {initial}
+        {avatarUrl ? (
+          // La foto va absoluta: con height 100% dentro de un grid de fila
+          // auto, el alto se resuelve como auto y el círculo muestra solo la
+          // franja superior de la foto en lugar del recorte centrado.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt="" className="absolute inset-0 size-full object-cover" />
+        ) : (
+          initial
+        )}
       </button>
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-40 flex w-[230px] flex-col overflow-hidden rounded-[16px] border-[1.5px] border-border-input bg-white py-1.5 shadow-[0_12px_32px_rgba(30,83,80,.18)]">

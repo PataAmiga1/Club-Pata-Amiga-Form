@@ -2,6 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePortal } from "@/lib/panel-guard";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { AdminNav, AdminNavMobile } from "@/components/admin/AdminNav";
+import { AdminBell } from "@/components/admin/AdminBell";
+import { fetchEventosAdmin } from "@/lib/admin/eventos";
 
 export default async function AdminLayout({
   children,
@@ -15,7 +17,7 @@ export default async function AdminLayout({
   // Contadores de las colas para los badges de la barra lateral
   // (service role: los conteos abarcan a todos los miembros)
   const admin = createAdminClient();
-  const [petsQ, reimbQ, ambQ, centersQ, appealsQ] = await Promise.all([
+  const [petsQ, reimbQ, ambQ, centersQ, appealsQ, eventos] = await Promise.all([
     admin
       .from("pets")
       .select("id", { count: "exact", head: true })
@@ -37,6 +39,8 @@ export default async function AdminLayout({
       .from("appeals")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending"),
+    // Actividad para la campanita (misma fuente que /admin/notificaciones)
+    fetchEventosAdmin(admin, 4),
   ]);
 
   const navProps = {
@@ -47,6 +51,12 @@ export default async function AdminLayout({
     appealsPending: appealsQ.count ?? 0,
     isSuper: session.role === "super_admin",
   };
+  const pendingTotal =
+    navProps.petsPending +
+    navProps.reimbursementsPending +
+    navProps.ambassadorsPending +
+    navProps.centersPending +
+    navProps.appealsPending;
 
   return (
     <PanelShell
@@ -54,6 +64,7 @@ export default async function AdminLayout({
       session={session}
       nav={<AdminNav {...navProps} />}
       navMobile={<AdminNavMobile {...navProps} />}
+      bell={<AdminBell events={eventos.slice(0, 10)} pending={pendingTotal} />}
     >
       {children}
     </PanelShell>

@@ -2,16 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { WelcomeOnce } from "@/components/app/WelcomeOnce";
 import { CenterInfoCard } from "./CenterInfoCard";
 import { PromotionsCard, type PromotionRow } from "./PromotionsCard";
 import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
-import { LogoutButton } from "@/components/app/LogoutButton";
+import { ServiciosCard, type LocationRow } from "./ServiciosCard";
+import { RedesCard } from "./RedesCard";
+import { BajaVoluntariaCard } from "./BajaVoluntariaCard";
 import { ProfileMenu, type DashboardEntry } from "@/components/app/ProfileMenu";
 import { AppealButton } from "@/components/app/AppealButton";
-import { APPEAL_MAX_PER_SUBJECT } from "@/lib/constants";
+import { CENTER_APPEAL_MAX } from "@/lib/constants";
 
 export const metadata = { title: "Dashboard de centro aliado · Club Pata Amiga" };
 
@@ -21,24 +22,28 @@ function StatusScreen({
   reason,
 }: {
   name: string;
-  status: "pending" | "rejected";
+  status: "pending" | "rejected" | "deactivated";
   reason: string | null;
 }) {
   return (
     <div className="mx-auto flex w-full max-w-[520px] flex-col items-center gap-4 rounded-[20px] bg-white p-8 text-center shadow-[0_2px_12px_rgba(30,83,80,.06)]">
       <span className="text-[42px]" aria-hidden>
-        {status === "pending" ? "⏳" : "💌"}
+        {status === "pending" ? "⏳" : status === "deactivated" ? "🕊️" : "💌"}
       </span>
       <h1 className="font-display text-[24px] text-ink-title">
         {status === "pending"
           ? `La solicitud de ${name} está en revisión`
-          : "Tu solicitud no fue aprobada"}
+          : status === "deactivated"
+            ? `${name} está dado de baja`
+            : "Tu solicitud no fue aprobada"}
       </h1>
       <p className="text-sm leading-relaxed text-ink-secondary">
         {status === "pending"
           ? "El comité está revisando tu solicitud de centro aliado. Te avisaremos por correo en cuanto haya resolución."
-          : (reason ??
-            "El comité no pudo aprobar tu solicitud en esta ocasión. Puedes escribirnos si crees que hay un error.")}
+          : status === "deactivated"
+            ? "Tu centro ya no aparece en el directorio de centros aliados. Si quieres volver a la red, escríbenos o envía una nueva solicitud — con gusto te recibimos de vuelta. 💚"
+            : (reason ??
+              "El comité no pudo aprobar tu solicitud en esta ocasión. Puedes escribirnos si crees que hay un error.")}
       </p>
       <Link href="/" className="font-semibold text-teal-deep hover:underline">
         Volver al inicio
@@ -56,7 +61,7 @@ export default async function CentroDashboardPage() {
 
   const admin = createAdminClient();
   const CENTER_COLS =
-    "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason";
+    "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, social_links";
   let { data: centerRows } = await admin
     .from("wellness_centers")
     .select(CENTER_COLS)
@@ -150,21 +155,87 @@ export default async function CentroDashboardPage() {
     const pendingAppeal = (centerAppeals ?? []).find(
       (a) => a.status === "pending",
     );
+    // En revisión: el centro ya puede completar su perfil (logo, beneficio,
+    // servicios, sucursales, redes, contraseña). Solo no aparece en el
+    // directorio. Antes esta pantalla era un callejón sin salida (equipo, 11-ago).
+    const enRevision = center.status === "pending";
+    const { data: pendingLocations } = enRevision
+      ? await admin
+          .from("wellness_center_locations")
+          .select("id, address, colony, city, state, postal_code, phone")
+          .eq("center_id", center.id)
+          .order("created_at", { ascending: true })
+      : { data: null };
+
     return (
-      <div className="min-h-dvh bg-cream">
+      <div className="min-h-dvh bg-cream pb-12">
         {header}
-        <div className="flex flex-col items-center gap-4 px-5 py-12">
+        <div className="mx-auto flex w-full max-w-[980px] flex-col items-center gap-5 px-5 py-8 sm:px-8">
           <StatusScreen
             name={center.name}
-            status={center.status as "pending" | "rejected"}
+            status={center.status as "pending" | "rejected" | "deactivated"}
             reason={center.rejection_reason}
           />
+          {enRevision && (
+            <>
+              <p className="text-center text-[13.5px] text-ink-secondary">
+                Mientras tanto puedes dejar listo el perfil de tu centro — así,
+                en cuanto te aprobemos, apareces completo en el directorio.
+              </p>
+              <div className="grid w-full items-start gap-4 lg:grid-cols-2">
+                <CenterInfoCard
+                  initialLogoUrl={center.logo_url}
+                  initialBenefit={center.member_benefit}
+                  initialPhone={center.phone}
+                  initialWebsite={center.website}
+                />
+                <ServiciosCard
+                  initialServices={center.services ?? []}
+                  locations={(pendingLocations ?? []) as LocationRow[]}
+                />
+                <RedesCard
+                  initial={
+                    (center.social_links ?? null) as Record<
+                      string,
+                      string
+                    > | null
+                  }
+                />
+                <ChangePasswordCard />
+              </div>
+              <div className="w-full rounded-[18px] border-[1.5px] border-dashed border-border-input bg-white/60 p-5">
+                <span className="text-[13px] font-semibold text-ink-title">
+                  Se activa cuando el comité apruebe tu centro
+                </span>
+                <ul className="mt-3 flex flex-col gap-2">
+                  {[
+                    { icon: "📍", label: "Aparecer en el directorio de centros" },
+                    { icon: "🎁", label: "Publicar promociones para miembros" },
+                    { icon: "💳", label: "Pagos de Pata Amiga por servicios" },
+                  ].map((l) => (
+                    <li
+                      key={l.label}
+                      className="flex items-center gap-2.5 text-[14px] text-ink-placeholder"
+                    >
+                      <span className="opacity-40" aria-hidden>
+                        {l.icon}
+                      </span>
+                      {l.label}
+                      <span className="ml-auto text-[11px] font-semibold uppercase tracking-wide text-ink-placeholder">
+                        Bloqueado
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
           {center.status === "rejected" &&
             (pendingAppeal ? (
               <span className="rounded-full bg-info-bg px-3 py-1 text-[11px] font-extrabold tracking-[.04em] text-info-text">
                 APELACIÓN {pendingAppeal.folio} EN REVISIÓN
               </span>
-            ) : (centerAppeals ?? []).length < APPEAL_MAX_PER_SUBJECT ? (
+            ) : (centerAppeals ?? []).length < CENTER_APPEAL_MAX ? (
               <div className="w-full max-w-[520px]">
                 <AppealButton
                   centerId={center.id}
@@ -177,18 +248,37 @@ export default async function CentroDashboardPage() {
     );
   }
 
-  const [{ data: promotions }, { data: locations }] = await Promise.all([
-    admin
-      .from("center_promotions")
-      .select("id, title, description, discount_label, valid_until, is_active")
-      .eq("center_id", center.id)
-      .order("created_at", { ascending: false }),
-    admin
-      .from("wellness_center_locations")
-      .select("id, address, colony, city, state, postal_code, phone")
-      .eq("center_id", center.id)
-      .order("created_at", { ascending: true }),
-  ]);
+  const [{ data: promotions }, { data: locations }, { data: pagos }] =
+    await Promise.all([
+      admin
+        .from("center_promotions")
+        .select("id, title, description, discount_label, valid_until, is_active")
+        .eq("center_id", center.id)
+        .order("created_at", { ascending: false }),
+      admin
+        .from("wellness_center_locations")
+        .select("id, address, colony, city, state, postal_code, phone")
+        .eq("center_id", center.id)
+        .order("created_at", { ascending: true }),
+      // Pagos directos de Pata Amiga a este centro (equipo, 5-ago)
+      admin
+        .from("center_payments")
+        .select("id, concept, amount, notes, paid_at")
+        .eq("center_id", center.id)
+        .order("paid_at", { ascending: false })
+        .limit(50),
+    ]);
+
+  const CONCEPTO: Record<string, string> = {
+    vacunas: "Vacunas",
+    emergencia_medica: "Emergencia médica",
+    fallecimiento: "Fallecimiento",
+    otro: "Otro",
+  };
+  const totalPagos = (pagos ?? []).reduce(
+    (s, p) => s + Number(p.amount ?? 0),
+    0,
+  );
 
   return (
     <div className="min-h-dvh bg-cream">
@@ -228,57 +318,65 @@ export default async function CentroDashboardPage() {
           </div>
 
           <div className="flex flex-col gap-4">
-            {/* Servicios y ubicaciones: los cambia el comité para cuidar el directorio */}
-            <div className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)]">
+            {/* Servicios y ubicaciones editables por el centro (equipo, 5-ago) */}
+            <ServiciosCard
+              initialServices={center.services ?? []}
+              locations={(locations ?? []) as LocationRow[]}
+            />
+            <RedesCard
+              initial={
+                (center.social_links ?? null) as Record<string, string> | null
+              }
+            />
+
+            {/* Pagos recibidos de Pata Amiga (equipo, 5-ago) */}
+            <div className="flex flex-col gap-2.5 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)]">
               <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
-                TUS SERVICIOS
+                PAGOS DE PATA AMIGA
               </span>
-              <div className="flex flex-wrap gap-2">
-                {(center.services ?? []).map((s: string) => {
-                  const svc = WELLNESS_SERVICES[s as WellnessService];
-                  return (
-                    <span
-                      key={s}
-                      className="rounded-full bg-info-bg px-3 py-1.5 text-xs font-bold text-info-text"
-                    >
-                      {svc ? `${svc.emoji} ${svc.label}` : s}
+              <span className="text-[12px] text-ink-tertiary">
+                Pagos directos por servicios a miembros (vacunas, emergencias,
+                fallecimiento). Total recibido:{" "}
+                <strong className="text-ink-title">
+                  ${totalPagos.toLocaleString("es-MX")} MXN
+                </strong>
+              </span>
+              {(pagos ?? []).length > 0 ? (
+                (pagos ?? []).map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 border-b border-[#F2EEE4] py-2 text-[12.5px] text-ink-body last:border-0"
+                  >
+                    <span className="flex-1">
+                      {CONCEPTO[p.concept] ?? p.concept}
+                      {p.notes ? (
+                        <span className="block text-[11px] text-ink-tertiary">
+                          {p.notes}
+                        </span>
+                      ) : null}
                     </span>
-                  );
-                })}
-              </div>
-              <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
-                TUS UBICACIONES
-              </span>
-              {(locations ?? []).map((l) => (
-                <div
-                  key={l.id}
-                  className="flex flex-col rounded-[12px] border-[1.5px] border-border-input px-3.5 py-2.5 text-[12.5px] text-ink-body"
-                >
-                  <span className="font-semibold text-ink-title">
-                    {l.address}
-                  </span>
-                  <span className="text-ink-tertiary">
-                    {[l.colony, l.city, l.state, l.postal_code]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </span>
-                  {l.phone && <span className="text-ink-tertiary">📞 {l.phone}</span>}
-                </div>
-              ))}
-              <span className="text-xs text-ink-tertiary">
-                ¿Cambió algún servicio o dirección? Escríbenos y el comité lo
-                actualiza para cuidar el directorio.
-              </span>
+                    <span className="font-bold text-ink-title">
+                      ${Number(p.amount).toLocaleString("es-MX")} MXN
+                    </span>
+                    <span className="text-[11px] text-ink-tertiary">
+                      {p.paid_at}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <span className="text-[12.5px] text-ink-secondary">
+                  Aún sin pagos registrados.
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Ajustes de la cuenta del centro */}
+        {/* Ajustes de la cuenta del centro. El "Cerrar sesión" vive solo en el
+            menú del encabezado — aquí estaba duplicado (hallazgo del equipo). */}
         <div className="grid items-start gap-4 lg:grid-cols-[1.3fr_1fr]">
           <ChangePasswordCard />
-          <div className="flex lg:justify-end">
-            <LogoutButton variant="button" />
-          </div>
+          <BajaVoluntariaCard centerName={center.name} />
         </div>
       </div>
 

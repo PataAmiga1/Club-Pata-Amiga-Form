@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField } from "@/components/ui/Field";
+import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 
-import { validateCurp } from "@/lib/curp";
+import { validateCurp, curpCoincide } from "@/lib/curp";
 
 type Initial = {
   first_name?: string | null;
@@ -14,6 +15,8 @@ type Initial = {
   mother_last_name?: string | null;
   phone?: string | null;
   curp?: string | null;
+  birth_date?: string | null;
+  nationality?: string | null;
   postal_code?: string | null;
   state?: string | null;
   city?: string | null;
@@ -23,34 +26,14 @@ type Initial = {
   number_int?: string | null;
 };
 
-function joinName(i: Initial) {
-  return [i.first_name, i.last_name, i.mother_last_name]
-    .filter(Boolean)
-    .join(" ");
-}
-
-/** MX convention: the last two tokens are apellidos, the rest is nombre(s). */
-function splitName(full: string) {
-  const parts = full.trim().split(/\s+/);
-  if (parts.length <= 1)
-    return { first_name: full.trim() || null, last_name: null, mother_last_name: null };
-  if (parts.length === 2)
-    return { first_name: parts[0], last_name: parts[1], mother_last_name: null };
-  return {
-    first_name: parts.slice(0, -2).join(" "),
-    last_name: parts[parts.length - 2],
-    mother_last_name: parts[parts.length - 1],
-  };
-}
-
-function IneUpload({
+function DocUpload({
   side,
   label,
   fileName,
   onUploaded,
   userId,
 }: {
-  side: "ine_front" | "ine_back";
+  side: "ine_front" | "ine_back" | "passport";
   label: string;
   fileName: string | null;
   onUploaded: (name: string) => void;
@@ -123,16 +106,26 @@ function IneUpload({
 export function ProfileForm({
   userId,
   initial,
-  ineFront,
-  ineBack,
+  passport,
+  avatarUrl,
 }: {
   userId: string;
   initial: Initial;
-  ineFront: string | null;
-  ineBack: string | null;
+  /** Nombre de archivo del pasaporte ya subido (solo extranjeros). */
+  passport: string | null;
+  /** Foto de perfil ya guardada (equipo, 11-ago). */
+  avatarUrl: string | null;
 }) {
   const router = useRouter();
-  const [fullName, setFullName] = useState(joinName(initial));
+  // Nombre desglosado (equipo, 5-ago): nombres, apellido paterno y materno
+  // en campos propios — antes era un solo "Nombre completo".
+  const [firstName, setFirstName] = useState(initial.first_name ?? "");
+  const [lastName, setLastName] = useState(initial.last_name ?? "");
+  const [motherLastName, setMotherLastName] = useState(
+    initial.mother_last_name ?? "",
+  );
+  const [birthDate, setBirthDate] = useState(initial.birth_date ?? "");
+  const [nationality, setNationality] = useState(initial.nationality ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
   const [curp, setCurp] = useState(initial.curp ?? "");
   const [cp, setCp] = useState(initial.postal_code ?? "");
@@ -145,12 +138,66 @@ export function ProfileForm({
   const [street, setStreet] = useState(initial.street ?? "");
   const [numExt, setNumExt] = useState(initial.number_ext ?? "");
   const [numInt, setNumInt] = useState(initial.number_int ?? "");
-  const [frontFile, setFrontFile] = useState(ineFront);
-  const [backFile, setBackFile] = useState(ineBack);
+  const [passportFile, setPassportFile] = useState(passport);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // Foto de perfil (equipo, 11-ago): el círculo que el equipo marcó en rojo.
+  // OPCIONAL y no cuenta para el 100% (mismo criterio que el INE del 10-ago).
+  // Se guarda al momento de subirla — no espera al botón de guardar.
+  const [avatar, setAvatar] = useState(avatarUrl);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarBusy(true);
+    const supabase = createClient();
+    const path = `${userId}/avatar-${Date.now()}-${file.name}`;
+    const { error: upErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file);
+    if (upErr) {
+      setAvatarBusy(false);
+      setMessage("No pudimos subir tu foto. Intenta de nuevo.");
+      return;
+    }
+    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+    const { error: saveErr } = await supabase
+      .from("profiles")
+      .update({ avatar_url: pub.publicUrl })
+      .eq("id", userId);
+    setAvatarBusy(false);
+    if (saveErr) {
+      setMessage("No pudimos guardar tu foto. Intenta de nuevo.");
+      return;
+    }
+    setAvatar(pub.publicUrl);
+  }
+
+  // Extranjeros: suben PASAPORTE en lugar de CURP — no pueden tener CURP
+  // (equipo, 11-ago). Nacionalidad vacía se trata como mexicana.
+  const esExtranjero = (() => {
+    const n = nationality
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+    return (
+      n.length > 0 && !["mexicana", "mexicano", "mexico", "mx"].includes(n)
+    );
+  })();
 
   const curpValid = validateCurp(curp).isValid;
+  // Cruce CURP ↔ datos: SOLO MARCA, no bloquea (decisión de Pablo, 5-ago)
+  const cruceCurp = curpValid
+    ? curpCoincide(curp, {
+        nombres: firstName,
+        apellidoPaterno: lastName,
+        apellidoMaterno: motherLastName,
+        birthDate: birthDate || null,
+      })
+    : null;
 
   // Sepomex lookup when a full CP is typed
   useEffect(() => {
@@ -172,12 +219,19 @@ export function ProfileForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cp]);
 
+  // Nacionalidad y fecha de nacimiento son obligatorias para el 100%
+  // (decisión de Pablo, 5-ago). El INE se dejó de pedir a miembros por
+  // completo (equipo, 11-ago). La identificación vale 25%: CURP válida para
+  // mexicanos, pasaporte subido para extranjeros.
+  // OJO con los Boolean(): sin ellos, un string en el && produce
+  // Number("Av...") = NaN (hallazgo del equipo).
+  const identidadOk = esExtranjero ? Boolean(passportFile) : curpValid;
   const completion =
-    20 * Number(fullName.trim().length > 0) +
-    20 * Number(curpValid) +
-    20 * Number(cp.length === 5 && colony && street) +
-    20 * Number(Boolean(frontFile)) +
-    20 * Number(Boolean(backFile));
+    25 * Number(firstName.trim().length > 0 && lastName.trim().length > 0) +
+    25 * Number(identidadOk) +
+    15 * Number(/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) +
+    10 * Number(nationality.trim().length > 0) +
+    25 * Number(Boolean(cp.length === 5 && colony && street));
 
   async function save(finalize: boolean) {
     setSaving(true);
@@ -186,9 +240,15 @@ export function ProfileForm({
     const { error } = await supabase
       .from("profiles")
       .update({
-        ...splitName(fullName),
+        first_name: firstName.trim() || null,
+        last_name: lastName.trim() || null,
+        mother_last_name: motherLastName.trim() || null,
+        birth_date: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
+        nationality: nationality.trim() || null,
         phone: phone || null,
-        curp: curp ? curp.toUpperCase() : null,
+        // Extranjeros no tienen CURP: si cambió su nacionalidad después de
+        // haber tecleado una, no se guarda basura.
+        curp: esExtranjero ? null : curp ? curp.toUpperCase() : null,
         postal_code: cp || null,
         state: stateMx || null,
         city: city || null,
@@ -222,15 +282,44 @@ export function ProfileForm({
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-[28px] text-ink-title md:text-[34px]">
-            Completa tu perfil
-          </h1>
-          <p className="mt-1.5 text-[14.5px] text-ink-secondary">
-            Necesitamos estos datos para validar tu identidad y habilitar tus
-            reintegros.
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3.5">
+          {/* El círculo que el equipo marcó en rojo: ahora ES la foto de
+              perfil, opcional y subible aquí mismo (equipo, 11-ago) */}
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarBusy}
+            title="Foto de perfil (opcional) — toca para cambiarla"
+            className="relative grid size-16 flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[22px] transition-colors hover:border-teal"
+          >
+            {avatarBusy ? (
+              "…"
+            ) : avatar ? (
+              // Absoluta: height 100% en fila auto de grid se resuelve como
+              // auto y el círculo muestra la franja superior, no el centro
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatar} alt="Tu foto de perfil" className="absolute inset-0 size-full object-cover" />
+            ) : (
+              "📷"
+            )}
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarFile}
+          />
+          <div className="min-w-0">
+            <h1 className="font-display text-[28px] text-ink-title md:text-[34px]">
+              Completa tu perfil
+            </h1>
+            <p className="mt-1.5 text-[14.5px] text-ink-secondary">
+              Necesitamos estos datos para validar tu identidad y habilitar tus
+              reintegros. La foto es opcional.
+            </p>
+          </div>
         </div>
         <div className="grid size-16 flex-none place-items-center rounded-full bg-white shadow-[0_2px_10px_rgba(30,83,80,.08)]">
           <span className="font-display text-base text-teal-deep">
@@ -251,47 +340,87 @@ export function ProfileForm({
         <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
           TUS DATOS
         </span>
+        <TextField
+          label="Nombre(s)"
+          placeholder="Como aparece en tu identificación"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          autoComplete="given-name"
+        />
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
           <TextField
-            label="Nombre completo"
-            placeholder="Nombre y apellidos"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            autoComplete="name"
+            label="Apellido paterno"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            autoComplete="family-name"
           />
           <TextField
-            label="Teléfono"
-            type="tel"
-            placeholder="+52 ··· ··· ····"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            autoComplete="tel"
+            label="Apellido materno"
+            value={motherLastName}
+            onChange={(e) => setMotherLastName(e.target.value)}
           />
         </div>
-        <TextField
-          label="CURP"
-          placeholder="18 caracteres"
-          value={curp}
-          maxLength={18}
-          onChange={(e) => setCurp(e.target.value.toUpperCase())}
-          style={{ letterSpacing: ".06em" }}
-          rightSlot={
-            curp.length > 0 ? (
-              curpValid ? (
-                <span className="text-sm text-success-text">✓</span>
-              ) : (
-                <span className="text-xs text-error-text">
-                  {curp.length}/18
-                </span>
-              )
-            ) : undefined
-          }
-          hint={
-            curp.length > 0 && !curpValid
-              ? "Revisa el formato de tu CURP."
-              : undefined
-          }
-        />
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+          <TextField
+            label="Fecha de nacimiento"
+            type="date"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            autoComplete="bday"
+          />
+          <TextField
+            label="Nacionalidad"
+            placeholder="Mexicana"
+            value={nationality}
+            onChange={(e) => setNationality(e.target.value)}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+          {/* Mismo componente que el registro: prefijo +52 fijo y solo 10
+              dígitos en la BD. Antes era un campo libre, así que el mismo
+              teléfono podía guardarse de cinco formas distintas. */}
+          <PhoneField
+            label="Teléfono"
+            value={phone}
+            onChange={setPhone}
+            hint="10 dígitos, sin lada internacional."
+          />
+          {/* Extranjeros no tienen CURP: en su lugar suben pasaporte (abajo) */}
+          {!esExtranjero && (
+            <TextField
+              label="CURP"
+              placeholder="18 caracteres"
+              value={curp}
+              maxLength={18}
+              onChange={(e) => setCurp(e.target.value.toUpperCase())}
+              style={{ letterSpacing: ".06em" }}
+              rightSlot={
+                curp.length > 0 ? (
+                  curpValid ? (
+                    <span className="text-sm text-success-text">✓</span>
+                  ) : (
+                    <span className="text-xs text-error-text">
+                      {curp.length}/18
+                    </span>
+                  )
+                ) : undefined
+              }
+              hint={
+                curp.length > 0 && !curpValid
+                  ? "Revisa el formato de tu CURP."
+                  : undefined
+              }
+            />
+          )}
+        </div>
+        {/* El cruce CURP ↔ datos solo avisa, nunca bloquea (Pablo, 5-ago) */}
+        {!esExtranjero && cruceCurp && !cruceCurp.coincide && (
+          <div className="rounded-[12px] bg-warning-bg px-4 py-3 text-[12.5px] leading-normal text-warning-text">
+            ⚠ Tu CURP no parece coincidir con{" "}
+            {cruceCurp.discrepancias.join(" ni con ")}. Revísalos por favor —
+            si están bien así, puedes continuar sin problema.
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
@@ -364,27 +493,30 @@ export function ProfileForm({
         </div>
       </section>
 
-      <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
-        <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
-          TU IDENTIFICACIÓN (INE)
-        </span>
-        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-          <IneUpload
-            side="ine_front"
-            label="INE — frente"
-            fileName={frontFile}
-            onUploaded={setFrontFile}
-            userId={userId}
-          />
-          <IneUpload
-            side="ine_back"
-            label="INE — reverso"
-            fileName={backFile}
-            onUploaded={setBackFile}
-            userId={userId}
-          />
-        </div>
-      </section>
+      {/* El INE se dejó de pedir a los miembros (equipo, 11-ago). Los
+          embajadores lo conservan — su formulario es aparte. Los extranjeros
+          suben PASAPORTE: no pueden tener CURP. */}
+      {esExtranjero && (
+        <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
+          <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
+            TU PASAPORTE
+          </span>
+          <p className="-mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
+            Como tu nacionalidad no es mexicana, tu identificación es tu
+            pasaporte (en lugar de la CURP). Lo usamos para validar tu
+            identidad al habilitar tus reintegros.
+          </p>
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+            <DocUpload
+              side="passport"
+              label="Pasaporte — página de datos"
+              fileName={passportFile}
+              onUploaded={setPassportFile}
+              userId={userId}
+            />
+          </div>
+        </section>
+      )}
 
       {message && (
         <div className="rounded-[12px] bg-info-bg px-4 py-3 text-sm text-info-text">

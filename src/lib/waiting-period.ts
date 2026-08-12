@@ -1,13 +1,21 @@
 /**
- * Reglas de período de espera por mascota — importadas del sitio vivo
- * (Club-Pata-Amiga-Form: pet.service.ts) y confirmadas con el cliente
- * el 15-jul-2026. Aplican igual a perros y gatos:
+ * Reglas de período de espera por mascota — confirmadas por la PM el
+ * 11-ago-2026 (audio + respuestas escritas). Aplican igual a perros y gatos:
  *
- * 1. Mascota de reemplazo (registrada después de dar de baja otra) → 180 días
- * 2. Registro con código de embajador válido                        → 90 días
- * 3. Adoptado/rescatado mestizo o doméstico                         → 120 días
- * 4. Adoptado/rescatado de raza                                     → 150 días
- * 5. Caso estándar                                                  → 180 días
+ * 1. Código de embajador en la MEMBRESÍA → 90 días. Es un beneficio por
+ *    membresía, no por mascota: la tercera mascota registrada meses después
+ *    lo conserva. Lo ÚNICO que lo pierde es una mascota de reemplazo.
+ * 2. Adoptado/rescatado mestizo o doméstico → 120 días
+ * 3. Adoptado/rescatado de raza             → 150 días
+ * 4. Caso estándar                          → 180 días
+ *
+ * REEMPLAZO (registrada tras dar de baja otra): ya NO son 180 fijos — se
+ * evalúa con las condiciones normales (120/150/180 según adopción y raza),
+ * solo que SIN el beneficio del embajador. Regla anterior (15-jul, sitio
+ * vivo): 180 fijos; la PM la corrigió el 11-ago.
+ *
+ * El CONTRATANTE no tiene período de espera: al pagar es miembro, sin
+ * aprobación ni espera (PM, 11-ago).
  */
 import { diaEnMexicoMasDias } from "@/lib/zona-horaria";
 
@@ -32,7 +40,6 @@ export type WaitingPeriodBenefits = {
   espera_mascota_adoptada_raza_dias?: number;
   espera_mascota_adoptada_mestizo_dias?: number;
   espera_mascota_con_embajador_dias?: number;
-  espera_mascota_reemplazo_dias?: number;
 };
 
 export function petWaitingPeriodDays(
@@ -45,8 +52,9 @@ export function petWaitingPeriodDays(
   benefits: WaitingPeriodBenefits = {},
 ): number {
   const estandar = benefits.espera_mascota_estandar_dias ?? 180;
-  if (opts.isReplacement) return benefits.espera_mascota_reemplazo_dias ?? 180;
-  if (opts.hasReferralCode)
+  // El reemplazo NO tiene días propios: solo pierde el beneficio del
+  // embajador y se evalúa con las condiciones normales (PM, 11-ago).
+  if (opts.hasReferralCode && !opts.isReplacement)
     return benefits.espera_mascota_con_embajador_dias ?? 90;
   if (opts.isAdopted)
     return isMixedBreedName(opts.breed)

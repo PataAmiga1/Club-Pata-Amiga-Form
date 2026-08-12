@@ -2,8 +2,44 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { ProfileMenu, type DashboardEntry } from "@/components/app/ProfileMenu";
+import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
+import { LogoutButton } from "@/components/app/LogoutButton";
 import { AmbassadorNav } from "./AmbassadorNav";
+import { PaymentDataCard } from "./PaymentDataCard";
+import { ExtrasCard } from "./ExtrasCard";
 import { getAmbassadorContext } from "./shared";
+
+/** Lo que se desbloquea al ser aprobado — se muestra en gris mientras tanto. */
+function LockedPreview() {
+  const locked = [
+    { icon: "🎟️", label: "Tu código de embajador" },
+    { icon: "📊", label: "Métricas de referidos y comisiones" },
+    { icon: "🎨", label: "Materiales para compartir" },
+  ];
+  return (
+    <div className="rounded-[18px] border-[1.5px] border-dashed border-border-input bg-white/60 p-5">
+      <span className="text-[13px] font-semibold text-ink-title">
+        Se activa cuando el comité apruebe tu solicitud
+      </span>
+      <ul className="mt-3 flex flex-col gap-2">
+        {locked.map((l) => (
+          <li
+            key={l.label}
+            className="flex items-center gap-2.5 text-[14px] text-ink-placeholder"
+          >
+            <span className="opacity-40" aria-hidden>
+              {l.icon}
+            </span>
+            {l.label}
+            <span className="ml-auto text-[11px] font-semibold uppercase tracking-wide text-ink-placeholder">
+              Bloqueado
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function StatusScreen({
   name,
@@ -84,16 +120,45 @@ export default async function EmbajadorLayout({
     />
   );
 
+  // Solicitud sin resolver: NO se cierra la puerta. El embajador entra a su
+  // portal, ve en qué va su solicitud y puede ir completando su perfil (datos
+  // de pago, RFC, redes, contraseña). Lo que depende de la aprobación —código,
+  // métricas, materiales— se muestra en gris y bloqueado (equipo, 11-ago).
   if (ambassador.status !== "approved") {
+    const enRevision = ambassador.status === "pending";
     return (
-      <div className="min-h-dvh bg-cream">
+      <div className="min-h-dvh bg-cream pb-12">
         {header}
-        <div className="px-5 py-12">
+        <div className="mx-auto flex w-full max-w-[980px] flex-col gap-5 px-5 py-8 sm:px-8">
           <StatusScreen
             name={ambassador.first_name}
             status={ambassador.status}
             reason={ambassador.rejection_reason}
           />
+          {enRevision && (
+            <>
+              <p className="text-center text-[13.5px] text-ink-secondary">
+                Mientras tanto puedes dejar listo tu perfil — así, en cuanto te
+                aprobemos, empiezas a compartir sin trámites.
+              </p>
+              <div className="grid items-start gap-4 lg:grid-cols-2">
+                <PaymentDataCard
+                  initialBank={ambassador.bank_name}
+                  initialClabe={ambassador.clabe}
+                  initialHolder={ambassador.bank_holder}
+                />
+                <ExtrasCard
+                  initialRfc={ambassador.rfc}
+                  initialLinks={ambassador.social_links}
+                />
+                <ChangePasswordCard />
+                <LockedPreview />
+              </div>
+            </>
+          )}
+          <div className="flex justify-center">
+            <LogoutButton variant="button" />
+          </div>
         </div>
       </div>
     );

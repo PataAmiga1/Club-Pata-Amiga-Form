@@ -1,0 +1,35 @@
+name: Lint y tipos
+
+# Por qué existe esto: Next 16 ya NO corre ESLint dentro de `next build`, así
+# que Vercel puede desplegar en verde con errores de lint acumulados en el
+# árbol (fue exactamente lo que pasó: 12 errores sin que nadie los viera).
+#
+# A propósito NO metimos el lint dentro de `npm run build`: eso haría que una
+# variable sin usar pueda tumbar un deploy de producción. Esta reja avisa
+# fuerte y visible; el deploy sigue siendo decisión de quien lo ve.
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Tipos de TypeScript
+        run: npm run typecheck

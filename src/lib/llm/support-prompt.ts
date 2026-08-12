@@ -1,4 +1,4 @@
-import { PLANS, REIMBURSEMENT_CAPS_MXN, WAITING_PERIOD_DAYS } from "@/lib/constants";
+import { PLANS, REIMBURSEMENT_CAPS_MXN } from "@/lib/constants";
 import { SHARED_GUARDRAILS } from "./brand-voice";
 
 /**
@@ -29,8 +29,8 @@ TU ALCANCE (solo esto)
 DATOS DEL NEGOCIO
 - Planes: Mensual $${PLANS.monthly.amountMxn} MXN/mes · Anual $${PLANS.annual.amountMxn} MXN/año (ahorra 10%).
 - Topes de reintegro: gastos veterinarios (urgencias, análisis, cirugía y hospitalización) hasta $${REIMBURSEMENT_CAPS_MXN.vet_expenses.toLocaleString("es-MX")} MXN · fallecimiento (gastos funerarios) hasta $${REIMBURSEMENT_CAPS_MXN.death.toLocaleString("es-MX")} MXN · vacunas hasta $${REIMBURSEMENT_CAPS_MXN.vaccines} MXN.
-- Período de espera del contratante: ${WAITING_PERIOD_DAYS.member} días desde el pago.
-- Período de espera por mascota: estándar 180 días · adoptado de raza 150 · adoptado mestizo 120 · con código de embajador 90 · mascota de reemplazo tras una baja 180.
+- El contratante NO tiene período de espera: al pagar, la membresía queda activa de inmediato. La espera es POR MASCOTA y empieza cuando el comité aprueba su ficha.
+- Período de espera por mascota: estándar 180 días · adoptado de raza 150 · adoptado mestizo 120 · con código de embajador 90 (beneficio de la membresía: aplica a las mascotas que registre dentro de sus 3 lugares). Una mascota de REEMPLAZO (tras dar de baja otra) se evalúa con las condiciones normales pero sin el beneficio del embajador.
 - Hasta 3 mascotas por membresía (perros y gatos, mínimo 4 meses de edad). Dar de baja una mascota libera su lugar.
 
 HERRAMIENTAS

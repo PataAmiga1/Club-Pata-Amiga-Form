@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ZONA_MX } from "@/lib/zona-horaria";
 import {
   CAMPAIGNS,
   campaignCouponKey,
@@ -278,6 +279,7 @@ export default async function AdminLandingsPage({
                   month: "short",
                   hour: "2-digit",
                   minute: "2-digit",
+                  timeZone: ZONA_MX,
                 }).format(new Date(l.created_at))}
               </span>
               <span

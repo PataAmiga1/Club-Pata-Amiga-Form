@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { formatMxn } from "@/lib/format";
-import { inicioDelMes } from "@/lib/zona-horaria";
+import { inicioDelMes, ZONA_MX } from "@/lib/zona-horaria";
 import { DetailModal, DetailItem } from "@/components/panel/DetailModal";
 
 type PaymentRow = {
@@ -37,7 +38,8 @@ export default async function AdminFinanzasPage() {
   // arrancaba a las 6 de la tarde del día anterior en Vercel.
   const monthStart = inicioDelMes();
 
-  const [subsQ, monthReimbs, payableReferrals] = await Promise.all([
+  const [subsQ, monthReimbs, payableReferrals, activosQ, bajasQ, cfdiQ] =
+    await Promise.all([
     admin.from("subscriptions").select("plan, amount").eq("status", "active"),
     admin
       .from("reimbursements")
@@ -49,9 +51,50 @@ export default async function AdminFinanzasPage() {
       .select("commission_amount")
       .eq("status", "pending")
       .lt("created_at", monthStart.toISOString()),
+    // Miembros activos TOTALES: el MRR solo puede ver a los que cobran por
+    // Stripe, y los migrados de Memberstack no tienen suscripción aquí. Sin
+    // este contraste el tablero daba a entender que el MRR era todo el negocio
+    // (auditoría 11-ago: 63 activos, 3 con cobro en la plataforma).
+    admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "member")
+      .eq("membership_status", "active"),
+    // Cancelaciones con su motivo (Fase 4). Solo registra las hechas en esta
+    // plataforma: las bajas de la era Memberstack no tienen fila aquí.
+    admin
+      .from("cancellations")
+      .select(
+        "id, reason, created_at, coverage_end_date, rejoined_at, profiles!user_id(first_name, last_name, email)",
+      )
+      .order("created_at", { ascending: false })
+      .limit(15),
+    admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "member")
+      .eq("cfdi_requested", true),
   ]);
 
   const subs = subsQ.data ?? [];
+  type Baja = {
+    id: string;
+    reason: string | null;
+    created_at: string;
+    coverage_end_date: string | null;
+    rejoined_at: string | null;
+    profiles: { first_name: string | null; last_name: string | null; email: string | null } | null;
+  };
+  const bajas = ((bajasQ.data ?? []) as unknown[]).map((b) => {
+    const row = b as Omit<Baja, "profiles"> & { profiles: Baja["profiles"] | Baja["profiles"][] };
+    return { ...row, profiles: Array.isArray(row.profiles) ? (row.profiles[0] ?? null) : row.profiles };
+  }) as Baja[];
+  const nombreBaja = (b: Baja) =>
+    b.profiles?.first_name
+      ? `${b.profiles.first_name} ${b.profiles.last_name ?? ""}`.trim()
+      : (b.profiles?.email ?? "Miembro");
+  const activosTotales = activosQ.count ?? 0;
+  const sinCobroAqui = Math.max(0, activosTotales - subs.length);
   const mrr = subs.reduce(
     (acc, s) =>
       acc + (s.plan === "annual" ? Number(s.amount ?? 0) / 12 : Number(s.amount ?? 0)),
@@ -102,6 +145,7 @@ export default async function AdminFinanzasPage() {
 
   const monthLabel = new Intl.DateTimeFormat("es-MX", {
     month: "long",
+    timeZone: ZONA_MX,
   }).format(new Date());
 
   const monthlyMrr = subs
@@ -113,7 +157,11 @@ export default async function AdminFinanzasPage() {
     {
       label: "MRR · INGRESO RECURRENTE MENSUAL",
       value: `${formatMxn(Math.round(mrr))}`,
-      note: "lo que suman las membresías activas cada mes",
+      note:
+        sinCobroAqui > 0
+          ? `solo ${subs.length} de ${activosTotales} miembros activos ⚠`
+          : "lo que suman las membresías activas cada mes",
+      noteCls: sinCobroAqui > 0 ? "text-warning-text font-semibold" : undefined,
       detail: (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <DetailItem
@@ -129,6 +177,16 @@ export default async function AdminFinanzasPage() {
             value={`${formatMxn(Math.round(mrr))} MXN`}
           />
           <DetailItem
+            label="MIEMBROS ACTIVOS"
+            value={`${activosTotales} en total · ${subs.length} con cobro en la plataforma`}
+          />
+          {sinCobroAqui > 0 && (
+            <DetailItem
+              label="⚠ NO CONTADOS EN EL MRR"
+              value={`${sinCobroAqui} miembros activos migrados de la plataforma anterior. Su cobro no vive aquí, así que no tienen plan ni monto registrados y NO suman al MRR. Mientras no se les cree una suscripción, esta cifra es solo la parte que cobra la plataforma nueva.`}
+            />
+          )}
+          <DetailItem
             label="QUÉ ES"
             value="Monthly Recurring Revenue: ingreso que se repite mes a mes con las membresías activas (los planes anuales se prorratean entre 12)."
           />
@@ -138,7 +196,7 @@ export default async function AdminFinanzasPage() {
     {
       label: `COBRADO EN ${monthLabel.toUpperCase()}`,
       value: stripeError ? "—" : formatMxn(monthCollected),
-      note: "facturas pagadas (Stripe)",
+      note: "comprobantes de pago (Stripe)",
       detail: (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <DetailItem
@@ -147,7 +205,7 @@ export default async function AdminFinanzasPage() {
           />
           <DetailItem
             label="FUENTE"
-            value="Facturas con estado 'pagada' en Stripe desde el día 1 del mes."
+            value="Comprobantes de pago con estado 'pagado' en Stripe desde el día 1 del mes."
           />
         </div>
       ),
@@ -213,6 +271,13 @@ export default async function AdminFinanzasPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-[26px] text-ink-title">Finanzas</h1>
         <div className="flex flex-wrap gap-2">
+          {/* Atajo al filtro de solicitantes de factura (Fase 4) */}
+          <Link
+            href="/admin/miembros?factura=si"
+            className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+          >
+            🧾 Solicitan factura ({cfdiQ.count ?? 0}) →
+          </Link>
           <a
             href="/api/admin/layouts/reintegros"
             className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
@@ -271,7 +336,7 @@ export default async function AdminFinanzasPage() {
         ) : (
           <div className="flex flex-col overflow-x-auto">
             <div className="grid min-w-[640px] grid-cols-[130px_1fr_110px_120px_90px] gap-2 border-b-[1.5px] border-[#F2EEE4] pb-2 text-[10.5px] font-extrabold tracking-[.05em] text-ink-placeholder">
-              <span>FACTURA</span>
+              <span>COMPROBANTE</span>
               <span>CLIENTE</span>
               <span>MONTO</span>
               <span>FECHA</span>
@@ -302,6 +367,7 @@ export default async function AdminFinanzasPage() {
                   {new Intl.DateTimeFormat("es-MX", {
                     day: "numeric",
                     month: "short",
+                    timeZone: ZONA_MX,
                   }).format(p.created)}
                 </span>
                 <span className="justify-self-start rounded-full bg-success-bg px-2.5 py-[3px] text-[10.5px] font-extrabold text-success-text">
@@ -319,6 +385,76 @@ export default async function AdminFinanzasPage() {
         <p className="text-[11.5px] text-ink-tertiary">
           Los cobros vienen de Stripe en tiempo real. Para reembolsos de pagos
           o detalles de disputas, usa el dashboard de Stripe.
+        </p>
+      </div>
+
+      {/* Cancelaciones con su motivo (Fase 4) */}
+      <div className="flex flex-col gap-3 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+        <h2 className="font-display text-lg text-ink-title">
+          Cancelaciones recientes
+        </h2>
+        {bajas.length > 0 ? (
+          <div className="flex flex-col overflow-x-auto">
+            <div className="grid min-w-[720px] grid-cols-[1fr_110px_170px_120px_110px] gap-2 border-b-[1.5px] border-[#F2EEE4] pb-2 text-[10.5px] font-extrabold tracking-[.05em] text-ink-placeholder">
+              <span>MIEMBRO</span>
+              <span>FECHA</span>
+              <span>MOTIVO</span>
+              <span>VIGENCIA HASTA</span>
+              <span>REGRESÓ</span>
+            </div>
+            {bajas.map((b) => (
+              <div
+                key={b.id}
+                className="grid min-w-[720px] grid-cols-[1fr_110px_170px_120px_110px] items-center gap-2 border-b border-[#F2EEE4] py-[10px] text-[12.5px] text-ink-body last:border-0"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-bold text-ink-title">
+                    {nombreBaja(b)}
+                  </span>
+                  <span className="block truncate text-[11px] text-ink-tertiary">
+                    {b.profiles?.email}
+                  </span>
+                </span>
+                <span>
+                  {new Intl.DateTimeFormat("es-MX", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                    timeZone: ZONA_MX,
+                  }).format(new Date(b.created_at))}
+                </span>
+                <span className="min-w-0 truncate" title={b.reason ?? undefined}>
+                  {b.reason || "Sin motivo registrado"}
+                </span>
+                <span>
+                  {b.coverage_end_date
+                    ? new Intl.DateTimeFormat("es-MX", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        timeZone: ZONA_MX,
+                      }).format(new Date(`${b.coverage_end_date}T12:00:00`))
+                    : "—"}
+                </span>
+                {b.rejoined_at ? (
+                  <span className="justify-self-start rounded-full bg-success-bg px-2.5 py-[3px] text-[10.5px] font-extrabold text-success-text">
+                    SÍ, VOLVIÓ
+                  </span>
+                ) : (
+                  <span>—</span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="text-sm text-ink-secondary">
+            Sin cancelaciones registradas en la plataforma.
+          </span>
+        )}
+        <p className="text-[11.5px] text-ink-tertiary">
+          Solo aparecen las cancelaciones hechas en esta plataforma; las bajas
+          de la era anterior (Memberstack) no dejaron registro aquí. El motivo
+          es el que la persona eligió al cancelar.
         </p>
       </div>
     </div>

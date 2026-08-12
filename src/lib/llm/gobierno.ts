@@ -1,4 +1,5 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
+import { costoEnCentavos, preciosDe } from "@/lib/newsletter/costos";
 import { inicioDelDia } from "@/lib/zona-horaria";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -52,15 +53,18 @@ export const AJUSTES_IA = [
   {
     key: "ia_precio_entrada_usd_millon",
     label: "Precio del modelo — entrada (USD por millón de tokens)",
-    hint: "Con esto se calcula el costo de cada corrida. Es el precio DECLARADO aquí, no lo que factura el proveedor: si cambia la lista de precios, actualízalo.",
-    default: "5",
+    hint: "Con esto se calcula el costo de cada corrida. Es el precio DECLARADO aquí, no lo que factura el proveedor: si cambia la lista de precios o el modelo, actualízalo.",
+    // La plataforma corre claude-sonnet-5 (LLM_MODEL en ambos ambientes):
+    // 3/15 USD por millón, cotejado contra la consola de Anthropic el 2-ago.
+    // Los valores anteriores (5/25) eran de nivel Opus e inflaban los costos.
+    default: "3",
     soloSuper: true,
   },
   {
     key: "ia_precio_salida_usd_millon",
     label: "Precio del modelo — salida (USD por millón de tokens)",
     hint: "Igual que el anterior, para los tokens que genera el modelo.",
-    default: "25",
+    default: "15",
     soloSuper: true,
   },
   {
@@ -255,6 +259,18 @@ export async function registrarUso(
   },
 ): Promise<void> {
   try {
+    // Si nadie calculó el costo, se calcula aquí con los precios DECLARADOS en
+    // Ajustes de IA: el tope diario suma cost_cents, y una fila en cero es una
+    // corrida invisible para la compuerta.
+    let costCents = uso.costCents;
+    if (costCents == null) {
+      const ajustes = await leerAjustesIA(admin);
+      costCents = costoEnCentavos(
+        uso.tokensIn ?? 0,
+        uso.tokensOut ?? 0,
+        preciosDe(ajustes),
+      );
+    }
     await admin.from("ai_usage").insert({
       agent: uso.agent,
       channel: uso.channel ?? null,
@@ -264,7 +280,7 @@ export async function registrarUso(
       model: uso.model,
       tokens_in: uso.tokensIn ?? 0,
       tokens_out: uso.tokensOut ?? 0,
-      cost_cents: uso.costCents ?? 0,
+      cost_cents: costCents,
       tools: uso.tools ?? [],
       error: uso.error ?? null,
     });

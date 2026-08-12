@@ -49,6 +49,95 @@ export async function savePaymentData(
   return { ok: true as const, bankName };
 }
 
+/** RFC y redes sociales del embajador — los captura él mismo (equipo, 5-ago). */
+export async function saveAmbassadorExtras(input: {
+  rfc?: string;
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Inicia sesión de nuevo." };
+
+  const rfc = input.rfc?.trim().toUpperCase() || null;
+  if (rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc))
+    return { error: "Revisa tu RFC — el formato no parece válido." };
+
+  const links: Record<string, string> = {};
+  for (const key of ["instagram", "facebook", "tiktok"] as const) {
+    const v = input[key]?.trim();
+    if (v) links[key] = v.startsWith("http") ? v : `https://${v}`;
+  }
+
+  const admin = createAdminClient();
+  const { data: ambassador } = await admin
+    .from("ambassadors")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (!ambassador) return { error: "No encontramos tu perfil de embajador." };
+
+  const { error } = await admin
+    .from("ambassadors")
+    .update({ rfc, social_links: links })
+    .eq("id", ambassador.id);
+  if (error) return { error: "No pudimos guardar. Intenta de nuevo." };
+
+  revalidatePath("/embajador");
+  revalidatePath("/embajador/cuenta");
+  return { ok: true as const };
+}
+
+/**
+ * Baja voluntaria del embajador (equipo, 5-ago): su código deja de operar
+ * (todo el flujo de referidos filtra por status approved).
+ */
+export async function requestAmbassadorDeactivation(reason: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Inicia sesión de nuevo." };
+  const motivo = reason?.trim();
+  if (!motivo || motivo.length < 5)
+    return { error: "Cuéntanos el motivo de la baja." };
+
+  const admin = createAdminClient();
+  const { data: ambassador } = await admin
+    .from("ambassadors")
+    .select("id, first_name, last_name")
+    .eq("user_id", user.id)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (!ambassador) return { error: "No encontramos tu perfil de embajador." };
+
+  const { error } = await admin
+    .from("ambassadors")
+    .update({
+      status: "canceled",
+      deactivated_at: new Date().toISOString(),
+      deactivation_reason: `Baja voluntaria — ${motivo}`,
+    })
+    .eq("id", ambassador.id);
+  if (error) return { error: "No pudimos procesar la baja. Intenta de nuevo." };
+
+  const { notifyTeam } = await import("@/lib/alerts");
+  await notifyTeam(
+    "notify_ambassadors",
+    "Baja voluntaria de embajador 🕊️",
+    `<h2 style="color:#1E5350">${ambassador.first_name}${ambassador.last_name ? ` ${ambassador.last_name}` : ""} se dio de baja como embajador</h2>
+     <p><strong>Motivo:</strong> ${motivo}</p>
+     <p>Su código dejó de operar. Puede verse en el panel → Embajadores → Bajas.</p>`,
+  );
+
+  revalidatePath("/embajador");
+  return { ok: true as const };
+}
+
 /** Personalizar código — permitido una sola vez (code_change_count). */
 export async function customizeCode(suffixRaw: string) {
   const supabase = await createClient();

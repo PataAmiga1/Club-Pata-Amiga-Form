@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { sendTemplatedEmail } from "@/lib/email/send";
+import { notifyTeam } from "@/lib/alerts";
+import { ZONA_MX } from "@/lib/zona-horaria";
 import { bankFromClabe, isValidClabe } from "@/lib/banks";
 import { versionVigente } from "@/lib/plans/versiones";
 import { reemplazarSnapshot } from "@/lib/plans/resolve";
@@ -29,7 +31,16 @@ async function getOwnSubscription() {
     .eq("status", "active")
     .not("stripe_subscription_id", "is", null)
     .maybeSingle();
-  if (!sub?.stripe_subscription_id) throw new Error("Sin suscripción activa");
+  if (!sub?.stripe_subscription_id) {
+    // Miembro heredado de Memberstack: su cobro no vive aquí, así que no hay
+    // suscripción que prorratear. El mensaje va dirigido a la persona, porque
+    // el cliente lo ve tal cual en el portal.
+    throw new Error(
+      "Tu membresía viene de nuestra plataforma anterior, así que el cambio de " +
+        "plan todavía se hace a mano: escríbenos a soporte@pataamiga.mx y lo " +
+        "resolvemos por ti.",
+    );
+  }
   return { userId: user.id, sub, admin };
 }
 
@@ -114,24 +125,74 @@ export async function switchPlan(target: "monthly" | "annual") {
   return { ok: true as const };
 }
 
-/** Cancels at period end (coverage continues until the paid period finishes). */
+/**
+ * Cancela al final del período pagado.
+ *
+ * Atiende los DOS tipos de miembro (auditoría del 11-ago):
+ *  - con suscripción de Stripe: se marca `cancel_at_period_end` en Stripe.
+ *  - **heredado de Memberstack** (activo sin suscripción, 60 de 63): antes
+ *    reventaba con "Sin suscripción activa" y el miembro NO PODÍA cancelar.
+ *    Ahora se registra la baja aquí y **se avisa al equipo**, porque el cobro
+ *    de esa persona no vive en esta plataforma y alguien tiene que detenerlo
+ *    por fuera. No se finge que el dinero dejó de moverse.
+ */
 export async function cancelMembership(reason: string, comments: string) {
-  const { userId, sub, admin } = await getOwnSubscription();
-  const stripe = getStripe();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+  const userId = user.id;
+  const admin = createAdminClient();
 
-  const updated = await stripe.subscriptions.update(sub.stripe_subscription_id, {
-    cancel_at_period_end: true,
-  });
-  const endTs = updated.items.data[0]?.current_period_end;
-  const coverageEnd = endTs ? new Date(endTs * 1000) : null;
+  const { data: perfil } = await admin
+    .from("profiles")
+    .select("email, first_name, membership_status")
+    .eq("id", userId)
+    .single();
+  if (perfil?.membership_status !== "active")
+    throw new Error("Sin membresía activa");
 
-  await admin
+  const { data: sub } = await admin
     .from("subscriptions")
-    .update({
+    .select("id, stripe_subscription_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .not("stripe_subscription_id", "is", null)
+    .maybeSingle();
+
+  let coverageEnd: Date | null = null;
+
+  if (sub?.stripe_subscription_id) {
+    const stripe = getStripe();
+    const updated = await stripe.subscriptions.update(sub.stripe_subscription_id, {
       cancel_at_period_end: true,
-      current_period_end: coverageEnd?.toISOString() ?? null,
-    })
-    .eq("id", sub.id);
+    });
+    const endTs = updated.items.data[0]?.current_period_end;
+    coverageEnd = endTs ? new Date(endTs * 1000) : null;
+    await admin
+      .from("subscriptions")
+      .update({
+        cancel_at_period_end: true,
+        current_period_end: coverageEnd?.toISOString() ?? null,
+      })
+      .eq("id", sub.id);
+  } else {
+    // Heredado: no hay período pagado que consultar. Se deja la baja asentada
+    // y el comité decide la fecha real de corte con el proveedor anterior.
+    await notifyTeam(
+      "notify_memberships",
+      "⚠️ Baja de miembro con cobro heredado",
+      `<h2 style="color:#1E5350">Canceló un miembro migrado</h2>
+       <p><strong>${perfil?.email ?? userId}</strong> canceló su membresía desde su portal.</p>
+       <p><strong>Motivo:</strong> ${reason}${comments ? ` — «${comments}»` : ""}</p>
+       <p><strong>Qué hay que hacer a mano:</strong> su cobro NO vive en esta
+       plataforma (viene de la migración de Memberstack). Hay que detenerlo con
+       el proveedor anterior, fijar la fecha real de corte y, cuando llegue,
+       dar de baja la cuenta desde Admin → Miembros.</p>`,
+    );
+  }
+
   await admin.from("cancellations").insert({
     user_id: userId,
     reason,
@@ -139,16 +200,11 @@ export async function cancelMembership(reason: string, comments: string) {
     coverage_end_date: coverageEnd?.toISOString().slice(0, 10) ?? null,
   });
 
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("email, first_name")
-    .eq("id", userId)
-    .single();
-  if (profile?.email) {
-    await sendTemplatedEmail("cancellation", profile.email, {
-      firstName: profile.first_name ?? "",
+  if (perfil?.email) {
+    await sendTemplatedEmail("cancellation", perfil.email, {
+      firstName: perfil.first_name ?? "",
       coverageEndLine: coverageEnd
-        ? `hasta el <strong>${coverageEnd.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}</strong>`
+        ? `hasta el <strong>${coverageEnd.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: ZONA_MX })}</strong>`
         : "hasta el fin de tu período pagado",
     });
   }

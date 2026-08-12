@@ -12,8 +12,13 @@ export type PetRow = {
   photo_url: string | null;
   approval_status: "pending" | "approved" | "rejected";
   waiting_period_end_date: string | null;
+  waiting_period_start_date?: string | null;
   waiting_period_bypassed: boolean;
   created_at: string;
+  /** Para distinguir "completar documentos" de "en revisión" (equipo, 11-ago) */
+  is_senior?: boolean;
+  vet_certificate_url?: string | null;
+  info_requested?: boolean;
   is_active?: boolean;
   deactivation_reason?: string | null;
   deactivated_at?: string | null;
@@ -28,7 +33,8 @@ function ageLabel(pet: PetRow) {
 const STATUS_CHIP = {
   approved: { text: "✓ APROBADO", cls: "bg-success-bg text-success-text" },
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
-  rejected: { text: "DENEGADO", cls: "bg-error-bg text-error-text" },
+  // "rechazado", no "denegado" (equipo, 11-ago)
+  rejected: { text: "RECHAZADO", cls: "bg-error-bg text-error-text" },
 } as const;
 
 export function PetCard({ pet }: { pet: PetRow }) {
@@ -38,7 +44,19 @@ export function PetCard({ pet }: { pet: PetRow }) {
     pet.created_at,
     pet.waiting_period_end_date,
     pet.waiting_period_bypassed,
+    pet.waiting_period_start_date,
   );
+  // La espera arranca cuando el comité aprueba (PM, 11-ago): una ficha en
+  // revisión no muestra un conteo corriendo.
+  const enRevision = pet.approval_status === "pending" && !pet.waiting_period_bypassed;
+  // Si el miembro ya subió todo (foto + certificado si es senior y el comité
+  // no pidió nada más), la leyenda dice "en revisión" — decirle "completar
+  // documentos" cuando no le falta nada confunde (equipo, 11-ago; se decidió
+  // en la junta conservar el aviso pero distinguir el estatus).
+  const docsCompletos =
+    Boolean(pet.photo_url) &&
+    (!pet.is_senior || Boolean(pet.vet_certificate_url)) &&
+    !pet.info_requested;
   const photoTone =
     pet.approval_status === "approved"
       ? "border-[#C9E9E4] bg-info-bg text-teal"
@@ -52,13 +70,15 @@ export function PetCard({ pet }: { pet: PetRow }) {
       }`}
     >
       <div
-        className={`grid size-16 flex-none place-items-center overflow-hidden rounded-[16px] border-2 border-dashed text-center text-[11px] font-bold sm:size-[86px] sm:rounded-[20px] ${photoTone}`}
+        className={`relative grid size-16 flex-none place-items-center overflow-hidden rounded-[16px] border-2 border-dashed text-center text-[11px] font-bold sm:size-[86px] sm:rounded-[20px] ${photoTone}`}
       >
         {pet.photo_url ? (
+          // Absoluta: height 100% en fila auto de grid se resuelve como auto
+          // y el recorte deja de estar centrado (muestra la franja superior)
           <img
             src={pet.photo_url}
             alt={pet.name}
-            className="size-full object-cover"
+            className="absolute inset-0 size-full object-cover"
           />
         ) : (
           <>
@@ -90,6 +110,17 @@ export function PetCard({ pet }: { pet: PetRow }) {
               : "Ya no está en la manada."}{" "}
             Su recuerdo se queda contigo. 💛
           </span>
+        ) : enRevision ? (
+        <div className="flex flex-col gap-[5px]">
+          <span className="text-[11.5px] text-ink-tertiary">
+            {docsCompletos
+              ? "Su ficha está en revisión del comité — el período de espera empieza al aprobarse · "
+              : "Su período de espera empieza cuando el comité apruebe su ficha · "}
+            <Link href="/app/peludos" className="font-semibold text-teal-deep">
+              {docsCompletos ? "Ver ficha" : "Completar documentos"}
+            </Link>
+          </span>
+        </div>
         ) : (
         <div className="flex flex-col gap-[5px]">
           <div className="flex justify-between text-[11.5px] text-ink-tertiary">
@@ -114,6 +145,8 @@ export function PetCard({ pet }: { pet: PetRow }) {
               style={{ width: `${wait.pct}%` }}
             />
           </div>
+          {/* La rama "pending" vive arriba (enRevision): aquí solo llegan
+              fichas aprobadas o con bypass. */}
           {wait.done && pet.approval_status === "approved" ? (
             <Link
               href="/app/reintegros/nueva"
@@ -121,16 +154,6 @@ export function PetCard({ pet }: { pet: PetRow }) {
             >
               Reintegro disponible 🎉 Utilizar mis beneficios →
             </Link>
-          ) : pet.approval_status === "pending" ? (
-            <span className="text-[11.5px] text-ink-tertiary">
-              El comité está revisando su ficha ·{" "}
-              <Link
-                href="/app/peludos"
-                className="font-semibold text-teal-deep"
-              >
-                Completar documentos
-              </Link>
-            </span>
           ) : null}
         </div>
         )}

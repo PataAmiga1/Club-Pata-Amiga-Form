@@ -118,12 +118,13 @@ export async function executeDemoTool(
     case "periodos_de_espera": {
       const b = beneficiosDe(null); // los valores vigentes del catálogo
       return [
-        `Contratante: ${b.espera_contratante_dias} días desde el pago.`,
+        `Contratante: sin período de espera — la membresía queda activa al pagar.`,
+        `La espera es por mascota y empieza cuando el comité aprueba su ficha:`,
         `Mascota estándar: ${b.espera_mascota_estandar_dias} días.`,
         `Mascota adoptada de raza: ${b.espera_mascota_adoptada_raza_dias} días.`,
         `Mascota adoptada mestiza: ${b.espera_mascota_adoptada_mestizo_dias} días.`,
-        `Con código de embajador: ${b.espera_mascota_con_embajador_dias} días.`,
-        `Mascota de reemplazo tras una baja: ${b.espera_mascota_reemplazo_dias} días.`,
+        `Con código de embajador: ${b.espera_mascota_con_embajador_dias} días (beneficio de la membresía).`,
+        `Mascota de reemplazo tras una baja: condiciones normales, sin el beneficio del embajador.`,
       ].join("\n");
     }
 

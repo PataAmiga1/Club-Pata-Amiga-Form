@@ -53,6 +53,81 @@ function checkDigit(curp17: string): string {
   return String((10 - (sum % 10)) % 10);
 }
 
+const quitarAcentos = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .trim();
+
+/** Nombres "de dientes para afuera" que la CURP salta (regla RENAPO). */
+const NOMBRES_COMUNES = new Set(["MARIA", "MA", "MA.", "JOSE", "J", "J."]);
+
+/**
+ * Cruce CURP ↔ datos del perfil (equipo, 5-ago). SOLO MARCA, NO BLOQUEA
+ * (decisión de Pablo): los nombres compuestos y las reglas de RENAPO dan
+ * falsos negativos, así que las discrepancias se muestran como aviso al
+ * miembro y como bandera en el admin.
+ */
+export function curpCoincide(
+  curpRaw: string,
+  datos: {
+    nombres?: string | null;
+    apellidoPaterno?: string | null;
+    apellidoMaterno?: string | null;
+    /** yyyy-mm-dd */
+    birthDate?: string | null;
+  },
+): { coincide: boolean; discrepancias: string[] } | null {
+  const curp = formatCurp(curpRaw ?? "");
+  if (!validateCurp(curp).isValid) return null;
+
+  const discrepancias: string[] = [];
+
+  if (datos.birthDate && /^\d{4}-\d{2}-\d{2}$/.test(datos.birthDate)) {
+    const esperado =
+      datos.birthDate.slice(2, 4) +
+      datos.birthDate.slice(5, 7) +
+      datos.birthDate.slice(8, 10);
+    if (curp.slice(4, 10) !== esperado)
+      discrepancias.push("la fecha de nacimiento");
+  }
+
+  const paterno = datos.apellidoPaterno
+    ? quitarAcentos(datos.apellidoPaterno)
+    : "";
+  if (paterno) {
+    const inicial = paterno.charAt(0) === "Ñ" ? "X" : paterno.charAt(0);
+    if (curp.charAt(0) !== inicial)
+      discrepancias.push("el apellido paterno");
+  }
+
+  const materno = datos.apellidoMaterno
+    ? quitarAcentos(datos.apellidoMaterno)
+    : "";
+  if (materno) {
+    const inicial = materno.charAt(0) === "Ñ" ? "X" : materno.charAt(0);
+    if (curp.charAt(2) !== inicial)
+      discrepancias.push("el apellido materno");
+  }
+
+  const nombres = datos.nombres ? quitarAcentos(datos.nombres) : "";
+  if (nombres) {
+    const tokens = nombres.split(/\s+/);
+    // MARIA/JOSE con segundo nombre: la CURP usa el segundo (regla RENAPO)
+    const efectivo =
+      tokens.length > 1 && NOMBRES_COMUNES.has(tokens[0])
+        ? tokens[1]
+        : tokens[0];
+    const inicial = efectivo.charAt(0) === "Ñ" ? "X" : efectivo.charAt(0);
+    const alternativa = tokens[0]?.charAt(0);
+    if (curp.charAt(3) !== inicial && curp.charAt(3) !== alternativa)
+      discrepancias.push("el nombre");
+  }
+
+  return { coincide: discrepancias.length === 0, discrepancias };
+}
+
 export function validateCurp(curpRaw: string): {
   isValid: boolean;
   error?: string;

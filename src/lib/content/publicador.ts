@@ -1,6 +1,7 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { publicadorDe } from "@/lib/content/registry";
 import { notifyTeam } from "@/lib/alerts";
+import { ZONA_MX } from "@/lib/zona-horaria";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -118,7 +119,7 @@ export async function avisarAntesDePublicar(
   let avisados = 0;
   for (const post of proximos ?? []) {
     const cuando = post.scheduled_for
-      ? new Date(post.scheduled_for).toLocaleString("es-MX")
+      ? new Date(post.scheduled_for).toLocaleString("es-MX", { timeZone: ZONA_MX })
       : "pronto";
 
     await avisar(

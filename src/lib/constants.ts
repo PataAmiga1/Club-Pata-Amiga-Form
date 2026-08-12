@@ -14,9 +14,13 @@ export const PLANS = {
  * variable (adopción, raza, código de embajador, reemplazo) — ver
  * src/lib/waiting-period.ts (reglas del sitio vivo, confirmadas 15-jul-2026).
  */
-export const WAITING_PERIOD_DAYS = {
-  member: 90,
-} as const;
+/**
+ * ELIMINADO el 11-ago-2026 (PM): el contratante NO tiene período de espera —
+ * al pagar es miembro, sin aprobación ni espera. La espera es POR MASCOTA
+ * (src/lib/waiting-period.ts) y arranca cuando el comité aprueba la ficha.
+ * `profiles.waiting_period_end_date` quedó como columna huérfana con fechas
+ * viejas; ya nadie la escribe ni la lee.
+ */
 
 /** Topes de reintegro en MXN por categoría. */
 export const REIMBURSEMENT_CAPS_MXN = {
@@ -47,14 +51,29 @@ export const MAX_ACTIVE_PETS = 3;
 export const PET_GALLERY_MAX = 5;
 /** Apelaciones máximas por sujeto (regla del sistema anterior). */
 export const APPEAL_MAX_PER_SUBJECT = 2;
-export const SENIOR_PET_AGE_YEARS = 10; // requiere certificado veterinario
+/**
+ * Centros de bienestar: UNA sola apelación (junta 10-ago 01:37:40, confirmado
+ * por Pablo el 11-ago). Distinto de miembros y mascotas, que conservan 2.
+ * Los embajadores NO pueden apelar — por eso no aparecen aquí.
+ */
+export const CENTER_APPEAL_MAX = 1;
+/**
+ * Edad senior (pide certificado veterinario). 10 → 8 el 11-ago-2026 (equipo).
+ * Es una regla GLOBAL, no un beneficio versionado: aplica a cualquier mascota
+ * registrada desde el cambio, incluidas las de miembros que ya existían
+ * (Regla X, decisión de Pablo). Las mascotas ya registradas conservan su
+ * `is_senior` guardado — no se recalculan.
+ */
+export const SENIOR_PET_AGE_YEARS = 8;
 export const REIMBURSEMENT_SLA_HOURS = 72; // compromiso de transferencia
 
 /** Las 5 características de la membresía — SIEMPRE en este orden. */
 export const MEMBERSHIP_FEATURES = [
   "Disponible en todo México",
   "Mantienes a tu veterinario",
-  "Incluye hasta 3 mascotas",
+  // "peludos" en vez de "mascotas" en la banda (equipo, 11-ago) — mismo
+  // orden vinculante de las 5 características.
+  "Incluye hasta 3 peludos",
   "Orientación veterinaria 24/7",
   "100% digital",
 ] as const;

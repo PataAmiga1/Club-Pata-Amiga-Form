@@ -99,6 +99,12 @@ function LoginForm() {
           </button>
         }
       />
+      <Link
+        href="/recuperar-contrasena"
+        className="-mt-1.5 self-end text-[13px] font-semibold text-teal-deep hover:underline"
+      >
+        ¿Olvidaste tu contraseña?
+      </Link>
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">
           {error}

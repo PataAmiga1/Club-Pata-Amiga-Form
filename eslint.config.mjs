@@ -32,6 +32,12 @@ const eslintConfig = defineConfig([
     "tests/**",
     "*.js",
     "test-memberstack-api.ts",
+    // No son código de la aplicación: código extraído de Webflow, utilerías
+    // sueltas y widgets estáticos servidos tal cual. La reja de CI vigila src/.
+    "login code extracted/**",
+    "scripts/**",
+    "scratch/**",
+    "public/**",
   ]),
 ]);
 

@@ -28,23 +28,25 @@ export default async function BienvenidaPage({
 
   const { data: pets } = await supabase
     .from("pets")
-    .select("name, waiting_period_end_date, created_at")
+    .select("name, waiting_period_end_date, waiting_period_start_date, created_at")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .order("created_at", { ascending: true })
     .limit(1);
   const pet = pets?.[0];
-  // El período es variable por mascota — se deriva de la fecha que fijó el webhook
-  const days = pet?.waiting_period_end_date
-    ? Math.max(
-        1,
-        Math.round(
-          (new Date(`${pet.waiting_period_end_date}T12:00:00`).getTime() -
-            new Date(pet.created_at).getTime()) /
-            86_400_000,
-        ),
-      )
-    : null;
+  // La espera arranca al APROBARSE la ficha (PM, 11-ago): recién pagado, la
+  // mascota aún no tiene fechas. Si las tiene (ya la aprobaron), se muestran.
+  const days =
+    pet?.waiting_period_end_date && pet?.waiting_period_start_date
+      ? Math.max(
+          1,
+          Math.round(
+            (new Date(`${pet.waiting_period_end_date}T12:00:00`).getTime() -
+              new Date(`${pet.waiting_period_start_date}T12:00:00`).getTime()) /
+              86_400_000,
+          ),
+        )
+      : null;
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-teal px-6 py-16">
@@ -71,13 +73,20 @@ export default async function BienvenidaPage({
         <p className="text-base leading-relaxed text-white/[.92]">
           Tu membresía está activa y la orientación veterinaria 24/7 ya está
           disponible.
-          {pet && days && (
-            <>
-              {" "}
-              {pet.name} entra a revisión del comité y su período de espera de{" "}
-              {days} días corre desde hoy.
-            </>
-          )}
+          {pet &&
+            (days ? (
+              <>
+                {" "}
+                {pet.name} entra a revisión del comité y su período de espera
+                de {days} días ya está en curso.
+              </>
+            ) : (
+              <>
+                {" "}
+                {pet.name} entra a revisión del comité; en cuanto su ficha sea
+                aprobada empezará su período de espera.
+              </>
+            ))}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link

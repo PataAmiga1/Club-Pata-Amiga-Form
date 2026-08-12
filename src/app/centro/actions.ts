@@ -154,6 +154,157 @@ export async function togglePromotion(promotionId: string, isActive: boolean) {
   return { ok: true as const };
 }
 
+/**
+ * Servicios y ubicaciones editables por el propio centro (equipo, 5-ago):
+ * antes solo podía "escribirnos" y el comité los cambiaba a mano.
+ */
+export async function updateCenterServices(services: string[]) {
+  const ctx = await ownCenter();
+  if (!ctx) return { error: "No encontramos tu centro aliado." };
+  const clean = [...new Set(services)].filter(Boolean);
+  if (clean.length === 0)
+    return { error: "Elige al menos un servicio." };
+
+  const { error } = await ctx.admin
+    .from("wellness_centers")
+    .update({ services: clean })
+    .eq("id", ctx.center.id);
+  if (error) return { error: "No pudimos guardar. Intenta de nuevo." };
+
+  refreshCenterPages();
+  return { ok: true as const };
+}
+
+export type LocationInput = {
+  address: string;
+  colony?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  phone?: string;
+};
+
+export async function addCenterLocation(input: LocationInput) {
+  const ctx = await ownCenter();
+  if (!ctx) return { error: "No encontramos tu centro aliado." };
+  if (!input.address?.trim())
+    return { error: "Escribe la dirección de la sucursal." };
+
+  const { error } = await ctx.admin.from("wellness_center_locations").insert({
+    center_id: ctx.center.id,
+    address: input.address.trim(),
+    colony: input.colony?.trim() || null,
+    city: input.city?.trim() || null,
+    state: input.state?.trim() || null,
+    postal_code: input.postalCode?.trim() || null,
+    phone: input.phone?.trim() || null,
+  });
+  if (error) return { error: "No pudimos guardar. Intenta de nuevo." };
+
+  refreshCenterPages();
+  return { ok: true as const };
+}
+
+export async function updateCenterLocation(
+  locationId: string,
+  input: LocationInput,
+) {
+  const ctx = await ownCenter();
+  if (!ctx) return { error: "No encontramos tu centro aliado." };
+  if (!input.address?.trim())
+    return { error: "Escribe la dirección de la sucursal." };
+
+  const { error } = await ctx.admin
+    .from("wellness_center_locations")
+    .update({
+      address: input.address.trim(),
+      colony: input.colony?.trim() || null,
+      city: input.city?.trim() || null,
+      state: input.state?.trim() || null,
+      postal_code: input.postalCode?.trim() || null,
+      phone: input.phone?.trim() || null,
+    })
+    .eq("id", locationId)
+    .eq("center_id", ctx.center.id);
+  if (error) return { error: "No pudimos guardar. Intenta de nuevo." };
+
+  refreshCenterPages();
+  return { ok: true as const };
+}
+
+export async function deleteCenterLocation(locationId: string) {
+  const ctx = await ownCenter();
+  if (!ctx) return { error: "No encontramos tu centro aliado." };
+
+  const { error } = await ctx.admin
+    .from("wellness_center_locations")
+    .delete()
+    .eq("id", locationId)
+    .eq("center_id", ctx.center.id);
+  if (error) return { error: "No pudimos borrar. Intenta de nuevo." };
+
+  refreshCenterPages();
+  return { ok: true as const };
+}
+
+/** Redes sociales del centro (equipo, 5-ago). */
+export async function updateCenterSocial(links: {
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+}) {
+  const ctx = await ownCenter();
+  if (!ctx) return { error: "No encontramos tu centro aliado." };
+
+  const clean: Record<string, string> = {};
+  for (const key of ["instagram", "facebook", "tiktok"] as const) {
+    const v = links[key]?.trim();
+    if (v) clean[key] = v.startsWith("http") ? v : `https://${v}`;
+  }
+
+  const { error } = await ctx.admin
+    .from("wellness_centers")
+    .update({ social_links: clean })
+    .eq("id", ctx.center.id);
+  if (error) return { error: "No pudimos guardar. Intenta de nuevo." };
+
+  refreshCenterPages();
+  return { ok: true as const };
+}
+
+/**
+ * Baja voluntaria del centro (equipo, 5-ago): sale del directorio de
+ * inmediato y el comité recibe el aviso con el motivo.
+ */
+export async function requestCenterDeactivation(reason: string) {
+  const ctx = await ownCenter();
+  if (!ctx) return { error: "No encontramos tu centro aliado." };
+  const motivo = reason?.trim();
+  if (!motivo || motivo.length < 5)
+    return { error: "Cuéntanos el motivo de la baja." };
+
+  const { error } = await ctx.admin
+    .from("wellness_centers")
+    .update({
+      status: "deactivated",
+      deactivated_at: new Date().toISOString(),
+      deactivation_reason: motivo,
+    })
+    .eq("id", ctx.center.id);
+  if (error) return { error: "No pudimos procesar la baja. Intenta de nuevo." };
+
+  await notifyTeam(
+    "notify_centers",
+    "Baja voluntaria de centro aliado 🕊️",
+    `<h2 style="color:#1E5350">${ctx.center.name} se dio de baja del directorio</h2>
+     <p><strong>Motivo:</strong> ${motivo}</p>
+     <p>Su ficha ya no aparece en el directorio. Puede verse en el panel → Centros → Bajas.</p>`,
+  );
+
+  refreshCenterPages();
+  return { ok: true as const };
+}
+
 export async function deletePromotion(promotionId: string) {
   const ctx = await ownCenter();
   if (!ctx) return { error: "No encontramos tu centro aliado." };

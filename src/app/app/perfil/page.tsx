@@ -13,15 +13,17 @@ export default async function PerfilPage() {
     supabase
       .from("profiles")
       .select(
-        "first_name, last_name, mother_last_name, phone, curp, postal_code, state, city, colony, street, number_ext, number_int",
+        "first_name, last_name, mother_last_name, phone, curp, birth_date, nationality, postal_code, state, city, colony, street, number_ext, number_int, avatar_url",
       )
       .eq("id", user.id)
       .single(),
+    // El INE se dejó de pedir a miembros (equipo, 11-ago); los extranjeros
+    // suben pasaporte en lugar de CURP.
     supabase
       .from("documents")
       .select("document_type, file_name")
       .eq("user_id", user.id)
-      .in("document_type", ["ine_front", "ine_back"]),
+      .eq("document_type", "passport"),
   ]);
 
   return (
@@ -29,8 +31,8 @@ export default async function PerfilPage() {
       <ProfileForm
         userId={user.id}
         initial={profile ?? {}}
-        ineFront={docs?.find((d) => d.document_type === "ine_front")?.file_name ?? null}
-        ineBack={docs?.find((d) => d.document_type === "ine_back")?.file_name ?? null}
+        passport={docs?.[0]?.file_name ?? null}
+        avatarUrl={profile?.avatar_url ?? null}
       />
     </div>
   );

@@ -21,7 +21,7 @@ export default async function PeludosPage({
     supabase
       .from("pets")
       .select(
-        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_bypassed, created_at, is_active, deactivation_reason, deactivated_at",
+        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at, is_active, deactivation_reason, deactivated_at, is_senior, vet_certificate_url, info_requested",
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: true }),

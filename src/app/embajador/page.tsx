@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ZONA_MX } from "@/lib/zona-horaria";
 import { formatMxn } from "@/lib/format";
 import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
 import { WelcomeOnce } from "@/components/app/WelcomeOnce";
@@ -24,7 +25,13 @@ const one = <T,>(v: T | T[] | null): T | null =>
   Array.isArray(v) ? (v[0] ?? null) : v;
 
 const shortDate = (iso: string) =>
-  new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" })
+  // timeZone explícita: sin ella, un alta de la noche (hora CDMX) se corría
+  // al día siguiente al renderizar en Vercel (UTC).
+  new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "short",
+    timeZone: ZONA_MX,
+  })
     .format(new Date(iso))
     .replace(".", "");
 
@@ -74,9 +81,10 @@ export default async function EmbajadorResumenPage() {
     (sum, r) => sum + Number(r.commission_amount ?? 0),
     0,
   );
-  const monthName = new Intl.DateTimeFormat("es-MX", { month: "long" }).format(
-    now,
-  );
+  const monthName = new Intl.DateTimeFormat("es-MX", {
+    month: "long",
+    timeZone: ZONA_MX,
+  }).format(now);
 
   const planLabel = (r: ReferralRow) => {
     const plan = r.subscriptions?.plan ?? null;

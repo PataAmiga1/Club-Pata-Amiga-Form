@@ -11,6 +11,7 @@ export type CenterCardData = {
   memberBenefit: string | null;
   logoUrl: string | null;
   phone: string | null;
+  website?: string | null;
   locations: {
     address: string | null;
     city: string | null;
@@ -74,6 +75,8 @@ export function CentersExplorer({
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [service, setService] = useState<WellnessService | "all">("all");
+  // Popup de detalle del centro (petición del equipo, 5-ago)
+  const [selected, setSelected] = useState<CenterCardData | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -177,7 +180,11 @@ export function CentersExplorer({
               return (
                 <article
                   key={center.id}
-                  className="flex flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_2px_10px_rgba(30,83,80,.05)]"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelected(center)}
+                  onKeyDown={(e) => e.key === "Enter" && setSelected(center)}
+                  className="flex cursor-pointer flex-col overflow-hidden rounded-[18px] bg-white shadow-[0_2px_10px_rgba(30,83,80,.05)] transition-shadow hover:shadow-[0_4px_18px_rgba(30,83,80,.12)]"
                 >
                   {center.logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -216,6 +223,7 @@ export function CentersExplorer({
                     {(loc?.phone || center.phone) && (
                       <a
                         href={`tel:${(loc?.phone || center.phone || "").replace(/\D/g, "")}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="text-xs font-semibold text-teal-deep hover:underline"
                       >
                         📞 {loc?.phone || center.phone}
@@ -265,6 +273,134 @@ export function CentersExplorer({
           </Link>
         </div>
       </div>
+
+      {/* Popup de detalle del centro: toda la info, ruta en Google Maps,
+          beneficios y promociones (petición del equipo, 5-ago). */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-ink-title/40 p-4"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            role="dialog"
+            aria-label={selected.name}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[86dvh] w-full max-w-[520px] overflow-y-auto rounded-[20px] bg-white p-5 shadow-[0_12px_40px_rgba(30,83,80,.25)]"
+          >
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h3 className="font-display text-[20px] text-ink-title">
+                {selected.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                aria-label="Cerrar"
+                className="grid size-8 flex-none place-items-center rounded-full bg-cream text-ink-secondary transition-colors hover:bg-border-input"
+              >
+                ✕
+              </button>
+            </div>
+
+            {selected.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={selected.logoUrl}
+                alt={selected.name}
+                className="mb-3 h-[180px] w-full rounded-[14px] bg-cream object-contain"
+              />
+            )}
+
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {selected.services.map((s) => {
+                const svc = WELLNESS_SERVICES[s as WellnessService];
+                return (
+                  <span
+                    key={s}
+                    className={`rounded-full px-2.5 py-[3px] text-[10px] font-extrabold uppercase ${CHIP_PALETTES[s as WellnessService] ?? CHIP_PALETTES.clinic}`}
+                  >
+                    {svc ? `${svc.emoji} ${svc.label}` : s}
+                  </span>
+                );
+              })}
+            </div>
+
+            {(selected.memberBenefit || selected.promotions.length > 0) && (
+              <div className="mb-3 flex flex-col gap-1.5 rounded-[12px] bg-cream p-3.5">
+                <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                  BENEFICIOS PARA MIEMBROS
+                </span>
+                {selected.memberBenefit && (
+                  <span className="text-[13px] font-semibold text-warning-text">
+                    🎁 {selected.memberBenefit}
+                  </span>
+                )}
+                {selected.promotions.map((p) => (
+                  <span
+                    key={p.title}
+                    className="text-[13px] font-semibold text-teal-deep"
+                  >
+                    🏷️ {p.title}
+                    {p.discountLabel ? ` — ${p.discountLabel}` : ""}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="mb-3 flex flex-col gap-2.5">
+              <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                UBICACIONES
+              </span>
+              {selected.locations.length > 0 ? (
+                selected.locations.map((l, i) => {
+                  const dir = [l.address, l.colony, l.city, l.state, l.postalCode]
+                    .filter(Boolean)
+                    .join(", ");
+                  return (
+                    <div key={i} className="flex flex-col gap-1 text-[13px] text-ink-body">
+                      <span>📍 {dir || "Dirección por confirmar"}</span>
+                      <span className="flex flex-wrap gap-3">
+                        {dir && (
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${selected.name}, ${dir}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[12.5px] font-bold text-teal-deep hover:underline"
+                          >
+                            🧭 Iniciar ruta en Google Maps
+                          </a>
+                        )}
+                        {(l.phone || selected.phone) && (
+                          <a
+                            href={`tel:${(l.phone || selected.phone || "").replace(/\D/g, "")}`}
+                            className="text-[12.5px] font-bold text-teal-deep hover:underline"
+                          >
+                            📞 {l.phone || selected.phone}
+                          </a>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <span className="text-[13px] text-ink-secondary">
+                  En todo México.
+                </span>
+              )}
+            </div>
+
+            {selected.website && (
+              <a
+                href={selected.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[13px] font-bold text-teal-deep hover:underline"
+              >
+                🌐 {selected.website.replace(/^https?:\/\/(www\.)?/, "")} ↗
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { reportError } from "@/lib/alerts";
-import { AMBASSADOR_COMMISSION_MXN, WAITING_PERIOD_DAYS } from "@/lib/constants";
+import { AMBASSADOR_COMMISSION_MXN } from "@/lib/constants";
 import { petWaitingPeriodDays } from "@/lib/waiting-period";
 import { crmEventoDeUsuario, marcarComoMiembro } from "@/lib/crm/sync";
 import {
@@ -12,16 +12,6 @@ import {
   esperasDe,
   tomarSnapshot,
 } from "@/lib/plans/resolve";
-import { diaEnMexicoMasDias } from "@/lib/zona-horaria";
-
-/**
- * Fecha a `days` días de hoy, en hora de México. Este webhook corre en Vercel
- * (UTC), donde "hoy" empieza a las 6 de la tarde del día anterior: con el reloj
- * del proceso, un pago de las 8 de la noche fechaba todo un día adelante.
- */
-function addDays(days: number): string {
-  return diaEnMexicoMasDias(days);
-}
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
@@ -35,10 +25,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     session.metadata?.plan_version_id,
   );
 
-  // 1. Member is ACTIVE immediately on payment
+  // 1. Member is ACTIVE immediately on payment.
+  // El contratante NO tiene período de espera (PM, 11-ago): quien compra la
+  // membresía se vuelve miembro automáticamente, sin aprobación ni espera.
+  // Antes aquí se escribía profiles.waiting_period_end_date (90 días); las
+  // fechas viejas se quedan en la columna pero ya nadie las lee.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("email, first_name, waiting_period_end_date")
+    .select("email, first_name")
     .eq("id", userId)
     .single();
 
@@ -47,23 +41,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     .update({
       membership_status: "active",
       member_since: new Date().toISOString(),
-      ...(profile?.waiting_period_end_date
-        ? {}
-        : {
-            waiting_period_end_date: addDays(
-              Number(beneficios.espera_contratante_dias) ||
-                WAITING_PERIOD_DAYS.member,
-            ),
-          }),
       ...(session.metadata?.ambassador_code
         ? { ambassador_code_used: session.metadata.ambassador_code }
         : {}),
     })
     .eq("id", userId);
 
-  // 2. Start waiting periods for pets that don't have one yet.
-  // Días variables por mascota (reglas del sitio vivo): adoptado mestizo 120,
-  // adoptado de raza 150, estándar 180; con código de embajador válido, 90.
+  // 2. Los días de espera de cada mascota — SOLO para informarlos en el
+  // correo de bienvenida. La fecha real ya NO se escribe aquí: el reloj
+  // arranca cuando el comité APRUEBA la ficha (regla de la PM, 11-ago;
+  // lo fija resolvePet vía iniciarEsperaDeMascota). Escribirla al pagar era
+  // parte del bug de los "13 días transcurridos": si el pago llegaba días
+  // después de crear la ficha, esa brecha aparecía como avance fantasma.
   const hasReferral = Boolean(session.metadata?.ambassador_code);
   const { data: pets } = await supabase
     .from("pets")
@@ -82,15 +71,39 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       esperasDe(beneficios),
     );
     petDays.set(pet.id, days);
-    await supabase
-      .from("pets")
-      .update({ waiting_period_end_date: addDays(days) })
-      .eq("id", pet.id);
   }
 
   // 3. Record the subscription.
   //    `plan_version_id` viaja en la metadata del checkout para que el webhook
   //    NUNCA tenga que adivinar de qué versión fue un pago.
+  // El período (inicio y fin) se pide a Stripe AQUÍ, en el alta.
+  //
+  // Por qué: Stripe NO dispara `customer.subscription.updated` al suscribirse
+  // (eso pasa en la primera renovación o en un cambio de plan), así que la fila
+  // se quedaba con `current_period_start/end` en NULL durante todo el primer
+  // período. Consecuencias que eso tenía: el comité no veía "Próximo cobro" en
+  // el expediente, el miembro veía una fecha ADIVINADA (`member_since` + 1 mes)
+  // en lugar de la real, y los recordatorios de renovación no tendrían de dónde
+  // leer. Detectado el 11-ago comparando la BD contra Stripe.
+  let periodoInicio: string | null = null;
+  let periodoFin: string | null = null;
+  if (session.subscription) {
+    try {
+      const suscripcion = await getStripe().subscriptions.retrieve(
+        session.subscription as string,
+      );
+      const item = suscripcion.items.data[0];
+      if (item?.current_period_start)
+        periodoInicio = new Date(item.current_period_start * 1000).toISOString();
+      if (item?.current_period_end)
+        periodoFin = new Date(item.current_period_end * 1000).toISOString();
+    } catch (e) {
+      // Si Stripe no responde, la fila se crea igual: el pago ya ocurrió y no
+      // se puede perder. Las fechas las rellenará el evento de renovación.
+      console.error("[webhook] no se pudo leer el período de la suscripción", e);
+    }
+  }
+
   const { data: subRow } = await supabase
     .from("subscriptions")
     .upsert(
@@ -102,6 +115,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         amount: session.amount_total ? session.amount_total / 100 : null,
         currency: (session.currency ?? "mxn").toUpperCase(),
         status: "active",
+        ...(periodoInicio ? { current_period_start: periodoInicio } : {}),
+        ...(periodoFin ? { current_period_end: periodoFin } : {}),
       },
       { onConflict: "stripe_subscription_id" },
     )
@@ -167,7 +182,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     await sendTemplatedEmail("welcome", profile.email, {
       firstName: profile.first_name ?? "",
       petNotice: firstPet
-        ? `<strong>${firstPet.name}</strong> entra a revisión del comité y su período de espera de ${petDays.get(firstPet.id) ?? 180} días corre desde hoy.`
+        ? `<strong>${firstPet.name}</strong> entra a revisión del comité. En cuanto su ficha sea aprobada empezará su período de espera de ${petDays.get(firstPet.id) ?? 180} días.`
         : "",
     });
   }

@@ -81,7 +81,7 @@ export function CenterInfoCard({
           {busy === "logo" ? (
             "…"
           ) : logoUrl ? (
-            <img src={logoUrl} alt="Logo del centro" className="size-full object-cover" />
+            <img src={logoUrl} alt="Logo del centro" className="size-full object-contain" />
           ) : (
             "+"
           )}

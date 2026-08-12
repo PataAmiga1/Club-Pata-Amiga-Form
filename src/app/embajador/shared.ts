@@ -15,13 +15,15 @@ export type AmbassadorContext = {
     bank_name: string | null;
     clabe: string | null;
     bank_holder: string | null;
+    rfc: string | null;
+    social_links: Record<string, string> | null;
   };
   isMember: boolean;
   wasMember: boolean;
 };
 
 const AMBASSADOR_COLS =
-  "id, first_name, last_name, referral_code, code_change_count, status, rejection_reason, bank_name, clabe, bank_holder";
+  "id, first_name, last_name, referral_code, code_change_count, status, rejection_reason, bank_name, clabe, bank_holder, rfc, social_links";
 
 /**
  * Contexto del portal del embajador: exige sesión, resuelve el perfil de

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { renewalDate, formatDateEs } from "@/lib/dates";
+import { situacionDeCobro } from "@/lib/membresia";
 import { MembershipManager } from "./MembershipManager";
 import { BillingCard } from "./BillingCard";
 import { BankingCard } from "./BankingCard";
@@ -32,11 +33,26 @@ export default async function CuentaPage() {
   ]);
 
   const settings = await fetchSiteSettings();
-  const renews = renewalDate(
-    sub?.current_period_end ?? null,
-    profile?.member_since ?? null,
-    sub?.plan ?? null,
-  );
+  const situacion = situacionDeCobro(profile?.membership_status, sub);
+  // La fecha de renovación SOLO se calcula cuando el cobro vive aquí. Para un
+  // heredado, `member_since + 1 mes` daba una fecha ya pasada (auditoría 11-ago).
+  const renews =
+    situacion.tipo === "stripe"
+      ? renewalDate(
+          sub?.current_period_end ?? null,
+          profile?.member_since ?? null,
+          sub?.plan ?? null,
+        )
+      : null;
+  // Un heredado que ya pidió su baja: el corte lo fija el comité a mano.
+  let bajaSolicitada = false;
+  if (situacion.tipo === "heredado") {
+    const { count } = await supabase
+      .from("cancellations")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    bajaSolicitada = (count ?? 0) > 0;
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-[22px] px-5 py-6 md:py-10">
@@ -67,11 +83,24 @@ export default async function CuentaPage() {
         </div>
       </section>
 
-      {sub && profile?.membership_status === "active" ? (
+      {/* Tres casos, no dos: con Stripe, heredado de Memberstack, o sin
+          membresía. Antes un heredado (60 de 63 activos) caía en el aviso
+          amarillo de "no tienes membresía" con un botón para volver a pagar. */}
+      {situacion.tipo === "stripe" ? (
         <MembershipManager
-          plan={(sub.plan as "monthly" | "annual") ?? "monthly"}
-          cancelAtPeriodEnd={sub.cancel_at_period_end}
+          plan={situacion.plan}
+          cancelAtPeriodEnd={situacion.cancelaAlCorte}
           renewsLabel={renews ? formatDateEs(renews) : null}
+          periodEndIso={renews ? renews.toISOString() : null}
+        />
+      ) : situacion.tipo === "heredado" ? (
+        <MembershipManager
+          heredado
+          bajaSolicitada={bajaSolicitada}
+          plan="monthly"
+          cancelAtPeriodEnd={false}
+          renewsLabel={null}
+          periodEndIso={null}
         />
       ) : (
         <section className="flex flex-col items-start gap-3 rounded-[20px] bg-warning-bg p-5 md:p-[26px]">

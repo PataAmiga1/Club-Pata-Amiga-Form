@@ -4,6 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deactivateMemberAccount } from "@/app/admin/actions";
 
+/** Motivos frecuentes de baja — clicables, con nota libre opcional (equipo, 5-ago). */
+const MOTIVOS_BAJA = [
+  "Ya no puede pagar la membresía",
+  "Su mascota falleció",
+  "No usa los beneficios",
+  "Inconformidad con un reintegro",
+  "Se muda / cambio de circunstancias",
+  "Incumplimiento del reglamento",
+];
+
 /**
  * Dar de baja la cuenta de un miembro — visible SOLO para el super admin
  * (regla del sitio vivo). Cancela la membresía de inmediato y avisa al
@@ -18,9 +28,13 @@ export function DeactivateAccountPanel({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [motivo, setMotivo] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // El aviso lleva el motivo elegido y, si hay, la nota libre.
+  const motivoCompleto = [motivo, reason.trim()].filter(Boolean).join(" — ");
 
   return (
     <div className="flex flex-col gap-2.5 rounded-[18px] border-[1.5px] border-[#F2C7D4] bg-white p-5">
@@ -42,11 +56,27 @@ export function DeactivateAccountPanel({
             inmediato (también en Stripe) y recibirá el aviso por correo
             (plantilla editable en Comunicados).
           </p>
+          <div className="flex flex-wrap gap-2">
+            {MOTIVOS_BAJA.map((mtv) => (
+              <button
+                key={mtv}
+                type="button"
+                onClick={() => setMotivo(motivo === mtv ? null : mtv)}
+                className={`rounded-full px-3 py-1.5 text-[11.5px] font-bold transition-colors ${
+                  motivo === mtv
+                    ? "bg-error-text text-white"
+                    : "border-[1.5px] border-border-input text-ink-secondary hover:border-error-text"
+                }`}
+              >
+                {mtv}
+              </button>
+            ))}
+          </div>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
-            placeholder="Motivo de la baja (se incluye en el aviso al miembro)…"
+            placeholder="Notas (opcional si eliges un motivo; se incluye en el aviso al miembro)…"
             className="rounded-[12px] border-[1.5px] border-border-input p-3 text-sm text-ink-body outline-none focus:border-teal"
           />
           {error && (
@@ -64,11 +94,14 @@ export function DeactivateAccountPanel({
             </button>
             <button
               type="button"
-              disabled={busy || reason.trim().length < 5}
+              disabled={busy || motivoCompleto.length < 5}
               onClick={async () => {
                 setBusy(true);
                 setError(null);
-                const result = await deactivateMemberAccount(userId, reason);
+                const result = await deactivateMemberAccount(
+                  userId,
+                  motivoCompleto,
+                );
                 setBusy(false);
                 if (result.error) setError(result.error);
                 else router.refresh();

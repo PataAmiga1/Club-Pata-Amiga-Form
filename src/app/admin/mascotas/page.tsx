@@ -2,35 +2,73 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAdminRole } from "@/lib/admin-guard";
 import { formatDateEs } from "@/lib/dates";
+import { SENIOR_PET_AGE_YEARS } from "@/lib/constants";
 import {
   DetailModal,
   DetailItem,
   SensitiveBlock,
 } from "@/components/panel/DetailModal";
+import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { FilterChips } from "@/components/panel/FilterChips";
 import { PetReviewRow } from "./PetReviewRow";
+import { PetResolveButtons } from "./PetResolveButtons";
 
 export default async function AdminMascotasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; orden?: string }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, orden } = await searchParams;
   const admin = createAdminClient();
   const isSuper = (await getAdminRole()) === "super_admin";
-  const { data: pets } = await admin
-    .from("pets")
-    .select(
-      "id, name, species, breed, sex, coat_color, eye_color, nose_color, is_adopted, adoption_story, age_years, age_months, birth_date, is_senior, vet_certificate_url, photo_url, gallery_photos, approval_status, approval_notes, waiting_period_end_date, waiting_period_bypassed, created_at, user_id, profiles!user_id(first_name, last_name, email, phone, member_since, membership_status, curp, birth_date, street, number_ext, number_int, colony, postal_code, city, state, bank_name, clabe, rfc)",
-    )
-    .eq("is_active", true)
-    .order("created_at", { ascending: true });
+  // Por omisión las más recientes arriba (petición del equipo, 5-ago).
+  const masAntiguas = orden === "antiguas";
+  // Tabs extra del super admin: "bajas" (mascotas dadas de baja) y
+  // "apelacion" (mascotas con apelación presentada) — equipo, 5-ago.
+  const verBajas = estado === "bajas";
+  const verApelaciones = estado === "apelacion";
+  const [{ data: pets }, { data: petAppeals }] = await Promise.all([
+    admin
+      .from("pets")
+      .select(
+        "id, name, species, breed, sex, coat_color, eye_color, nose_color, is_adopted, adoption_story, age_years, age_months, birth_date, is_senior, vet_certificate_url, photo_url, gallery_photos, approval_status, approval_notes, waiting_period_end_date, waiting_period_bypassed, created_at, user_id, deactivation_reason, profiles!user_id(first_name, last_name, email, phone, member_since, membership_status, curp, birth_date, nationality, street, number_ext, number_int, colony, postal_code, city, state, bank_name, clabe, rfc)",
+      )
+      .eq("is_active", !verBajas)
+      .order("created_at", { ascending: masAntiguas }),
+    admin
+      .from("appeals")
+      .select("id, folio, status, pet_id")
+      .not("pet_id", "is", null),
+  ]);
 
-  const all = (pets ?? []).filter(
-    (p) => !estado || p.approval_status === estado,
+  const apeladasPorMascota = new Map<string, { folio: string; status: string }>();
+  for (const a of petAppeals ?? [])
+    if (a.pet_id && !apeladasPorMascota.has(a.pet_id))
+      apeladasPorMascota.set(a.pet_id, { folio: a.folio, status: a.status });
+
+  // Pasaportes de los dueños: la identidad de un extranjero es su pasaporte,
+  // no la CURP (lib/perfil-faltantes necesita saber si lo subió).
+  const duenos = [...new Set((pets ?? []).map((p) => p.user_id))];
+  const { data: pasaportes } = duenos.length
+    ? await admin
+        .from("documents")
+        .select("user_id")
+        .eq("document_type", "passport")
+        .in("user_id", duenos)
+    : { data: [] };
+  const conPasaporte = new Set((pasaportes ?? []).map((d) => d.user_id));
+
+  const all = (pets ?? []).filter((p) =>
+    verBajas
+      ? true
+      : verApelaciones
+        ? apeladasPorMascota.has(p.id)
+        : !estado || p.approval_status === estado,
   );
-  const pending = all.filter((p) => p.approval_status === "pending");
-  const resolved = all.filter((p) => p.approval_status !== "pending");
+  const pending = all.filter(
+    (p) => p.approval_status === "pending" && !verBajas && !verApelaciones,
+  );
+  const resolved = all.filter((p) => !pending.includes(p));
 
   type OwnerProfile = {
     first_name?: string | null;
@@ -41,6 +79,7 @@ export default async function AdminMascotasPage({
     membership_status?: string | null;
     curp?: string | null;
     birth_date?: string | null;
+    nationality?: string | null;
     street?: string | null;
     number_ext?: string | null;
     number_int?: string | null;
@@ -87,15 +126,32 @@ export default async function AdminMascotasPage({
       <h1 className="font-display text-[26px] text-ink-title">
         Mascotas por aprobar
       </h1>
-      <FilterChips
-        basePath="/admin/mascotas"
-        current={estado}
-        options={[
-          { value: "pending", label: "En revisión" },
-          { value: "approved", label: "Aprobadas" },
-          { value: "rejected", label: "Denegadas" },
-        ]}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterChips
+          basePath="/admin/mascotas"
+          current={estado}
+          keep={{ orden }}
+          options={[
+            { value: "pending", label: "En revisión" },
+            { value: "approved", label: "Aprobadas" },
+            { value: "rejected", label: "Rechazadas" },
+            ...(isSuper
+              ? [
+                  { value: "apelacion", label: "⚖️ Apelaciones" },
+                  { value: "bajas", label: "🕊️ Bajas" },
+                ]
+              : []),
+          ]}
+        />
+        <FilterChips
+          basePath="/admin/mascotas"
+          current={orden}
+          param="orden"
+          keep={{ estado }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguas", label: "Más antiguas" }]}
+        />
+      </div>
       <div className="flex flex-col gap-2.5">
         {pending.map((p) => (
           <PetReviewRow
@@ -118,12 +174,45 @@ export default async function AdminMascotasPage({
               <DetailModal title={`Ficha de ${p.name}`}>
                 {/* Toda la información de la mascota y su dueño (patrón del sitio vivo) */}
                 <div className="flex flex-col gap-4">
+                  {/* Faltantes visibles de un vistazo (equipo, 5-ago), incluidos
+                      los del PERFIL del dueño (Fase 4: en todos los popups) */}
+                  {(() => {
+                    const faltaPerfil = datosFaltantesDelPerfil(
+                      profOf(p.profiles) ?? {},
+                      { tienePasaporte: conPasaporte.has(p.user_id) },
+                    );
+                    const faltaAlgo =
+                      !p.photo_url ||
+                      (p.is_senior && !p.vet_certificate_url) ||
+                      faltaPerfil.length > 0;
+                    return faltaAlgo ? (
+                      <div className="flex flex-wrap gap-2">
+                        {p.is_senior && !p.vet_certificate_url && (
+                          <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                            ⚠ Falta certificado veterinario (senior {SENIOR_PET_AGE_YEARS}+)
+                          </span>
+                        )}
+                        {!p.photo_url && (
+                          <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                            ⚠ Falta foto
+                          </span>
+                        )}
+                        {faltaPerfil.length > 0 && (
+                          <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                            ⚠ Al perfil del dueño le falta: {faltaPerfil.join(" · ")}
+                          </span>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
                   {p.photo_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.photo_url}
                       alt={p.name}
-                      className="h-[180px] w-full rounded-[14px] object-cover"
+                      // object-contain: el comité necesita VER la foto completa,
+                      // no un recorte (equipo: "la foto sale cortada")
+                      className="h-[180px] w-full rounded-[14px] bg-cream object-contain"
                     />
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -142,13 +231,25 @@ export default async function AdminMascotasPage({
                     <DetailItem label="COLOR DE OJOS" value={p.eye_color} />
                     <DetailItem label="COLOR DE NARIZ" value={p.nose_color} />
                     <DetailItem label="ADOPTADO" value={p.is_adopted ? "Sí 🏠" : "No"} />
-                    <DetailItem label="SENIOR (10+)" value={p.is_senior ? "Sí 👴" : "No"} />
+                    <DetailItem
+                      label={`SENIOR (${SENIOR_PET_AGE_YEARS}+)`}
+                      value={
+                        p.is_senior
+                          ? "Sí 👴"
+                          : // Vinculación edad ↔ clasificación (equipo, 11-ago): si la
+                            // edad guardada indica senior pero la ficha dice que no, el
+                            // comité lo ve — la ficha NO se recalcula sola (Regla X).
+                            (p.age_years ?? 0) >= SENIOR_PET_AGE_YEARS && !p.age_months
+                            ? "No ⚠ (la edad indica senior)"
+                            : "No"
+                      }
+                    />
                     <DetailItem
                       label="PERÍODO DE ESPERA"
                       value={
                         p.waiting_period_end_date
                           ? `termina el ${formatDateEs(p.waiting_period_end_date)}`
-                          : "se fija al pagar"
+                          : "empieza al aprobarse"
                       }
                     />
                     <DetailItem label="REGISTRADA" value={formatDateEs(new Date(p.created_at))} />
@@ -202,21 +303,38 @@ export default async function AdminMascotasPage({
                       Ver expediente completo del miembro →
                     </Link>
                   </div>
+                  {/* Resolver sin salir del popup (petición del equipo, 5-ago) */}
+                  <div className="border-t border-border-divider pt-3">
+                    <PetResolveButtons petId={p.id} />
+                  </div>
                 </div>
               </DetailModal>
             }
           />
         ))}
-        {pending.length === 0 && (
+        {pending.length === 0 && !verBajas && !verApelaciones && (
           <div className="rounded-[18px] bg-white p-6 text-sm text-ink-secondary shadow-[0_2px_10px_rgba(30,83,80,.05)]">
             Sin mascotas pendientes de revisión. 🎉
+          </div>
+        )}
+        {(verBajas || verApelaciones) && resolved.length === 0 && (
+          <div className="rounded-[18px] bg-white p-6 text-sm text-ink-secondary shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+            {verBajas
+              ? "Sin mascotas dadas de baja."
+              : "Sin mascotas con apelación."}
           </div>
         )}
       </div>
 
       {resolved.length > 0 && (
         <>
-          <h2 className="font-display text-lg text-ink-title">Resueltas</h2>
+          <h2 className="font-display text-lg text-ink-title">
+            {verBajas
+              ? "Dadas de baja"
+              : verApelaciones
+                ? "Con apelación"
+                : "Resueltas"}
+          </h2>
           <div className="flex flex-col rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
             {resolved.map((p) => {
               const prof = profOf(p.profiles);
@@ -234,14 +352,25 @@ export default async function AdminMascotasPage({
                         <strong className="text-ink-title">{p.name}</strong>
                         {p.breed ? ` · ${p.breed}` : ""} · {memberName(p.profiles)}
                       </span>
+                      {apeladasPorMascota.has(p.id) && (
+                        <span className="rounded-full bg-info-bg px-2.5 py-1 text-[10.5px] font-extrabold text-info-text">
+                          ⚖️ {apeladasPorMascota.get(p.id)!.folio}
+                        </span>
+                      )}
                       <span
                         className={`rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${
-                          p.approval_status === "approved"
-                            ? "bg-success-bg text-success-text"
-                            : "bg-error-bg text-error-text"
+                          verBajas
+                            ? "bg-cream text-ink-tertiary"
+                            : p.approval_status === "approved"
+                              ? "bg-success-bg text-success-text"
+                              : "bg-error-bg text-error-text"
                         }`}
                       >
-                        {p.approval_status === "approved" ? "APROBADA" : "DENEGADA"}
+                        {verBajas
+                          ? `🕊️ BAJA${p.deactivation_reason ? ` · ${p.deactivation_reason}` : ""}`
+                          : p.approval_status === "approved"
+                            ? "APROBADA"
+                            : "RECHAZADA"}
                       </span>
                     </div>
                   }
@@ -252,7 +381,7 @@ export default async function AdminMascotasPage({
                       <img
                         src={p.photo_url}
                         alt={p.name}
-                        className="h-40 w-full rounded-[14px] object-cover"
+                        className="h-40 w-full rounded-[14px] bg-cream object-contain"
                       />
                     )}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -267,12 +396,12 @@ export default async function AdminMascotasPage({
                         value={p.is_adopted ? "Sí" : null}
                       />
                       <DetailItem
-                        label="SENIOR (10+)"
+                        label={`SENIOR (${SENIOR_PET_AGE_YEARS}+)`}
                         value={p.is_senior ? "Sí" : null}
                       />
                       <DetailItem
                         label="ESTATUS"
-                        value={p.approval_status === "approved" ? "Aprobada" : "Denegada"}
+                        value={p.approval_status === "approved" ? "Aprobada" : "Rechazada"}
                       />
                       <DetailItem label="NOTAS DEL COMITÉ" value={p.approval_notes} />
                       <DetailItem
@@ -315,6 +444,18 @@ export default async function AdminMascotasPage({
                               : null
                           }
                         />
+                        {/* Qué le falta al perfil (Fase 4: en todos los popups) */}
+                        {(() => {
+                          const falta = datosFaltantesDelPerfil(prof ?? {}, {
+                            tienePasaporte: conPasaporte.has(p.user_id),
+                          });
+                          return falta.length > 0 ? (
+                            <DetailItem
+                              label="⚠ FALTA EN SU PERFIL"
+                              value={falta.join(" · ")}
+                            />
+                          ) : null;
+                        })()}
                       </div>
                     </div>
 

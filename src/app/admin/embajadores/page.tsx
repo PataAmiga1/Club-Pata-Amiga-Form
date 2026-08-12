@@ -10,7 +10,12 @@ import {
   SensitiveBlock,
 } from "@/components/panel/DetailModal";
 import { FilterChips } from "@/components/panel/FilterChips";
+import { SocialLinks } from "@/components/panel/SocialLinks";
 import { AmbassadorReviewRow } from "./AmbassadorReviewRow";
+import {
+  AmbassadorResolveButtons,
+  AmbassadorDeactivateButton,
+} from "./AmbassadorResolveButtons";
 import { PayCutButton } from "./PayCutButton";
 
 type Row = {
@@ -31,6 +36,11 @@ type Row = {
   bank_holder: string | null;
   ine_front_url: string | null;
   ine_back_url: string | null;
+  birth_date: string | null;
+  rfc: string | null;
+  motivation: string | null;
+  social_links: Record<string, string> | null;
+  deactivation_reason: string | null;
   referrals: {
     commission_amount: number | null;
     status: string;
@@ -41,23 +51,51 @@ type Row = {
 export default async function AdminEmbajadoresPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{
+    estado?: string;
+    desde?: string;
+    hasta?: string;
+    orden?: string;
+  }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, desde, hasta, orden } = await searchParams;
   const admin = createAdminClient();
   const isSuper = (await getAdminRole()) === "super_admin";
+  // Solicitudes de la más reciente a la más antigua (equipo, 11-ago), con
+  // filtro para invertir el orden (Fase 4)
+  const masAntiguos = orden === "antiguos";
   const { data } = await admin
     .from("ambassadors")
     .select(
-      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, referrals(commission_amount, status, created_at)",
+      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, referrals(commission_amount, status, created_at)",
     )
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: masAntiguos });
 
   const rows = ((data ?? []) as Row[]).filter(
     (a) => !estado || a.status === estado,
   );
   const pending = rows.filter((a) => a.status === "pending");
   const approved = rows.filter((a) => a.status === "approved");
+  const canceled = ((data ?? []) as Row[]).filter(
+    (a) => a.status === "canceled",
+  );
+
+  // Filtro de período para los referidos (equipo, 5-ago): cuántos trajo cada
+  // embajador entre dos fechas. Las fechas vienen como YYYY-MM-DD.
+  const periodo =
+    desde || hasta
+      ? {
+          desde: desde ? new Date(`${desde}T00:00:00-06:00`) : null,
+          hasta: hasta ? new Date(`${hasta}T23:59:59-06:00`) : null,
+        }
+      : null;
+  const referidosEnPeriodo = (a: Row) =>
+    a.referrals.filter((r) => {
+      const t = new Date(r.created_at);
+      if (periodo?.desde && t < periodo.desde) return false;
+      if (periodo?.hasta && t > periodo.hasta) return false;
+      return true;
+    }).length;
 
   // Medianoche de México: las comisiones del mes se cortan con el calendario del
   // negocio, no con el del servidor.
@@ -88,19 +126,76 @@ export default async function AdminEmbajadoresPage({
   const fullName = (a: Row) =>
     `${a.first_name}${a.last_name ? ` ${a.last_name}` : ""}`;
 
+  // Qué le falta a la solicitud/perfil del embajador (Fase 4: en todos los
+  // popups). Banco/CLABE y RFC no bloquean la aprobación, pero sin ellos no
+  // se le puede pagar el corte — por eso se marcan.
+  const faltantesEmbajador = (a: Row) =>
+    [
+      (!a.ine_front_url || !a.ine_back_url) && "INE (frente y reverso)",
+      !a.birth_date && "fecha de nacimiento",
+      (!a.bank_name || !a.clabe) && "banco y CLABE para su pago",
+      !a.rfc && "RFC",
+      !Object.values(a.social_links ?? {}).some(Boolean) &&
+        "al menos una red social",
+    ].filter(Boolean) as string[];
+
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
       <h1 className="font-display text-[26px] text-ink-title">Embajadores</h1>
-      <FilterChips
-        basePath="/admin/embajadores"
-        current={estado}
-        allLabel="Todos"
-        options={[
-          { value: "pending", label: "Pendientes" },
-          { value: "approved", label: "Aprobados" },
-          { value: "rejected", label: "Rechazados" },
-        ]}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterChips
+          basePath="/admin/embajadores"
+          current={estado}
+          keep={{ desde, hasta, orden }}
+          allLabel="Todos"
+          options={[
+            { value: "pending", label: "Pendientes" },
+            { value: "approved", label: "Aprobados" },
+            { value: "rejected", label: "Rechazados" },
+            ...(isSuper ? [{ value: "canceled", label: "🕊️ Bajas" }] : []),
+          ]}
+        />
+        <FilterChips
+          basePath="/admin/embajadores"
+          current={orden}
+          param="orden"
+          keep={{ estado, desde, hasta }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguos", label: "Más antiguos" }]}
+        />
+        {/* Rango de fechas para contar referidos por período (equipo, 5-ago) */}
+        <form
+          action="/admin/embajadores"
+          className="flex flex-wrap items-center gap-2 text-[12px] text-ink-secondary"
+        >
+          {estado && <input type="hidden" name="estado" value={estado} />}
+          {orden && <input type="hidden" name="orden" value={orden} />}
+          <label className="flex items-center gap-1.5">
+            Referidos del
+            <input
+              type="date"
+              name="desde"
+              defaultValue={desde}
+              className="h-9 rounded-full border-[1.5px] border-border-input bg-white px-3 text-[12px] text-ink-title outline-none focus:border-teal"
+            />
+          </label>
+          <label className="flex items-center gap-1.5">
+            al
+            <input
+              type="date"
+              name="hasta"
+              defaultValue={hasta}
+              className="h-9 rounded-full border-[1.5px] border-border-input bg-white px-3 text-[12px] text-ink-title outline-none focus:border-teal"
+            />
+          </label>
+          <button
+            type="submit"
+            className="grid h-9 place-items-center rounded-full bg-teal px-4 text-[12px] font-bold text-white transition-colors hover:bg-teal-deep"
+          >
+            Aplicar
+          </button>
+        </form>
+      </div>
 
       <h2 className="font-display text-lg text-ink-title">
         Solicitudes por revisar
@@ -121,21 +216,53 @@ export default async function AdminEmbajadoresPage({
             }}
             detailSlot={
               <DetailModal title={`Solicitud de ${fullName(a)}`}>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                  <DetailItem label="NOMBRE" value={fullName(a)} />
-                  <DetailItem label="CORREO" value={a.email} />
-                  <DetailItem label="TELÉFONO" value={a.phone} />
-                  <DetailItem label="CURP" value={a.curp} />
-                  <DetailItem label="CIUDAD" value={a.city} />
-                  <DetailItem label="ESTADO" value={a.state} />
-                  <DetailItem
-                    label="CUENTA VINCULADA"
-                    value={a.user_id ? "Sí ✓" : "Aún no crea cuenta"}
-                  />
-                  <DetailItem
-                    label="SOLICITÓ"
-                    value={formatDateEs(new Date(a.created_at))}
-                  />
+                <div className="flex flex-col gap-4">
+                  {faltantesEmbajador(a).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                        ⚠ Falta: {faltantesEmbajador(a).join(" · ")}
+                      </span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    <DetailItem label="NOMBRE" value={fullName(a)} />
+                    <DetailItem label="CORREO" value={a.email} />
+                    <DetailItem label="TELÉFONO" value={a.phone} />
+                    <DetailItem label="CURP" value={a.curp} />
+                    <DetailItem
+                      label="FECHA DE NACIMIENTO"
+                      value={
+                        a.birth_date
+                          ? formatDateEs(new Date(a.birth_date + "T12:00:00"))
+                          : null
+                      }
+                    />
+                    <DetailItem label="CIUDAD" value={a.city} />
+                    <DetailItem label="ESTADO" value={a.state} />
+                    <DetailItem
+                      label="CUENTA VINCULADA"
+                      value={a.user_id ? "Sí ✓" : "Aún no crea cuenta"}
+                    />
+                    <DetailItem
+                      label="SOLICITÓ"
+                      value={formatDateEs(new Date(a.created_at))}
+                    />
+                  </div>
+                  {a.motivation && (
+                    <p className="rounded-[10px] bg-cream px-3 py-2 text-[12.5px] italic text-ink-secondary">
+                      «{a.motivation}»
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                      REDES SOCIALES
+                    </span>
+                    <SocialLinks links={a.social_links} />
+                  </div>
+                  {/* Resolver sin salir del popup (equipo, 5-ago) */}
+                  <div className="border-t border-border-divider pt-3">
+                    <AmbassadorResolveButtons ambassadorId={a.id} />
+                  </div>
                 </div>
               </DetailModal>
             }
@@ -196,10 +323,17 @@ export default async function AdminEmbajadoresPage({
       <div className="flex flex-col overflow-x-auto rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
         {approved.length > 0 ? (
           <>
-            <div className="grid min-w-[560px] grid-cols-[1fr_150px_90px_110px] gap-2 border-b-[1.5px] border-[#F2EEE4] pb-1.5 text-[10.5px] font-extrabold tracking-[.05em] text-ink-placeholder">
+            <div
+              className={`grid min-w-[560px] gap-2 border-b-[1.5px] border-[#F2EEE4] pb-1.5 text-[10.5px] font-extrabold tracking-[.05em] text-ink-placeholder ${
+                periodo
+                  ? "grid-cols-[1fr_150px_90px_110px_110px]"
+                  : "grid-cols-[1fr_150px_90px_110px]"
+              }`}
+            >
               <span>EMBAJADOR</span>
               <span>CÓDIGO</span>
               <span>REFERIDOS</span>
+              {periodo && <span>EN PERÍODO</span>}
               <span>HISTÓRICO</span>
             </div>
             {approved.map((a) => {
@@ -209,7 +343,13 @@ export default async function AdminEmbajadoresPage({
                   key={a.id}
                   title={`Embajador: ${fullName(a)}`}
                   trigger={
-                    <div className="grid min-w-[560px] grid-cols-[1fr_150px_90px_110px] items-center gap-2 border-b border-[#F2EEE4] px-1 py-2.5 text-[13px] text-ink-body">
+                    <div
+                      className={`grid min-w-[560px] items-center gap-2 border-b border-[#F2EEE4] px-1 py-2.5 text-[13px] text-ink-body ${
+                        periodo
+                          ? "grid-cols-[1fr_150px_90px_110px_110px]"
+                          : "grid-cols-[1fr_150px_90px_110px]"
+                      }`}
+                    >
                       <span className="truncate">
                         <strong className="text-ink-title">{fullName(a)}</strong>
                         <span className="text-ink-tertiary"> · {a.email}</span>
@@ -218,6 +358,11 @@ export default async function AdminEmbajadoresPage({
                         {a.referral_code}
                       </span>
                       <span>{s.count}</span>
+                      {periodo && (
+                        <span className="font-bold text-teal-deep">
+                          {referidosEnPeriodo(a)}
+                        </span>
+                      )}
                       <span className="font-bold text-ink-title">
                         {formatMxn(s.historic)} MXN
                       </span>
@@ -261,9 +406,35 @@ export default async function AdminEmbajadoresPage({
                       </div>
                     </div>
 
+                    {a.motivation && (
+                      <p className="rounded-[10px] bg-cream px-3 py-2 text-[12.5px] italic text-ink-secondary">
+                        «{a.motivation}»
+                      </p>
+                    )}
+                    {faltantesEmbajador(a).length > 0 && (
+                      <span className="self-start rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                        ⚠ Falta: {faltantesEmbajador(a).join(" · ")}
+                      </span>
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                        REDES SOCIALES
+                      </span>
+                      <SocialLinks links={a.social_links} />
+                    </div>
+
                     <SensitiveBlock isSuper={isSuper}>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                         <DetailItem label="CURP" value={a.curp} />
+                        <DetailItem
+                          label="FECHA DE NACIMIENTO"
+                          value={
+                            a.birth_date
+                              ? formatDateEs(new Date(a.birth_date + "T12:00:00"))
+                              : null
+                          }
+                        />
+                        <DetailItem label="RFC" value={a.rfc} />
                         <DetailItem label="BANCO" value={a.bank_name} />
                         <DetailItem label="CLABE" value={a.clabe} />
                         <DetailItem label="TITULAR DE LA CUENTA" value={a.bank_holder} />
@@ -296,6 +467,23 @@ export default async function AdminEmbajadoresPage({
                         />
                       </div>
                     </SensitiveBlock>
+
+                    {/* Tablero dinámico por embajador (equipo, 5-ago) */}
+                    <a
+                      href={`/admin/embajadores/${a.id}`}
+                      className="self-start text-[13px] font-bold text-teal-deep hover:underline"
+                    >
+                      📊 Ver tablero de referidos y pagos →
+                    </a>
+
+                    {isSuper && (
+                      <div className="border-t border-border-divider pt-3">
+                        <AmbassadorDeactivateButton
+                          ambassadorId={a.id}
+                          name={fullName(a)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </DetailModal>
               );
@@ -307,6 +495,38 @@ export default async function AdminEmbajadoresPage({
           </p>
         )}
       </div>
+
+      {/* Bajas (super admin) — con su motivo (equipo, 5-ago) */}
+      {isSuper && estado === "canceled" && (
+        <>
+          <h2 className="font-display text-lg text-ink-title">
+            Dados de baja
+          </h2>
+          <div className="flex flex-col rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+            {canceled.length > 0 ? (
+              canceled.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-3 border-b border-[#F2EEE4] py-2.5 text-[13px] text-ink-body last:border-0"
+                >
+                  <span className="flex-1">
+                    <strong className="text-ink-title">{fullName(a)}</strong> ·{" "}
+                    {a.email}
+                    {a.referral_code ? ` · ${a.referral_code}` : ""}
+                  </span>
+                  <span className="rounded-full bg-cream px-2.5 py-1 text-[10.5px] font-extrabold text-ink-tertiary">
+                    🕊️ BAJA{a.deactivation_reason ? ` · ${a.deactivation_reason}` : ""}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-ink-secondary">
+                Sin embajadores dados de baja.
+              </p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

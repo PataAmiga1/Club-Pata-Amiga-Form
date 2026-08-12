@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PetCard, type PetRow } from "@/components/app/PetCard";
 import { WelcomeOnce } from "@/components/app/WelcomeOnce";
+import { CompleteProfileNudge } from "@/components/app/CompleteProfileNudge";
 import { markWelcomeShown } from "./actions";
 import { NotificationsBell } from "@/components/app/NotificationsBell";
 import { MAX_ACTIVE_PETS } from "@/lib/constants";
 import { formatDateEs, renewalDate, waitingProgress } from "@/lib/dates";
+import { situacionDeCobro, etiquetaDeCobro } from "@/lib/membresia";
 
 export default async function AppHome() {
   const supabase = await createClient();
@@ -18,7 +20,9 @@ export default async function AppHome() {
   const [{ data: profile }, { data: sub }, { data: pets }, { data: notifications }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("first_name, email, membership_status, member_since, profile_completed, welcome_shown")
+      .select(
+        "first_name, email, membership_status, member_since, profile_completed, welcome_shown, curp, birth_date, nationality, street, postal_code, phone",
+      )
       .eq("id", user.id)
       .single(),
     supabase
@@ -30,7 +34,7 @@ export default async function AppHome() {
     supabase
       .from("pets")
       .select(
-        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_bypassed, created_at",
+        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at, is_senior, vet_certificate_url, info_requested",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
@@ -46,18 +50,29 @@ export default async function AppHome() {
   const active = profile?.membership_status === "active";
   const name = profile?.first_name || profile?.email?.split("@")[0] || "";
   const petList = (pets ?? []) as (PetRow & { created_at: string })[];
-  const renews = renewalDate(
-    sub?.current_period_end ?? null,
-    profile?.member_since ?? null,
-    sub?.plan ?? null,
-  );
-  const planLabel = sub?.plan === "annual" ? "Plan anual" : "Plan mensual";
+  // Un miembro heredado de Memberstack no tiene plan ni período registrados:
+  // antes se le mostraba "Plan mensual" inventado y una fecha de renovación ya
+  // pasada (auditoría 11-ago). Ahora sale "Membresía activa" y sin fecha.
+  const situacion = situacionDeCobro(profile?.membership_status, sub);
+  const renews =
+    situacion.tipo === "stripe"
+      ? renewalDate(
+          sub?.current_period_end ?? null,
+          profile?.member_since ?? null,
+          sub?.plan ?? null,
+        )
+      : null;
+  const planLabel = etiquetaDeCobro(situacion);
 
   const availablePet = petList.find(
     (p) =>
       p.approval_status === "approved" &&
-      waitingProgress(p.created_at, p.waiting_period_end_date, p.waiting_period_bypassed)
-        .done,
+      waitingProgress(
+        p.created_at,
+        p.waiting_period_end_date,
+        p.waiting_period_bypassed,
+        p.waiting_period_start_date,
+      ).done,
   );
 
   // Activity feed derived from real records — cronológico, de lo más
@@ -72,7 +87,9 @@ export default async function AppHome() {
     activityRaw.push({
       icon: "🐾",
       tone: "bg-info-bg",
-      text: `Registraste a ${pet.name} — su período de espera comenzó`,
+      // La espera ya NO comienza al registrar: arranca cuando el comité
+      // aprueba la ficha (PM, 11-ago).
+      text: `Registraste a ${pet.name} — su ficha entró a revisión del comité`,
       at: new Date(pet.created_at),
     });
   }
@@ -105,6 +122,22 @@ export default async function AppHome() {
           cta={profile.profile_completed ? "Explorar mi cuenta" : "¡Entendido!"}
         />
       )}
+      {/* Perfil incompleto (migrados incluidos): guía al primer login
+          (Pablo, 5-ago). No se encima con la bienvenida de membresía nueva. */}
+      {profile &&
+        !profile.profile_completed &&
+        !(profile.membership_status === "active" && !profile.welcome_shown) && (
+          <CompleteProfileNudge
+            userId={user.id}
+            missing={[
+              !profile.curp && "CURP",
+              !profile.birth_date && "fecha de nacimiento",
+              !profile.nationality && "nacionalidad",
+              !(profile.street && profile.postal_code) && "domicilio",
+              !profile.phone && "teléfono",
+            ].filter((x): x is string => Boolean(x))}
+          />
+        )}
       {/* Greeting */}
       <div className="flex items-center justify-between">
         <div>
@@ -270,7 +303,7 @@ export default async function AppHome() {
               Completa tu perfil
             </span>
             <span className="text-[11.5px] text-ink-tertiary">
-              CURP, domicilio e INE — habilita tus reintegros
+              CURP y domicilio — habilita tus reintegros
             </span>
           </div>
           <span className="font-extrabold text-teal-deep">→</span>

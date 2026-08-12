@@ -20,13 +20,38 @@ export type EmailTemplateDef = {
   html: string;
 };
 
-const FOOTER = `<p style="color:#6B7C79;font-size:13px">Club Pata Amiga · Protección para tu manada</p>`;
-const WRAP = (inner: string) =>
-  `<div style="font-family:sans-serif;color:#3D524F;line-height:1.6">${inner}${FOOTER}</div>`;
+const FOOTER = `<p style="margin:0;color:#6B7C79;font-size:13px">Club Pata Amiga · Protección para tu manada</p>`;
 
-/** Logo hosteado para correos (los clientes de correo no soportan SVG). */
-const EMAIL_HEADER_IMG =
-  "https://iddzylyvuhkhuvinvbou.supabase.co/storage/v1/object/public/site-assets/email-header.png";
+/**
+ * Logo para correos (los clientes de correo no soportan SVG).
+ *
+ * Se sirve del propio sitio (`public/brand/`), NO del storage de Supabase:
+ * antes apuntaba al proyecto de desarrollo, así que pausar ese proyecto
+ * rompía el logo de correos que producción ya manda (hallazgo 7-ago).
+ * La URL es absoluta y del dominio de producción a propósito: las plantillas
+ * de Auth de Supabase son las mismas en staging y producción.
+ */
+const EMAIL_HEADER_IMG = "https://www.pataamiga.mx/brand/email-header.png";
+
+/**
+ * Cascarón brandeado de TODOS los correos transaccionales (Fase 5: "que
+ * todos los correos vayan con la marca"). Antes era un <div> pelón sin logo
+ * ni tarjeta — el correo de la campaña sí iba brandeado y el resto no. Solo
+ * tablas + estilos inline (Gmail/Outlook no soportan flexbox ni <style>),
+ * 600px, mismo encabezado teal con logo que el correo de campaña.
+ */
+const WRAP = (inner: string) =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAF7F1;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+      <tr><td style="background-color:#1CBCAD;border-radius:20px 20px 0 0;padding:22px 20px;text-align:center;">
+        <img src="${EMAIL_HEADER_IMG}" width="170" alt="Club Pata Amiga" style="display:inline-block;width:170px;max-width:60%;height:auto;border-radius:12px;">
+      </td></tr>
+      <tr><td style="background-color:#FFFFFF;padding:30px 32px 22px;color:#3D524F;font-size:15px;line-height:1.65;">${inner}</td></tr>
+      <tr><td style="background-color:#FFFFFF;border-radius:0 0 20px 20px;border-top:1px solid #F2EEE4;padding:16px 32px;text-align:center;">${FOOTER}</td></tr>
+    </table>
+  </td></tr>
+</table>`;
 
 /**
  * Correo brandeado de la campaña de regalo — HTML apto para clientes de
@@ -287,6 +312,45 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
 <p>Si crees que hay un error, responde a este correo y lo revisamos.</p>`),
   },
   {
+    key: "profile_incomplete_reminder",
+    name: "Recordatorio de datos faltantes",
+    description:
+      "Recordatorio periódico a miembros con el perfil incompleto: sin esos datos no se habilitan los reintegros. Se envía desde Comunicados → Envíos (o el cron semanal).",
+    variables: {
+      firstName: "Nombre del miembro",
+      missingList: "Lista de lo que falta (CURP, domicilio, etc.)",
+    },
+    sample: {
+      firstName: "Cipatli",
+      missingList: "fecha de nacimiento · nacionalidad · domicilio",
+    },
+    subject: "Te falta poco para habilitar tus reintegros 🐾",
+    html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
+<p>Tu membresía de Club Pata Amiga está activa, pero aún nos faltan algunos datos para habilitar tus reintegros:</p>
+<p style="background:#FDF3E0;border-radius:12px;padding:12px 16px"><strong>{{missingList}}</strong></p>
+<p>Completa tu perfil en un par de minutos y tu manada queda protegida al 100%.</p>
+<p><a href="https://www.pataamiga.mx/app/perfil" style="display:inline-block;background:#1CBCAD;color:#fff;border-radius:999px;padding:12px 26px;font-weight:700;text-decoration:none">Completar mi perfil</a></p>`),
+  },
+  {
+    key: "ambassador_deactivated",
+    name: "Baja de embajador (por el comité)",
+    description:
+      "Cuando el super admin da de baja a un embajador: su código deja de generar comisiones nuevas.",
+    variables: {
+      firstName: "Nombre del embajador",
+      reason: "Motivo de la baja",
+    },
+    sample: {
+      firstName: "Paola",
+      reason: "Inactividad prolongada del programa de embajadores.",
+    },
+    subject: "Aviso sobre tu participación como embajador",
+    html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
+<p>Te escribimos para informarte que tu participación como embajador de Club Pata Amiga fue dada de baja por el comité.</p>
+<p><strong>Motivo:</strong> {{reason}}</p>
+<p>Tu código de embajador deja de generar comisiones nuevas a partir de hoy. Si crees que hay un error o quieres compartir tu versión, responde a este correo y con gusto lo revisamos.</p>`),
+  },
+  {
     key: "campaign_gift",
     name: "Regalo de campaña (landings)",
     description:
@@ -502,6 +566,7 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   welcome: "membresia",
   cancellation: "membresia",
   account_deactivated: "membresia",
+  profile_incomplete_reminder: "membresia",
   reimbursement_approved: "reintegros",
   reimbursement_rejected: "reintegros",
   pet_approved: "mascotas",
@@ -513,6 +578,7 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   ambassador_received: "embajadores",
   ambassador_approved: "embajadores",
   ambassador_rejected: "embajadores",
+  ambassador_deactivated: "embajadores",
   center_received: "centros",
   center_approved: "centros",
   center_rejected: "centros",

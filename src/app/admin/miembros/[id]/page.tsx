@@ -5,8 +5,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { DeactivateAccountPanel } from "./DeactivateAccountPanel";
 import { formatDateEs } from "@/lib/dates";
 import { formatMxn } from "@/lib/format";
+import { curpCoincide } from "@/lib/curp";
+import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
 import { PetThreadPanel } from "./PetThreadPanel";
+import { PetResolveButtons } from "../../mascotas/PetResolveButtons";
+import { NOTA_HEREDADO_ADMIN } from "@/lib/membresia";
+import { EditMemberButton, EditPetButton } from "./EditPanels";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   active: { text: "ACTIVO", cls: "bg-success-bg text-success-text" },
@@ -18,7 +23,7 @@ const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
 const PET_CHIP: Record<string, { text: string; cls: string }> = {
   approved: { text: "APROBADA", cls: "bg-success-bg text-success-text" },
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
-  rejected: { text: "DENEGADA", cls: "bg-error-bg text-error-text" },
+  rejected: { text: "RECHAZADA", cls: "bg-error-bg text-error-text" },
 };
 
 /** Expediente del miembro: contacto, fiscal, mascotas, reintegros, apelaciones. */
@@ -46,7 +51,7 @@ export default async function AdminMiembroDetailPage({
       admin
         .from("profiles")
         .select(
-          "id, first_name, last_name, mother_last_name, email, phone, curp, birth_date, membership_status, member_since, waiting_period_end_date, postal_code, state, city, colony, street_address, ambassador_code_used, cfdi_requested, rfc, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal, created_at, bank_name, clabe",
+          "id, first_name, last_name, mother_last_name, email, phone, curp, birth_date, nationality, membership_status, member_since, waiting_period_end_date, postal_code, state, city, colony, street, number_ext, number_int, street_address, ambassador_code_used, cfdi_requested, rfc, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal, created_at, bank_name, clabe, profile_completed",
         )
         .eq("id", id)
         .maybeSingle(),
@@ -74,6 +79,13 @@ export default async function AdminMiembroDetailPage({
         .eq("status", "active")
         .maybeSingle(),
     ]);
+
+  // Historial de cancelaciones con su motivo (equipo, 5-ago)
+  const { data: cancelaciones } = await admin
+    .from("cancellations")
+    .select("id, reason, survey, created_at")
+    .eq("user_id", id)
+    .order("created_at", { ascending: false });
 
   if (!m) notFound();
 
@@ -117,11 +129,23 @@ export default async function AdminMiembroDetailPage({
         </span>
       </div>
 
+      {/* Contacto y Membresía separados en tarjetas propias, Registro y
+          Miembro desde en líneas aparte, y banco/plan/código en su tarjeta
+          (reestructura pedida por el equipo, 5-ago). */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Contacto y membresía */}
+        {/* Contacto */}
         <div className="flex flex-col gap-2 rounded-[18px] bg-white p-5 text-[13px] text-ink-body shadow-[0_2px_10px_rgba(30,83,80,.05)]">
-          <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
-            CONTACTO Y MEMBRESÍA
+          <span className="flex items-center justify-between text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
+            CONTACTO
+            <span
+              className={`rounded-full px-2 py-[3px] text-[10px] font-extrabold ${
+                m.profile_completed
+                  ? "bg-success-bg text-success-text"
+                  : "bg-warning-bg text-warning-text"
+              }`}
+            >
+              PERFIL {m.profile_completed ? "COMPLETO" : "INCOMPLETO"}
+            </span>
           </span>
           <span>
             ✉️{" "}
@@ -130,32 +154,37 @@ export default async function AdminMiembroDetailPage({
             </a>
             {m.phone ? ` · 📞 ${m.phone}` : ""}
           </span>
-          <span>CURP: {m.curp ?? "—"}</span>
-          <span>Domicilio: {address || "—"}</span>
-          <span>
-            Miembro desde:{" "}
-            {m.member_since ? formatDateEs(new Date(m.member_since)) : "—"} ·
-            Registro: {formatDateEs(new Date(m.created_at))}
+          <span className="flex flex-wrap items-center gap-2">
+            CURP: {m.curp ?? "—"}
+            {/* Bandera del cruce CURP ↔ datos (Pablo, 5-ago: marca, no bloquea) */}
+            {(() => {
+              const cruce = m.curp
+                ? curpCoincide(m.curp, {
+                    nombres: m.first_name,
+                    apellidoPaterno: m.last_name,
+                    apellidoMaterno: m.mother_last_name,
+                    birthDate: m.birth_date,
+                  })
+                : null;
+              return cruce && !cruce.coincide ? (
+                <span
+                  title={`No coincide con ${cruce.discrepancias.join(", ")}`}
+                  className="rounded-full bg-warning-bg px-2 py-[3px] text-[10px] font-extrabold text-warning-text"
+                >
+                  ⚠ NO CUADRA CON {cruce.discrepancias.join(" · ").toUpperCase()}
+                </span>
+              ) : null;
+            })()}
           </span>
           <span>
-            Período de espera (contratante):{" "}
-            {m.waiting_period_end_date
-              ? `termina el ${formatDateEs(m.waiting_period_end_date)}`
+            Fecha de nacimiento:{" "}
+            {m.birth_date
+              ? formatDateEs(new Date(m.birth_date + "T12:00:00"))
               : "—"}
           </span>
-          <span>
-            Plan:{" "}
-            {sub
-              ? `${sub.plan === "annual" ? "Anual" : "Mensual"} · ${formatMxn(Number(sub.amount ?? 0))} MXN${sub.cancel_at_period_end ? " · CANCELA AL CORTE" : ""}`
-              : "sin suscripción activa"}
-          </span>
-          {m.ambassador_code_used && (
-            <span>Código de embajador usado: {m.ambassador_code_used}</span>
-          )}
-          <span>
-            Banco: {m.bank_name ?? "—"}
-            {m.clabe ? ` · CLABE ····${String(m.clabe).slice(-4)}` : ""}
-          </span>
+          <span>Nacionalidad: {m.nationality ?? "—"}</span>
+          <span>Domicilio: {address || "—"}</span>
+          <span>Registro: {formatDateEs(new Date(m.created_at))}</span>
           {ineDocs.length > 0 && (
             <span className="flex flex-wrap items-center gap-2">
               Identificación:
@@ -174,6 +203,117 @@ export default async function AdminMiembroDetailPage({
               )}
             </span>
           )}
+          {/* Edición por teléfono — solo super admin (equipo, 5-ago) */}
+          {isSuper && (
+            <EditMemberButton
+              userId={m.id}
+              initial={{
+                first_name: m.first_name,
+                last_name: m.last_name,
+                mother_last_name: m.mother_last_name,
+                phone: m.phone,
+                birth_date: m.birth_date,
+                nationality: m.nationality,
+                curp: m.curp,
+                street: m.street,
+                number_ext: m.number_ext,
+                number_int: m.number_int,
+                colony: m.colony,
+                city: m.city,
+                state: m.state,
+                postal_code: m.postal_code,
+              }}
+            />
+          )}
+          {!m.profile_completed && (
+            <span className="rounded-[10px] bg-warning-bg px-3 py-2 text-[12px] text-warning-text">
+              Falta:{" "}
+              {/* La MISMA regla del 100% del miembro (lib/perfil-faltantes);
+                  el INE no cuenta (opcional, Pablo 10-ago) y el teléfono se
+                  menciona aparte porque tampoco entra al 100%. */}
+              {[
+                ...datosFaltantesDelPerfil(m, {
+                  tienePasaporte: (docs ?? []).some(
+                    (d) => d.document_type === "passport",
+                  ),
+                }),
+                !m.phone && "teléfono (no bloquea el 100%)",
+              ]
+                .filter(Boolean)
+                .join(" · ") || "revisar el perfil"}
+            </span>
+          )}
+        </div>
+
+        {/* Membresía */}
+        <div className="flex flex-col gap-2 rounded-[18px] bg-white p-5 text-[13px] text-ink-body shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+          <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
+            MEMBRESÍA
+          </span>
+          <span>
+            Miembro desde:{" "}
+            {m.member_since ? formatDateEs(new Date(m.member_since)) : "—"}
+          </span>
+          <span>
+            Plan:{" "}
+            {sub
+              ? `${sub.plan === "annual" ? "Anual" : "Mensual"} · ${formatMxn(Number(sub.amount ?? 0))} MXN${sub.cancel_at_period_end ? " · CANCELA AL CORTE" : ""}`
+              : m.membership_status === "active"
+                ? "cobro heredado (plataforma anterior)"
+                : "sin suscripción activa"}
+          </span>
+          {/* Sin esta nota el comité leía "sin suscripción activa" y creía que
+              la persona no tenía membresía (auditoría 11-ago). */}
+          {!sub && m.membership_status === "active" && (
+            <span className="rounded-[10px] bg-info-bg px-3 py-2 text-[12px] leading-relaxed text-info-text">
+              {NOTA_HEREDADO_ADMIN}
+            </span>
+          )}
+          {sub?.current_period_end && (
+            <span>
+              Próximo cobro:{" "}
+              {formatDateEs(new Date(sub.current_period_end))}
+            </span>
+          )}
+          {/* El contratante ya no tiene período de espera (PM, 11-ago): la
+              espera es por mascota y se ve en cada ficha. */}
+        </div>
+
+        {/* Cancelaciones con motivo (equipo, 5-ago) */}
+        {(cancelaciones ?? []).length > 0 && (
+          <div className="flex flex-col gap-2 rounded-[18px] bg-white p-5 text-[13px] text-ink-body shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+            <span className="text-[11px] font-extrabold tracking-[.06em] text-error-text">
+              CANCELACIONES ({(cancelaciones ?? []).length})
+            </span>
+            {(cancelaciones ?? []).map((c) => {
+              const survey = (c.survey ?? {}) as { motivo?: string };
+              return (
+                <span key={c.id}>
+                  {formatDateEs(new Date(c.created_at))} ·{" "}
+                  {c.reason === "baja_por_comite"
+                    ? "Baja por el comité"
+                    : c.reason === "baja_voluntaria"
+                      ? "Baja voluntaria"
+                      : c.reason}
+                  {survey.motivo ? ` — «${survey.motivo}»` : ""}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Banco, plan de pago y código */}
+        <div className="flex flex-col gap-2 rounded-[18px] bg-white p-5 text-[13px] text-ink-body shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+          <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
+            DATOS BANCARIOS Y CÓDIGO
+          </span>
+          <span>
+            Banco: {m.bank_name ?? "—"}
+            {m.clabe ? ` · CLABE ····${String(m.clabe).slice(-4)}` : ""}
+          </span>
+          <span>
+            Código de embajador usado: {m.ambassador_code_used ?? "—"}
+          </span>
         </div>
 
         {/* Fiscal */}
@@ -292,8 +432,29 @@ export default async function AdminMiembroDetailPage({
                     </span>
                   )}
                 </span>
-                <span className={`rounded-full px-2.5 py-[3px] text-[10.5px] font-extrabold ${pchip.cls}`}>
-                  {!p.is_active ? "🕊️ BAJA" : pchip.text}
+                <span className="flex flex-none flex-col items-end gap-2">
+                  <span className={`rounded-full px-2.5 py-[3px] text-[10.5px] font-extrabold ${pchip.cls}`}>
+                    {!p.is_active ? "🕊️ BAJA" : pchip.text}
+                  </span>
+                  {/* Resolver desde el expediente, sin ir a Mascotas (equipo, 5-ago) */}
+                  {p.is_active && p.approval_status === "pending" && (
+                    <PetResolveButtons petId={p.id} />
+                  )}
+                  {isSuper && (
+                    <EditPetButton
+                      petId={p.id}
+                      initial={{
+                        name: p.name,
+                        breed: p.breed,
+                        sex: p.sex,
+                        age_years: p.age_years,
+                        age_months: p.age_months,
+                        coat_color: p.coat_color,
+                        eye_color: p.eye_color,
+                        nose_color: p.nose_color,
+                      }}
+                    />
+                  )}
                 </span>
               </div>
               <PetThreadPanel

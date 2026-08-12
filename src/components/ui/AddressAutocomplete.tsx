@@ -30,6 +30,31 @@ type Props = {
   required?: boolean;
 };
 
+/**
+ * Rescate cuando la llave de Google está mal (facturación apagada, dominio no
+ * autorizado, API deshabilitada): el script de Google DESHABILITA el input y
+ * le pone "Oops! Something went wrong." — el usuario ya no puede ni teclear su
+ * dirección a mano. Google avisa por `gm_authFailure`; aquí lo usamos para
+ * devolver los campos a texto normal. Diagnóstico del 11-ago: la llave actual
+ * responde REQUEST_DENIED por facturación sin habilitar en el proyecto de
+ * Google Cloud — eso arregla el autocompletado; esto arregla que mientras
+ * tanto el campo no se muera.
+ */
+const inputsRegistrados = new Set<HTMLInputElement>();
+function instalarRescateAuth() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as any;
+  if (w.__pataAmigaGmRescate) return;
+  w.__pataAmigaGmRescate = true;
+  w.gm_authFailure = () => {
+    for (const input of inputsRegistrados) {
+      input.disabled = false;
+      input.placeholder = "Escribe tu dirección (calle y número)";
+      input.style.backgroundImage = "none";
+    }
+  };
+}
+
 // Carga del script de Google Maps una sola vez para toda la app.
 let mapsPromise: Promise<void> | null = null;
 function loadGoogleMaps(key: string): Promise<void> {
@@ -87,6 +112,10 @@ export function AddressAutocomplete({
     let autocomplete: unknown;
     let cancelled = false;
 
+    const input = inputRef.current;
+    inputsRegistrados.add(input);
+    instalarRescateAuth();
+
     loadGoogleMaps(key)
       .then(() => {
         if (cancelled || !inputRef.current) return;
@@ -114,6 +143,7 @@ export function AddressAutocomplete({
 
     return () => {
       cancelled = true;
+      inputsRegistrados.delete(input);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

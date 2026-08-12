@@ -1,11 +1,15 @@
 import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
 import { LogoutButton } from "@/components/app/LogoutButton";
 import { PaymentDataCard } from "../PaymentDataCard";
+import { ExtrasCard, BajaEmbajadorCard } from "../ExtrasCard";
 import { getAmbassadorContext } from "../shared";
 
 export const metadata = { title: "Mi cuenta de embajador · Club Pata Amiga" };
 
-/** Ajustes del embajador: datos de pago (con titular) y contraseña. */
+/**
+ * Ajustes del embajador: datos de pago (con titular), RFC y redes sociales,
+ * contraseña y baja voluntaria (equipo, 5-ago).
+ */
 export default async function EmbajadorCuentaPage() {
   const { ambassador } = await getAmbassadorContext();
 
@@ -18,7 +22,12 @@ export default async function EmbajadorCuentaPage() {
           initialClabe={ambassador.clabe}
           initialHolder={ambassador.bank_holder}
         />
+        <ExtrasCard
+          initialRfc={ambassador.rfc}
+          initialLinks={ambassador.social_links}
+        />
         <ChangePasswordCard />
+        <BajaEmbajadorCard />
       </div>
       <div className="flex justify-start">
         <LogoutButton variant="button" />

@@ -14,6 +14,7 @@ import {
   type NotificationItem,
 } from "@/components/app/NotificationsBell";
 import { fetchSiteSettings } from "@/lib/site";
+import { situacionDeCobro, etiquetaDeCobro } from "@/lib/membresia";
 
 export default async function AppLayout({
   children,
@@ -34,7 +35,7 @@ export default async function AppLayout({
     await Promise.all([
       supabase
         .from("profiles")
-        .select("first_name, email, member_since")
+        .select("first_name, email, member_since, membership_status, avatar_url")
         .eq("id", user.id)
         .single(),
       supabase
@@ -93,12 +94,11 @@ export default async function AppLayout({
   const displayName =
     profile?.first_name || profile?.email?.split("@")[0] || "Miembro";
   const initial = displayName.charAt(0).toUpperCase();
-  const planLabel =
-    sub?.plan === "annual"
-      ? "Plan anual"
-      : sub?.plan === "monthly"
-        ? "Plan mensual"
-        : "Sin plan activo";
+  // Un heredado de Memberstack está activo aunque no tenga suscripción aquí:
+  // la barra decía "Sin plan activo" a 60 miembros (auditoría 11-ago).
+  const planLabel = etiquetaDeCobro(
+    situacionDeCobro(profile?.membership_status, sub),
+  );
 
   return (
     <div className="min-h-dvh bg-cream md:grid md:grid-cols-[240px_1fr]">
@@ -120,6 +120,7 @@ export default async function AppLayout({
           />
           <ProfileMenu
             initial={initial}
+            avatarUrl={profile?.avatar_url ?? null}
             entries={menuEntries}
             settingsHref="/app/cuenta"
           />

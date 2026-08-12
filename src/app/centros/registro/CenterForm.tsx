@@ -4,8 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { TextField, SelectField } from "@/components/ui/Field";
+import { PhoneField } from "@/components/ui/PhoneField";
 import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
 import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/client";
 import { registerCenter, type CenterLocationInput } from "./actions";
 
 type LocationDraft = CenterLocationInput & { colonies: string[] };
@@ -29,6 +31,9 @@ export function CenterForm() {
   const [services, setServices] = useState<WellnessService[]>([]);
   const [memberBenefit, setMemberBenefit] = useState("");
   const [locations, setLocations] = useState<LocationDraft[]>([emptyLocation()]);
+  // Contraseña: la cuenta se crea al aplicar (equipo, 11-ago)
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -73,9 +78,29 @@ export function CenterForm() {
         services,
         memberBenefit,
         locations: locations.map(({ colonies: _c, ...loc }) => loc),
+        password,
       });
-      if (result.error) setError(result.error);
-      else setDone(true);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      // La cuenta ya quedó creada del lado del servidor: iniciamos sesión y lo
+      // dejamos en su panel, donde puede completar su perfil mientras el comité
+      // resuelve (equipo, 11-ago).
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (signInError) {
+        // No lo dejamos colgado: la solicitud sí se guardó.
+        setDone(true);
+        return;
+      }
+      // Navegación completa (no router.push): la cookie de sesión tiene que
+      // llegar al servidor antes de pintar el panel.
+      window.location.assign("/centro");
+      return;
     } catch {
       setError("Algo salió mal. Intenta de nuevo.");
     } finally {
@@ -93,15 +118,16 @@ export function CenterForm() {
           ¡Solicitud recibida!
         </h2>
         <p className="text-sm leading-relaxed text-ink-secondary">
-          El comité revisará la información de <strong>{name}</strong> y te
-          contactaremos por correo con la resolución. Al ser aprobado, tu
-          centro aparecerá en el directorio para toda la manada.
+          Tu cuenta ya quedó creada. Inicia sesión con tu correo y contraseña
+          para entrar a tu panel y completar el perfil de{" "}
+          <strong>{name}</strong> mientras el comité revisa la solicitud. Al ser
+          aprobado, tu centro aparecerá en el directorio para toda la manada.
         </p>
         <Link
-          href="/centros"
+          href="/iniciar-sesion?next=/centro"
           className="font-semibold text-teal-deep hover:underline"
         >
-          Volver al directorio
+          Iniciar sesión
         </Link>
       </div>
     );
@@ -126,17 +152,17 @@ export function CenterForm() {
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
-            label="Nombre de contacto"
+            label="Nombre completo de contacto"
             value={contactName}
             onChange={(e) => setContactName(e.target.value)}
             required
           />
-          <TextField
+          <PhoneField
             label="Teléfono"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
             required
+            value={phone}
+            onChange={setPhone}
+            hint="10 dígitos, sin lada internacional."
           />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -154,6 +180,26 @@ export function CenterForm() {
             placeholder="https://…"
           />
         </div>
+        <TextField
+          label="Contraseña"
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          placeholder="Mínimo 8 caracteres"
+          hint="Con ella entras a tu panel para completar tu perfil, aunque tu solicitud siga en revisión."
+          required
+          rightSlot={
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="text-[13px] font-semibold text-teal-deep"
+            >
+              {showPassword ? "Ocultar" : "Mostrar"}
+            </button>
+          }
+        />
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-semibold text-ink-title">
             Servicios que ofreces

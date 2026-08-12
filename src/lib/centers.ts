@@ -8,7 +8,7 @@ export async function fetchApprovedCenters(): Promise<CenterCardData[]> {
   const { data } = await supabase
     .from("wellness_centers")
     .select(
-      "id, name, services, member_benefit, logo_url, phone, wellness_center_locations(address, city, state, colony, postal_code, phone), center_promotions(title, discount_label, valid_until, is_active)",
+      "id, name, services, member_benefit, logo_url, phone, website, wellness_center_locations(address, city, state, colony, postal_code, phone), center_promotions(title, discount_label, valid_until, is_active)",
     )
     .eq("status", "approved")
     .order("created_at", { ascending: true });
@@ -24,6 +24,7 @@ export async function fetchApprovedCenters(): Promise<CenterCardData[]> {
     memberBenefit: c.member_benefit,
     logoUrl: c.logo_url,
     phone: c.phone,
+    website: c.website,
     locations: (c.wellness_center_locations ?? []).map((l) => ({
       address: l.address,
       city: l.city,

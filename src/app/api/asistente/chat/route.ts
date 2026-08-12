@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getLLMProvider,
   buildSupportSystemPrompt,
@@ -7,6 +8,7 @@ import {
   SUPPORT_TOOLS,
   type ChatMessage,
 } from "@/lib/llm";
+import { puedeResponderIA, registrarUso } from "@/lib/llm/gobierno";
 import { fetchActivePromosText } from "@/lib/llm/promos";
 import { fetchSiteSettings } from "@/lib/site";
 import { reportError } from "@/lib/alerts";
@@ -79,6 +81,19 @@ export async function POST(request: Request) {
     content: m.content,
   }));
 
+  const admin = createAdminClient();
+  const veredicto = await puedeResponderIA(admin, {
+    canal: "asistente",
+    conversationId: convId,
+    humanTakeover: false,
+  });
+  if (!veredicto.puede) {
+    return NextResponse.json(
+      { error: "El asistente no está disponible en este momento. Intenta más tarde." },
+      { status: 429 },
+    );
+  }
+
   const system = buildSupportSystemPrompt({
     memberName: profile?.first_name ?? null,
     contactEmail: settings.contact_email,
@@ -105,6 +120,16 @@ export async function POST(request: Request) {
     { conversation_id: convId, role: "user", content: message },
     { conversation_id: convId, role: "assistant", content: reply },
   ]);
+
+  await registrarUso(admin, {
+    agent: "soporte",
+    assistantConversationId: convId,
+    model: process.env.LLM_MODEL ?? process.env.LLM_PROVIDER ?? "demo",
+    tokensIn: Math.ceil(
+      [...history, { content: message }].reduce((s, m) => s + m.content.length, 0) / 4,
+    ),
+    tokensOut: Math.ceil(reply.length / 4),
+  });
 
   return NextResponse.json({ conversationId: convId, reply });
 }

@@ -13,10 +13,6 @@ import {
   PET_COLORS,
   BREED_CONDITIONS,
 } from "@/data/pet-catalogs";
-import {
-  petWaitingPeriodDays,
-  waitingPeriodEndDate,
-} from "@/lib/waiting-period";
 
 type Species = "dog" | "cat";
 
@@ -48,7 +44,8 @@ const AGE_OPTIONS: {
  *   (sin stepper ni plan; su período de espera corre desde hoy).
  *
  * Reglas del sitio vivo: raza y colores con autocompletado (se puede escribir
- * un valor libre si no aparece), edad por rangos, aviso senior a los 10+.
+ * un valor libre si no aparece), edad por rangos, aviso senior a los
+ * SENIOR_PET_AGE_YEARS o más (8 desde el 11-ago-2026).
  */
 export function PetForm({ mode }: { mode: "registro" | "member" }) {
   const router = useRouter();
@@ -67,6 +64,9 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
   const [story, setStory] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Certificado veterinario para seniors, subible desde el alta (equipo, 5-ago)
+  const [cert, setCert] = useState<File | null>(null);
+  const certRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,13 +92,17 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
   const ageOption = AGE_OPTIONS.find((o) => o.value === ageKey) ?? null;
   // Aviso transparente por raza (copy aprobado por el cliente, 16-jul-2026)
   const breedConditions = BREED_CONDITIONS[breed.trim()] ?? null;
-  // El aviso de senior aparece en cuanto se elige 10 años o más
+  // El aviso de senior aparece en cuanto se elige SENIOR_PET_AGE_YEARS o más
   const showsSeniorNote =
     !!ageOption && ageOption.years >= SENIOR_PET_AGE_YEARS;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!userId) return;
+    // Doble envío = mascota doble: el botón se deshabilita con `loading`,
+    // pero este candado corta también el caso en que un segundo submit
+    // alcance a dispararse antes del re-render.
+    if (loading) return;
     setError(null);
     if (!ageOption) {
       setError("Cuéntanos la edad de tu peludo.");
@@ -127,6 +131,19 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       }
     }
 
+    // Certificado del senior (mismo bucket que usa la ficha)
+    let certUrl: string | null = null;
+    if (cert && showsSeniorNote) {
+      const path = `${userId}/cert-${Date.now()}-${cert.name}`;
+      const { error: certError } = await supabase.storage
+        .from("pet-photos")
+        .upload(path, cert);
+      if (!certError) {
+        certUrl = supabase.storage.from("pet-photos").getPublicUrl(path)
+          .data.publicUrl;
+      }
+    }
+
     const isSenior = ageOption.years >= SENIOR_PET_AGE_YEARS;
     const petData = {
       user_id: userId,
@@ -143,38 +160,26 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       is_adopted: adopted,
       adoption_story: adopted ? story.trim() || null : null,
       ...(photoUrl ? { photo_url: photoUrl } : {}),
+      ...(certUrl ? { vet_certificate_url: certUrl } : {}),
     };
 
     if (mode === "member") {
-      // Miembro activo: nueva mascota, período de espera variable desde hoy.
-      // Si antes dio de baja una, la nueva cuenta como reemplazo (180 días).
-      const [{ count: activeCount }, { count: inactiveCount }] =
-        await Promise.all([
-          supabase
-            .from("pets")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", userId)
-            .eq("is_active", true),
-          supabase
-            .from("pets")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", userId)
-            .eq("is_active", false),
-        ]);
+      // Miembro activo: solo se valida el cupo; el período de espera (incluido
+      // el caso de reemplazo) lo determina el comité al aprobar la ficha.
+      const { count: activeCount } = await supabase
+        .from("pets")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_active", true);
       if ((activeCount ?? 0) >= MAX_ACTIVE_PETS) {
         setError(`Ya tienes ${MAX_ACTIVE_PETS} peludos activos en tu membresía.`);
         setLoading(false);
         return;
       }
-      const days = petWaitingPeriodDays({
-        isAdopted: adopted,
-        breed,
-        isReplacement: (inactiveCount ?? 0) > 0,
-      });
-      const { error: saveError } = await supabase.from("pets").insert({
-        ...petData,
-        waiting_period_end_date: waitingPeriodEndDate(days),
-      });
+      // La espera arranca cuando el COMITÉ APRUEBA la ficha (PM, 11-ago), no
+      // al registrar: la fecha la fija resolvePet vía iniciarEsperaDeMascota.
+      // Mientras la ficha está en revisión no corre ningún conteo.
+      const { error: saveError } = await supabase.from("pets").insert(petData);
       if (saveError) {
         setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
         setLoading(false);
@@ -187,13 +192,21 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     // Registro pre-pago: volver a este paso actualiza la mascota capturada.
     // Su período de espera se fija al pagar (webhook), donde ya se conoce
     // si hubo código de embajador (90 días).
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from("pets")
       .select("id")
       .eq("user_id", userId)
       .eq("is_active", true)
       .order("created_at", { ascending: true })
       .limit(1);
+    // Si la búsqueda falla NO se puede caer al insert: crearía una mascota
+    // duplicada cuando la captura ya existía (sospechoso del reporte de
+    // "mascota duplicada tras el pago" que nadie pudo reproducir).
+    if (lookupError) {
+      setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
+      setLoading(false);
+      return;
+    }
 
     const query = existing?.length
       ? supabase.from("pets").update(petData).eq("id", existing[0].id)
@@ -222,14 +235,16 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="grid size-[84px] flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[26px] text-teal"
+          className="relative grid size-[84px] flex-none place-items-center overflow-hidden rounded-full border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] text-[26px] text-teal"
         >
           {photoPreview ? (
+            // Absoluta: height 100% en fila auto de grid se resuelve como
+            // auto y el círculo muestra la franja superior, no el centro
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photoPreview}
               alt="Foto de tu peludo"
-              className="size-full object-cover"
+              className="absolute inset-0 size-full object-cover"
             />
           ) : (
             "+"
@@ -295,14 +310,27 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           <option value="female">Hembra</option>
         </SelectField>
       </div>
+      {/* Párrafos separados (equipo, 11-ago). El TEXTO no se toca: el tono lo
+          está revisando Cipa con Fer Fierro — aquí solo cambia el formato. */}
       {breedConditions && (
-        <div className="rounded-[12px] bg-info-bg px-4 py-3 text-[13px] leading-relaxed text-info-text">
-          💙 Queremos lo mejor para tu {breed.trim()}. Como muchas razas,
-          estos peluditos tienen predisposición a ciertas condiciones de salud
-          (como {breedConditions}). En Pata Amiga somos 100% transparentes
-          contigo, por eso te contamos que nuestro plan está diseñado para
-          acompañarte ante imprevistos y accidentes, por lo que actualmente no
-          incluye reintegros por enfermedades genéticas o hereditarias.
+        <div className="flex flex-col gap-2.5 rounded-[12px] bg-info-bg px-4 py-3 text-[13px] leading-relaxed text-info-text">
+          <p>
+            💙 Sabemos que, como muchas otras razas, los {breed.trim()} pueden
+            tener mayor predisposición a desarrollar algunas condiciones de
+            salud, como {breedConditions}.
+          </p>
+          <p>
+            En Pata Amiga creemos que la confianza comienza con la
+            transparencia. Por eso, es importante que sepas que nuestra
+            membresía está diseñada para acompañarte ante imprevistos y
+            accidentes. Actualmente, no contempla reintegros relacionados con
+            enfermedades genéticas o hereditarias.
+          </p>
+          <p>
+            Nuestro compromiso es brindarte claridad desde el primer día para
+            que siempre sepas cómo funciona tu membresía y puedas aprovecharla
+            al máximo.
+          </p>
         </div>
       )}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -369,10 +397,33 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
         </div>
       )}
       {showsSeniorNote && (
-        <div className="rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
-          Como tu peludo tiene {SENIOR_PET_AGE_YEARS} años o más, te pediremos
-          un certificado veterinario en su ficha para conocer su estado de
-          salud. 🐾
+        <div className="flex flex-col gap-2.5 rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
+          <span>
+            Como tu peludo tiene {SENIOR_PET_AGE_YEARS} años o más, te pedimos
+            un certificado veterinario para conocer su estado de salud. Puedes
+            subirlo aquí mismo o después desde su ficha. 🐾
+          </span>
+          <input
+            ref={certRef}
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => setCert(e.target.files?.[0] ?? null)}
+          />
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => certRef.current?.click()}
+              className="rounded-full border-[1.5px] border-[#8A5A12] px-4 py-1.5 text-[12.5px] font-bold text-[#8A5A12] transition-colors hover:bg-white/50"
+            >
+              {cert ? "Cambiar certificado" : "📄 Subir certificado ahora"}
+            </button>
+            {cert && (
+              <span className="text-[12px] font-semibold">
+                {cert.name} ✓
+              </span>
+            )}
+          </div>
         </div>
       )}
       {error && (
