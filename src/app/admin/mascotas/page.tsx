@@ -8,6 +8,7 @@ import {
   DetailItem,
   SensitiveBlock,
 } from "@/components/panel/DetailModal";
+import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { FilterChips } from "@/components/panel/FilterChips";
 import { PetReviewRow } from "./PetReviewRow";
 import { PetResolveButtons } from "./PetResolveButtons";
@@ -30,7 +31,7 @@ export default async function AdminMascotasPage({
     admin
       .from("pets")
       .select(
-        "id, name, species, breed, sex, coat_color, eye_color, nose_color, is_adopted, adoption_story, age_years, age_months, birth_date, is_senior, vet_certificate_url, photo_url, gallery_photos, approval_status, approval_notes, waiting_period_end_date, waiting_period_bypassed, created_at, user_id, deactivation_reason, profiles!user_id(first_name, last_name, email, phone, member_since, membership_status, curp, birth_date, street, number_ext, number_int, colony, postal_code, city, state, bank_name, clabe, rfc)",
+        "id, name, species, breed, sex, coat_color, eye_color, nose_color, is_adopted, adoption_story, age_years, age_months, birth_date, is_senior, vet_certificate_url, photo_url, gallery_photos, approval_status, approval_notes, waiting_period_end_date, waiting_period_bypassed, created_at, user_id, deactivation_reason, profiles!user_id(first_name, last_name, email, phone, member_since, membership_status, curp, birth_date, nationality, street, number_ext, number_int, colony, postal_code, city, state, bank_name, clabe, rfc)",
       )
       .eq("is_active", !verBajas)
       .order("created_at", { ascending: masAntiguas }),
@@ -44,6 +45,18 @@ export default async function AdminMascotasPage({
   for (const a of petAppeals ?? [])
     if (a.pet_id && !apeladasPorMascota.has(a.pet_id))
       apeladasPorMascota.set(a.pet_id, { folio: a.folio, status: a.status });
+
+  // Pasaportes de los dueños: la identidad de un extranjero es su pasaporte,
+  // no la CURP (lib/perfil-faltantes necesita saber si lo subió).
+  const duenos = [...new Set((pets ?? []).map((p) => p.user_id))];
+  const { data: pasaportes } = duenos.length
+    ? await admin
+        .from("documents")
+        .select("user_id")
+        .eq("document_type", "passport")
+        .in("user_id", duenos)
+    : { data: [] };
+  const conPasaporte = new Set((pasaportes ?? []).map((d) => d.user_id));
 
   const all = (pets ?? []).filter((p) =>
     verBajas
@@ -66,6 +79,7 @@ export default async function AdminMascotasPage({
     membership_status?: string | null;
     curp?: string | null;
     birth_date?: string | null;
+    nationality?: string | null;
     street?: string | null;
     number_ext?: string | null;
     number_int?: string | null;
@@ -160,21 +174,37 @@ export default async function AdminMascotasPage({
               <DetailModal title={`Ficha de ${p.name}`}>
                 {/* Toda la información de la mascota y su dueño (patrón del sitio vivo) */}
                 <div className="flex flex-col gap-4">
-                  {/* Faltantes visibles de un vistazo (petición del equipo, 5-ago) */}
-                  {(!p.photo_url || (p.is_senior && !p.vet_certificate_url)) && (
-                    <div className="flex flex-wrap gap-2">
-                      {p.is_senior && !p.vet_certificate_url && (
-                        <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
-                          ⚠ Falta certificado veterinario (senior {SENIOR_PET_AGE_YEARS}+)
-                        </span>
-                      )}
-                      {!p.photo_url && (
-                        <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
-                          ⚠ Falta foto
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  {/* Faltantes visibles de un vistazo (equipo, 5-ago), incluidos
+                      los del PERFIL del dueño (Fase 4: en todos los popups) */}
+                  {(() => {
+                    const faltaPerfil = datosFaltantesDelPerfil(
+                      profOf(p.profiles) ?? {},
+                      { tienePasaporte: conPasaporte.has(p.user_id) },
+                    );
+                    const faltaAlgo =
+                      !p.photo_url ||
+                      (p.is_senior && !p.vet_certificate_url) ||
+                      faltaPerfil.length > 0;
+                    return faltaAlgo ? (
+                      <div className="flex flex-wrap gap-2">
+                        {p.is_senior && !p.vet_certificate_url && (
+                          <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                            ⚠ Falta certificado veterinario (senior {SENIOR_PET_AGE_YEARS}+)
+                          </span>
+                        )}
+                        {!p.photo_url && (
+                          <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                            ⚠ Falta foto
+                          </span>
+                        )}
+                        {faltaPerfil.length > 0 && (
+                          <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                            ⚠ Al perfil del dueño le falta: {faltaPerfil.join(" · ")}
+                          </span>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
                   {p.photo_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -414,6 +444,18 @@ export default async function AdminMascotasPage({
                               : null
                           }
                         />
+                        {/* Qué le falta al perfil (Fase 4: en todos los popups) */}
+                        {(() => {
+                          const falta = datosFaltantesDelPerfil(prof ?? {}, {
+                            tienePasaporte: conPasaporte.has(p.user_id),
+                          });
+                          return falta.length > 0 ? (
+                            <DetailItem
+                              label="⚠ FALTA EN SU PERFIL"
+                              value={falta.join(" · ")}
+                            />
+                          ) : null;
+                        })()}
                       </div>
                     </div>
 

@@ -126,6 +126,19 @@ export default async function AdminEmbajadoresPage({
   const fullName = (a: Row) =>
     `${a.first_name}${a.last_name ? ` ${a.last_name}` : ""}`;
 
+  // Qué le falta a la solicitud/perfil del embajador (Fase 4: en todos los
+  // popups). Banco/CLABE y RFC no bloquean la aprobación, pero sin ellos no
+  // se le puede pagar el corte — por eso se marcan.
+  const faltantesEmbajador = (a: Row) =>
+    [
+      (!a.ine_front_url || !a.ine_back_url) && "INE (frente y reverso)",
+      !a.birth_date && "fecha de nacimiento",
+      (!a.bank_name || !a.clabe) && "banco y CLABE para su pago",
+      !a.rfc && "RFC",
+      !Object.values(a.social_links ?? {}).some(Boolean) &&
+        "al menos una red social",
+    ].filter(Boolean) as string[];
+
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
       <h1 className="font-display text-[26px] text-ink-title">Embajadores</h1>
@@ -204,6 +217,13 @@ export default async function AdminEmbajadoresPage({
             detailSlot={
               <DetailModal title={`Solicitud de ${fullName(a)}`}>
                 <div className="flex flex-col gap-4">
+                  {faltantesEmbajador(a).length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                        ⚠ Falta: {faltantesEmbajador(a).join(" · ")}
+                      </span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                     <DetailItem label="NOMBRE" value={fullName(a)} />
                     <DetailItem label="CORREO" value={a.email} />
@@ -390,6 +410,11 @@ export default async function AdminEmbajadoresPage({
                       <p className="rounded-[10px] bg-cream px-3 py-2 text-[12.5px] italic text-ink-secondary">
                         «{a.motivation}»
                       </p>
+                    )}
+                    {faltantesEmbajador(a).length > 0 && (
+                      <span className="self-start rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                        ⚠ Falta: {faltantesEmbajador(a).join(" · ")}
+                      </span>
                     )}
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">

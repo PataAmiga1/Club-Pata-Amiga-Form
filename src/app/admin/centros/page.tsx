@@ -48,6 +48,18 @@ const locationLabel = (l: Row["wellness_center_locations"][number]) =>
     .filter(Boolean)
     .join(", ");
 
+// Qué le falta al perfil del centro (Fase 4: en todos los popups). Nada de
+// esto bloquea la aprobación; es para que el comité lo pida de un vistazo.
+const faltantesCentro = (c: Row) =>
+  [
+    !c.logo_url && "logo",
+    !c.member_benefit && "beneficio para miembros",
+    !c.phone && "teléfono",
+    !c.website && "sitio web",
+    !Object.values(c.social_links ?? {}).some(Boolean) && "redes sociales",
+    (c.wellness_center_locations ?? []).length === 0 && "ubicación",
+  ].filter(Boolean) as string[];
+
 export default async function AdminCentrosPage({
   searchParams,
 }: {
@@ -155,6 +167,11 @@ export default async function AdminCentrosPage({
             detailSlot={
               <DetailModal title={`Solicitud de ${c.name}`}>
                 <div className="flex flex-col gap-3">
+                  {faltantesCentro(c).length > 0 && (
+                    <span className="self-start rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                      ⚠ Falta: {faltantesCentro(c).join(" · ")}
+                    </span>
+                  )}
                   {c.logo_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -290,6 +307,11 @@ export default async function AdminCentrosPage({
                 }
               >
                 <div className="flex flex-col gap-4">
+                  {faltantesCentro(c).length > 0 && (
+                    <span className="self-start rounded-full bg-warning-bg px-3 py-1.5 text-[11.5px] font-bold text-warning-text">
+                      ⚠ Falta: {faltantesCentro(c).join(" · ")}
+                    </span>
+                  )}
                   {c.logo_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

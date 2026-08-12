@@ -15,6 +15,7 @@ import {
 } from "@/lib/site";
 import { CAMPAIGN_COUPON_KEYS, CAMPAIGN_PDF_SLOTS } from "@/lib/landings";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
+import { perfilCompleto } from "@/lib/perfil-faltantes";
 import { notifyTeam } from "@/lib/alerts";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { getStripe } from "@/lib/stripe";
@@ -499,6 +500,36 @@ export async function updateMemberByAdmin(
     })
     .eq("id", userId);
   if (error) return { error: "No pudimos guardar los cambios." };
+
+  // Recalcular la bandera con la MISMA regla del 100% del miembro: sin esto,
+  // un perfil completado por teléfono seguía marcado INCOMPLETO hasta que la
+  // persona volviera a guardar (la bandera solo se recalculaba en su guardado
+  // — el caso Lucero del 10-ago).
+  const [{ data: fresh }, { data: pasaporte }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select(
+        "first_name, last_name, curp, birth_date, nationality, postal_code, colony, street",
+      )
+      .eq("id", userId)
+      .maybeSingle(),
+    admin
+      .from("documents")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("document_type", "passport")
+      .limit(1),
+  ]);
+  if (fresh) {
+    await admin
+      .from("profiles")
+      .update({
+        profile_completed: perfilCompleto(fresh, {
+          tienePasaporte: (pasaporte ?? []).length > 0,
+        }),
+      })
+      .eq("id", userId);
+  }
 
   revalidatePath(`/admin/miembros/${userId}`);
   revalidatePath("/admin/miembros");

@@ -6,6 +6,7 @@ import { DeactivateAccountPanel } from "./DeactivateAccountPanel";
 import { formatDateEs } from "@/lib/dates";
 import { formatMxn } from "@/lib/format";
 import { curpCoincide } from "@/lib/curp";
+import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
 import { PetThreadPanel } from "./PetThreadPanel";
 import { PetResolveButtons } from "../../mascotas/PetResolveButtons";
@@ -227,14 +228,16 @@ export default async function AdminMiembroDetailPage({
           {!m.profile_completed && (
             <span className="rounded-[10px] bg-warning-bg px-3 py-2 text-[12px] text-warning-text">
               Falta:{" "}
+              {/* La MISMA regla del 100% del miembro (lib/perfil-faltantes);
+                  el INE no cuenta (opcional, Pablo 10-ago) y el teléfono se
+                  menciona aparte porque tampoco entra al 100%. */}
               {[
-                !m.curp && "CURP",
-                !m.birth_date && "fecha de nacimiento",
-                !m.nationality && "nacionalidad",
-                !address && "domicilio",
-                !m.phone && "teléfono",
-                /* El INE NO se cuenta como faltante: es opcional y se pide al
-                   solicitar el primer reintegro (decisión de Pablo, 10-ago) */
+                ...datosFaltantesDelPerfil(m, {
+                  tienePasaporte: (docs ?? []).some(
+                    (d) => d.document_type === "passport",
+                  ),
+                }),
+                !m.phone && "teléfono (no bloquea el 100%)",
               ]
                 .filter(Boolean)
                 .join(" · ") || "revisar el perfil"}
