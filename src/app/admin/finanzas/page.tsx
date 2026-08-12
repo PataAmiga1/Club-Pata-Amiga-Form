@@ -51,10 +51,15 @@ export default async function AdminFinanzasPage() {
       .select("commission_amount")
       .eq("status", "pending")
       .lt("created_at", monthStart.toISOString()),
-    // Miembros activos TOTALES: el MRR solo puede ver a los que cobran por
-    // Stripe, y los migrados de Memberstack no tienen suscripción aquí. Sin
-    // este contraste el tablero daba a entender que el MRR era todo el negocio
-    // (auditoría 11-ago: 63 activos, 3 con cobro en la plataforma).
+    // Miembros activos TOTALES: el MRR solo puede sumar a quienes tienen
+    // suscripción registrada aquí. Sin este contraste, el tablero daría a
+    // entender que el MRR es todo el negocio.
+    //
+    // ⚠ OJO al leer la diferencia: en el ambiente de PRUEBAS sale enorme
+    // porque esa base es copia de producción pero sus suscripciones apuntan
+    // al Stripe de prueba — las reales no están. Se confundió dos veces con
+    // "hay miembros a los que no se les cobra" (11 y 12-ago) y NO lo es.
+    // Para juzgar esta cifra: producción, nunca pruebas.
     admin
       .from("profiles")
       .select("id", { count: "exact", head: true })
