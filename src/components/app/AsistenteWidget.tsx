@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const WELCOME =
-  "¡Hola! 🐾 Soy el asistente de Club Pata Amiga. Puedo ayudarte con dudas de tu membresía, tus reintegros y los períodos de espera de tus peludos. ¿En qué te ayudo?";
+  "¡Hola! 🐾 Soy el asistente de Club Pata Amiga. Puedo ayudarte con dudas de tu membresía, tus reintegros y los períodos de espera de tus peludos.\n\nSi lo tuyo es la salud de tu peludo (síntomas, qué hacer, si es urgente), eso lo ve la Orientación veterinaria 24/7, que es otro asistente:";
 
 /**
  * Widget flotante del asistente IA en el portal de miembros. Botón burbuja
@@ -64,10 +65,10 @@ export function AsistenteWidget() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Abrir asistente"
-          className="fixed bottom-[152px] right-4 z-30 flex items-center gap-2 rounded-full bg-teal px-4 py-3 text-[13px] font-extrabold text-white shadow-[0_6px_20px_rgba(30,83,80,.35)] transition-transform hover:scale-105 md:bottom-[84px] md:right-6"
+          title="Asistente"
+          className="fixed bottom-[152px] right-4 z-30 grid size-14 place-items-center rounded-full bg-teal text-[22px] text-white shadow-[0_6px_20px_rgba(30,83,80,.35)] transition-transform hover:scale-105 md:bottom-[84px] md:right-6"
         >
           <span aria-hidden>💬</span>
-          Asistente
         </button>
       )}
 
@@ -102,6 +103,19 @@ export function AsistenteWidget() {
                 }`}
               >
                 {m.content}
+                {/* El primer mensaje lleva el enlace de verdad a la
+                    orientación veterinaria: decirle a la gente "ve al otro
+                    asistente" sin darle cómo llegar la deja igual de perdida.
+                    Va aparte porque las burbujas se pintan como texto plano. */}
+                {i === 0 && m.role === "assistant" && (
+                  <Link
+                    href="/app/vet"
+                    onClick={() => setOpen(false)}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-info-bg px-3 py-1.5 text-[12.5px] font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+                  >
+                    🩺 Ir a Orientación veterinaria 24/7 →
+                  </Link>
+                )}
               </div>
             ))}
             {sending && (
