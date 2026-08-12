@@ -271,6 +271,14 @@ export default async function AdminFinanzasPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-[26px] text-ink-title">Finanzas</h1>
         <div className="flex flex-wrap gap-2">
+          {isSuper && (
+            <Link
+              href="/admin/costos"
+              className="grid h-9 place-items-center rounded-full bg-teal px-4 text-xs font-bold text-white transition-colors hover:bg-teal-deep"
+            >
+              📉 Costos de la plataforma →
+            </Link>
+          )}
           {/* Atajo al filtro de solicitantes de factura (Fase 4) */}
           <Link
             href="/admin/miembros?factura=si"
