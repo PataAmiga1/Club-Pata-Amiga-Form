@@ -12,8 +12,13 @@ import { Resend } from "resend";
  * miembros REALES. Sin esta reja, cualquier prueba del equipo (un comunicado,
  * un boletín) podría escribirle a un miembro de verdad desde el ambiente de
  * pruebas.
+ *
+ * Se exporta para que los contadores de "enviados" puedan descontar lo que la
+ * reja va a bloquear ANTES de llamar a Resend: la reja responde sin error para
+ * no romper el flujo, así que sin esto la pantalla decía "2 de 2" cuando solo
+ * salió 1. En producción la variable no existe → todos permitidos, sin cambio.
  */
-function destinatarioPermitido(destino: string): boolean {
+export function destinatarioPermitido(destino: string): boolean {
   const lista = (process.env.CORREOS_PERMITIDOS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())

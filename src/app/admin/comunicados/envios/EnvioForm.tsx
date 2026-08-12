@@ -106,7 +106,19 @@ export function EnvioForm({ isSuper }: { isSuper: boolean }) {
                   setMsg(
                     "error" in res && res.error
                       ? res.error
-                      : `Enviado a ${(res as { enviados: number; total: number }).enviados} de ${(res as { total: number }).total} destinatarios ✓`,
+                      : (() => {
+                          const r = res as {
+                            enviados: number;
+                            total: number;
+                            bloqueados?: number;
+                          };
+                          const base = `Enviado a ${r.enviados} de ${r.total} destinatarios ✓`;
+                          // En pruebas la reja bloquea a los que no son del
+                          // equipo: decirlo evita leer "salieron todos".
+                          return r.bloqueados
+                            ? `${base} · ${r.bloqueados} bloqueado${r.bloqueados === 1 ? "" : "s"} por la reja de pruebas`
+                            : base;
+                        })(),
                   );
                 })
               }
@@ -159,7 +171,17 @@ export function EnvioForm({ isSuper }: { isSuper: boolean }) {
                 setReminderMsg(
                   "error" in res && (res as { error?: string }).error
                     ? ((res as { error?: string }).error ?? "Error")
-                    : `Enviados ${(res as { enviados: number }).enviados} recordatorios (de ${(res as { candidatos: number }).candidatos} perfiles incompletos) ✓`,
+                    : (() => {
+                        const r = res as {
+                          enviados: number;
+                          candidatos: number;
+                          bloqueados?: number;
+                        };
+                        const base = `Enviados ${r.enviados} recordatorios (de ${r.candidatos} perfiles incompletos) ✓`;
+                        return r.bloqueados
+                          ? `${base} · ${r.bloqueados} bloqueado${r.bloqueados === 1 ? "" : "s"} por la reja de pruebas`
+                          : base;
+                      })(),
                 );
               })
             }

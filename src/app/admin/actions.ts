@@ -14,7 +14,7 @@ import {
   SITE_SETTINGS,
 } from "@/lib/site";
 import { CAMPAIGN_COUPON_KEYS, CAMPAIGN_PDF_SLOTS } from "@/lib/landings";
-import { getResend, EMAIL_FROM } from "@/lib/resend";
+import { getResend, EMAIL_FROM, destinatarioPermitido } from "@/lib/resend";
 import { perfilCompleto } from "@/lib/perfil-faltantes";
 import { notifyTeam, reportError } from "@/lib/alerts";
 import { sendTemplatedEmail } from "@/lib/email/send";
@@ -367,7 +367,14 @@ export async function sendExtraordinaryEmail(input: {
 
   const resend = getResend();
   let enviados = 0;
+  // La reja de pruebas responde sin error, así que un bloqueado se contaba
+  // como enviado ("2 de 2" cuando solo salió 1). Se descuenta aquí.
+  let bloqueados = 0;
   for (const to of recipients) {
+    if (!destinatarioPermitido(to)) {
+      bloqueados++;
+      continue;
+    }
     try {
       const { error } = await resend.emails.send({
         from: EMAIL_FROM,
@@ -386,10 +393,15 @@ export async function sendExtraordinaryEmail(input: {
     "Envío extraordinario realizado ✉️",
     `<h2 style="color:#1E5350">Envío extraordinario</h2>
      <p><strong>Asunto:</strong> ${subject}</p>
-     <p><strong>Audiencia:</strong> ${input.audience} · <strong>Enviados:</strong> ${enviados} de ${recipients.length}</p>`,
+     <p><strong>Audiencia:</strong> ${input.audience} · <strong>Enviados:</strong> ${enviados} de ${recipients.length}${bloqueados > 0 ? ` · <strong>Bloqueados por la reja de pruebas:</strong> ${bloqueados}` : ""}</p>`,
   );
 
-  return { ok: true as const, enviados, total: recipients.length };
+  return {
+    ok: true as const,
+    enviados,
+    total: recipients.length,
+    bloqueados,
+  };
 }
 
 /**
