@@ -53,15 +53,18 @@ export const AJUSTES_IA = [
   {
     key: "ia_precio_entrada_usd_millon",
     label: "Precio del modelo — entrada (USD por millón de tokens)",
-    hint: "Con esto se calcula el costo de cada corrida. Es el precio DECLARADO aquí, no lo que factura el proveedor: si cambia la lista de precios, actualízalo.",
-    default: "5",
+    hint: "Con esto se calcula el costo de cada corrida. Es el precio DECLARADO aquí, no lo que factura el proveedor: si cambia la lista de precios o el modelo, actualízalo.",
+    // La plataforma corre claude-sonnet-5 (LLM_MODEL en ambos ambientes):
+    // 3/15 USD por millón, cotejado contra la consola de Anthropic el 2-ago.
+    // Los valores anteriores (5/25) eran de nivel Opus e inflaban los costos.
+    default: "3",
     soloSuper: true,
   },
   {
     key: "ia_precio_salida_usd_millon",
     label: "Precio del modelo — salida (USD por millón de tokens)",
     hint: "Igual que el anterior, para los tokens que genera el modelo.",
-    default: "25",
+    default: "15",
     soloSuper: true,
   },
   {
