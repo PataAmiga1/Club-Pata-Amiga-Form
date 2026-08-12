@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { reportError } from "@/lib/alerts";
 import { getAdminRole } from "@/lib/admin-guard";
 import { formatDateEs } from "@/lib/dates";
 import { FilterChips } from "@/components/panel/FilterChips";
@@ -92,52 +93,76 @@ export default async function AdminMiembrosPage({
     memberIds = [...new Set((petOwners ?? []).map((p) => p.user_id))];
   }
 
-  let membersQuery = admin
-    .from("profiles")
-    .select(
-      "id, first_name, last_name, mother_last_name, email, phone, membership_status, member_since, created_at, birth_date, nationality, bank_name, clabe, cfdi_requested, profile_completed, pets!user_id(id, name, is_active), subscriptions(plan, status, current_period_end, cancel_at_period_end)",
-    )
-    .eq("role", "member")
-    .order("created_at", { ascending: masAntiguos })
-    .limit(100);
+  // Dos juegos de columnas: el completo y uno MÍNIMO de respaldo.
+  //
+  // Si una sola columna del select no existe en la base (p. ej. una migración
+  // que no se corrió en ese ambiente), PostgREST devuelve error y el cliente
+  // regresa `data: null` — sin lanzar excepción y sin dejar rastro en los
+  // registros del servidor. La pantalla mostraba entonces "0 resultados" con
+  // los contadores en 43/402/54, que es exactamente cómo se ve "no hay
+  // miembros" (reporte de la PM en producción, 12-ago). Ahora, si la consulta
+  // rica falla, se reintenta con lo indispensable y se DICE qué pasó.
+  const COLUMNAS_COMPLETAS =
+    "id, first_name, last_name, mother_last_name, email, phone, membership_status, member_since, created_at, birth_date, nationality, bank_name, clabe, cfdi_requested, profile_completed, pets!user_id(id, name, is_active), subscriptions(plan, status, current_period_end, cancel_at_period_end)";
+  const COLUMNAS_MINIMAS =
+    "id, first_name, last_name, email, phone, membership_status, member_since, created_at";
 
-  // Las poblaciones se separan EN LA CONSULTA: filtrarlas después del limit
-  // escondía a los inactivos que no cupieran entre los 100 más recientes.
-  if (estado === "activos")
-    membersQuery = membersQuery.eq("membership_status", "active");
-  else if (estado === "inactivos")
-    membersQuery = membersQuery
-      .neq("membership_status", "active")
-      .not("member_since", "is", null);
-  else if (estado === "nunca")
-    membersQuery = membersQuery.is("member_since", null);
-  if (factura === "si") membersQuery = membersQuery.eq("cfdi_requested", true);
-  else if (factura === "no")
-    membersQuery = membersQuery.not("cfdi_requested", "is", true);
-
-  if (query && !/^[ra]-\d+$/i.test(query)) {
-    const like = `%${query.replace(/[%_,]/g, "")}%`;
-    const orParts = [
-      `first_name.ilike.${like}`,
-      `last_name.ilike.${like}`,
-      `email.ilike.${like}`,
-    ];
-    if (memberIds && memberIds.length > 0)
-      orParts.push(`id.in.(${memberIds.join(",")})`);
-    membersQuery = membersQuery.or(orParts.join(","));
-  }
+  const armarConsulta = (columnas: string) => {
+    let q = admin
+      .from("profiles")
+      .select(columnas)
+      .eq("role", "member")
+      .order("created_at", { ascending: masAntiguos })
+      .limit(100);
+    if (estado === "activos") q = q.eq("membership_status", "active");
+    else if (estado === "inactivos")
+      q = q.neq("membership_status", "active").not("member_since", "is", null);
+    else if (estado === "nunca") q = q.is("member_since", null);
+    if (factura === "si") q = q.eq("cfdi_requested", true);
+    else if (factura === "no") q = q.not("cfdi_requested", "is", true);
+    if (query && !/^[ra]-\d+$/i.test(query)) {
+      const like = `%${query.replace(/[%_,]/g, "")}%`;
+      const orParts = [
+        `first_name.ilike.${like}`,
+        `last_name.ilike.${like}`,
+        `email.ilike.${like}`,
+      ];
+      if (memberIds && memberIds.length > 0)
+        orParts.push(`id.in.(${memberIds.join(",")})`);
+      q = q.or(orParts.join(","));
+    }
+    return q;
+  };
 
   // Contadores reales de toda la base (no solo la página visible)
   const base = () =>
     admin.from("profiles").select("id", { count: "exact", head: true }).eq("role", "member");
-  const [{ data: membersRaw }, activosQ, exMiembrosQ, nuncaQ, facturaQ] =
+  const [listaCompleta, activosQ, exMiembrosQ, nuncaQ, facturaQ] =
     await Promise.all([
-      membersQuery,
+      armarConsulta(COLUMNAS_COMPLETAS),
       base().eq("membership_status", "active"),
       base().neq("membership_status", "active").not("member_since", "is", null),
       base().is("member_since", null),
       base().eq("cfdi_requested", true),
     ]);
+
+  // Respaldo: si la consulta rica falla, la lista se trae con lo mínimo para
+  // que el comité pueda seguir trabajando (nombre, correo, estatus), y se
+  // avisa arriba con el mensaje exacto de la base. Nunca un "no hay
+  // resultados" que en realidad quiere decir "la consulta se rompió".
+  let membersRaw = listaCompleta.data;
+  let fallaDeLectura: string | null = null;
+  if (listaCompleta.error) {
+    fallaDeLectura = listaCompleta.error.message;
+    await reportError("admin/miembros: consulta completa", listaCompleta.error, {
+      estado,
+      factura,
+    });
+    const respaldo = await armarConsulta(COLUMNAS_MINIMAS);
+    membersRaw = respaldo.data;
+    if (respaldo.error)
+      fallaDeLectura = `${fallaDeLectura} · el respaldo también falló: ${respaldo.error.message}`;
+  }
   const members = (membersRaw ?? []) as unknown as Row[];
 
   // Motivo de baja: la cancelación más reciente de cada miembro listado
@@ -309,6 +334,21 @@ export default async function AdminMiembrosPage({
 
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
+      {fallaDeLectura && (
+        <div className="rounded-[14px] bg-error-bg px-4 py-3 text-[13px] text-error-text">
+          <strong>La lista de miembros no se pudo leer completa.</strong> Los
+          contadores de arriba sí son reales, así que los miembros están ahí:
+          lo que falló fue traer sus datos. Se muestra lo que sí se pudo leer.
+          <span className="mt-1 block font-mono text-[11.5px] opacity-80">
+            {fallaDeLectura}
+          </span>
+          <span className="mt-1 block">
+            Suele ser una columna que existe en el código pero no en esta base
+            (una migración que no se corrió en este ambiente). El equipo ya
+            recibió el aviso con el detalle.
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="font-display text-[26px] text-ink-title">Miembros</h1>
@@ -419,7 +459,9 @@ export default async function AdminMiembrosPage({
         ))}
         {members.length === 0 && (
           <span className="py-4 text-sm text-ink-secondary">
-            Sin resultados. Prueba con otro nombre, correo, mascota o folio.
+            {fallaDeLectura
+              ? "La lista no se pudo leer (ver el aviso de arriba). Los contadores sí son reales."
+              : "Sin resultados. Prueba con otro nombre, correo, mascota o folio."}
           </span>
         )}
       </div>
