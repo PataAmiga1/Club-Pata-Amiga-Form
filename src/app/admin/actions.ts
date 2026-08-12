@@ -16,7 +16,7 @@ import {
 import { CAMPAIGN_COUPON_KEYS, CAMPAIGN_PDF_SLOTS } from "@/lib/landings";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { perfilCompleto } from "@/lib/perfil-faltantes";
-import { notifyTeam } from "@/lib/alerts";
+import { notifyTeam, reportError } from "@/lib/alerts";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { getStripe } from "@/lib/stripe";
 import { getTemplateDef } from "@/lib/email/templates";
@@ -1033,8 +1033,16 @@ export async function deactivateMemberAccount(userId: string, reason: string) {
     try {
       const stripe = getStripe();
       await stripe.subscriptions.cancel(sub.stripe_subscription_id);
-    } catch {
-      // Si Stripe falla (p. ej. sub de prueba borrada), la baja local continúa
+    } catch (err) {
+      // La baja local continúa (p. ej. sub de prueba borrada), pero SIN
+      // avisar el cobro seguiría corriendo en Stripe mientras la plataforma
+      // cree que la persona ya no es miembro — el equipo debe cancelarlo a
+      // mano en el panel de Stripe.
+      await reportError("baja de cuenta: cancelar en Stripe", err, {
+        userId,
+        stripe_subscription_id: sub.stripe_subscription_id,
+        pendiente: "cancelar la suscripción a mano en el panel de Stripe",
+      });
     }
     await admin
       .from("subscriptions")

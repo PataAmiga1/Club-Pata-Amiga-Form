@@ -99,6 +99,10 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!userId) return;
+    // Doble envío = mascota doble: el botón se deshabilita con `loading`,
+    // pero este candado corta también el caso en que un segundo submit
+    // alcance a dispararse antes del re-render.
+    if (loading) return;
     setError(null);
     if (!ageOption) {
       setError("Cuéntanos la edad de tu peludo.");
@@ -188,13 +192,21 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     // Registro pre-pago: volver a este paso actualiza la mascota capturada.
     // Su período de espera se fija al pagar (webhook), donde ya se conoce
     // si hubo código de embajador (90 días).
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from("pets")
       .select("id")
       .eq("user_id", userId)
       .eq("is_active", true)
       .order("created_at", { ascending: true })
       .limit(1);
+    // Si la búsqueda falla NO se puede caer al insert: crearía una mascota
+    // duplicada cuando la captura ya existía (sospechoso del reporte de
+    // "mascota duplicada tras el pago" que nadie pudo reproducir).
+    if (lookupError) {
+      setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
+      setLoading(false);
+      return;
+    }
 
     const query = existing?.length
       ? supabase.from("pets").update(petData).eq("id", existing[0].id)
