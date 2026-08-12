@@ -16,20 +16,25 @@ const STATUS_LABEL: Record<string, string> = {
 export default async function AdminReintegrosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; tipo?: string }>;
+  searchParams: Promise<{ estado?: string; tipo?: string; orden?: string }>;
 }) {
-  const { estado, tipo } = await searchParams;
+  const { estado, tipo, orden } = await searchParams;
   const admin = createAdminClient();
-  const { data: rowsRaw } = await admin
+  // Por omisión los más recientes arriba, con filtro para invertir (Fase 4)
+  const masAntiguos = orden === "antiguos";
+  // Los filtros van EN la consulta: filtrarlos después del limit escondía
+  // solicitudes que no cupieran entre las 100 más recientes.
+  let rowsQuery = admin
     .from("reimbursements")
     .select(
       "id, folio, category, amount_requested, amount_approved, status, created_at, pets(name, species), profiles!user_id(first_name, last_name, email)",
     )
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: masAntiguos })
     .limit(100);
-  const rows = (rowsRaw ?? []).filter(
-    (r) => (!estado || r.status === estado) && (!tipo || r.category === tipo),
-  );
+  if (estado) rowsQuery = rowsQuery.eq("status", estado);
+  if (tipo) rowsQuery = rowsQuery.eq("category", tipo);
+  const { data: rowsRaw } = await rowsQuery;
+  const rows = rowsRaw ?? [];
 
   const memberName = (p: unknown) => {
     const prof = (Array.isArray(p) ? p[0] : p) as {
@@ -64,25 +69,35 @@ export default async function AdminReintegrosPage({
           </a>
         </div>
       </div>
-      <FilterChips
-        basePath="/admin/reintegros"
-        current={estado}
-        keep={{ tipo }}
-        allLabel="Todos"
-        options={[
-          { value: "pending", label: "Pendientes" },
-          { value: "in_review", label: "En revisión" },
-          { value: "approved", label: "Aprobados" },
-          { value: "rejected", label: "Rechazados" },
-          { value: "paid", label: "Pagados" },
-        ]}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterChips
+          basePath="/admin/reintegros"
+          current={estado}
+          keep={{ tipo, orden }}
+          allLabel="Todos"
+          options={[
+            { value: "pending", label: "Pendientes" },
+            { value: "in_review", label: "En revisión" },
+            { value: "approved", label: "Aprobados" },
+            { value: "rejected", label: "Rechazados" },
+            { value: "paid", label: "Pagados" },
+          ]}
+        />
+        <FilterChips
+          basePath="/admin/reintegros"
+          current={orden}
+          param="orden"
+          keep={{ estado, tipo }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguos", label: "Más antiguos" }]}
+        />
+      </div>
       {/* Filtro por tipo de gasto (petición del equipo, 5-ago) */}
       <FilterChips
         basePath="/admin/reintegros"
         current={tipo}
         param="tipo"
-        keep={{ estado }}
+        keep={{ estado, orden }}
         allLabel="Todos los tipos"
         options={Object.entries(REIMBURSEMENT_CATEGORY_LABELS).map(
           ([value, label]) => ({ value, label }),

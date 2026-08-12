@@ -51,18 +51,25 @@ type Row = {
 export default async function AdminEmbajadoresPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{
+    estado?: string;
+    desde?: string;
+    hasta?: string;
+    orden?: string;
+  }>;
 }) {
-  const { estado, desde, hasta } = await searchParams;
+  const { estado, desde, hasta, orden } = await searchParams;
   const admin = createAdminClient();
   const isSuper = (await getAdminRole()) === "super_admin";
+  // Solicitudes de la más reciente a la más antigua (equipo, 11-ago), con
+  // filtro para invertir el orden (Fase 4)
+  const masAntiguos = orden === "antiguos";
   const { data } = await admin
     .from("ambassadors")
     .select(
       "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, referrals(commission_amount, status, created_at)",
     )
-    // Solicitudes de la más reciente a la más antigua (equipo, 11-ago)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: masAntiguos });
 
   const rows = ((data ?? []) as Row[]).filter(
     (a) => !estado || a.status === estado,
@@ -126,7 +133,7 @@ export default async function AdminEmbajadoresPage({
         <FilterChips
           basePath="/admin/embajadores"
           current={estado}
-          keep={{ desde, hasta }}
+          keep={{ desde, hasta, orden }}
           allLabel="Todos"
           options={[
             { value: "pending", label: "Pendientes" },
@@ -135,12 +142,21 @@ export default async function AdminEmbajadoresPage({
             ...(isSuper ? [{ value: "canceled", label: "🕊️ Bajas" }] : []),
           ]}
         />
+        <FilterChips
+          basePath="/admin/embajadores"
+          current={orden}
+          param="orden"
+          keep={{ estado, desde, hasta }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguos", label: "Más antiguos" }]}
+        />
         {/* Rango de fechas para contar referidos por período (equipo, 5-ago) */}
         <form
           action="/admin/embajadores"
           className="flex flex-wrap items-center gap-2 text-[12px] text-ink-secondary"
         >
           {estado && <input type="hidden" name="estado" value={estado} />}
+          {orden && <input type="hidden" name="orden" value={orden} />}
           <label className="flex items-center gap-1.5">
             Referidos del
             <input

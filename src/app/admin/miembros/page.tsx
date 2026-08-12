@@ -54,12 +54,19 @@ type Col = { h: string; w: string; render: (m: Row) => React.ReactNode };
 export default async function AdminMiembrosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; factura?: string; estado?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    factura?: string;
+    estado?: string;
+    orden?: string;
+  }>;
 }) {
-  const { q, factura, estado } = await searchParams;
+  const { q, factura, estado, orden } = await searchParams;
   const query = q?.trim() ?? "";
   const admin = createAdminClient();
   const isSuper = (await getAdminRole()) === "super_admin";
+  // Por omisión los más recientes arriba, con filtro para invertir (Fase 4)
+  const masAntiguos = orden === "antiguos";
 
   // Folio directo: R-#### abre el reintegro
   if (/^r-\d+$/i.test(query)) {
@@ -91,7 +98,7 @@ export default async function AdminMiembrosPage({
       "id, first_name, last_name, mother_last_name, email, phone, membership_status, member_since, created_at, birth_date, nationality, bank_name, clabe, cfdi_requested, profile_completed, pets!user_id(id, name, is_active), subscriptions(plan, status, current_period_end, cancel_at_period_end)",
     )
     .eq("role", "member")
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: masAntiguos })
     .limit(100);
 
   // Las poblaciones se separan EN LA CONSULTA: filtrarlas después del limit
@@ -307,7 +314,11 @@ export default async function AdminMiembrosPage({
           <h1 className="font-display text-[26px] text-ink-title">Miembros</h1>
           <p className="text-sm text-ink-secondary">
             {members.length} resultado{members.length === 1 ? "" : "s"}
-            {query ? ` para “${query}”` : " (más recientes)"} ·{" "}
+            {query
+              ? ` para “${query}”`
+              : masAntiguos
+                ? " (más antiguos)"
+                : " (más recientes)"} ·{" "}
             <strong className="text-success-text">
               {activosQ.count ?? 0} activos
             </strong>{" "}
@@ -323,6 +334,10 @@ export default async function AdminMiembrosPage({
           </p>
         </div>
         <form action="/admin/miembros" className="flex items-center gap-2">
+          {/* Buscar no debe tirar los filtros activos */}
+          {estado && <input type="hidden" name="estado" value={estado} />}
+          {factura && <input type="hidden" name="factura" value={factura} />}
+          {orden && <input type="hidden" name="orden" value={orden} />}
           <input
             name="q"
             defaultValue={query}
@@ -342,7 +357,7 @@ export default async function AdminMiembrosPage({
         <FilterChips
           basePath="/admin/miembros"
           current={estado}
-          keep={{ q: query || undefined, factura }}
+          keep={{ q: query || undefined, factura, orden }}
           allLabel="Todos"
           options={[
             { value: "activos", label: `Pagaron · activos (${activosQ.count ?? 0})` },
@@ -354,12 +369,20 @@ export default async function AdminMiembrosPage({
           basePath="/admin/miembros"
           current={factura}
           param="factura"
-          keep={{ q: query || undefined, estado }}
+          keep={{ q: query || undefined, estado, orden }}
           allLabel="Con y sin factura"
           options={[
             { value: "si", label: "Solicitan factura" },
             { value: "no", label: "Sin factura" },
           ]}
+        />
+        <FilterChips
+          basePath="/admin/miembros"
+          current={orden}
+          param="orden"
+          keep={{ q: query || undefined, estado, factura }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguos", label: "Más antiguos" }]}
         />
       </div>
 

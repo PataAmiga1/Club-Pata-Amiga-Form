@@ -51,18 +51,20 @@ const locationLabel = (l: Row["wellness_center_locations"][number]) =>
 export default async function AdminCentrosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; orden?: string }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, orden } = await searchParams;
   const admin = createAdminClient();
   const isSuper = (await getAdminRole()) === "super_admin";
+  // Por omisión los más recientes arriba, con filtro para invertir (Fase 4)
+  const masAntiguos = orden === "antiguos";
   const [{ data }, { data: centerAppeals }] = await Promise.all([
     admin
       .from("wellness_centers")
       .select(
         "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, created_at, social_links, wellness_center_locations(address, colony, city, state, postal_code), center_promotions(title, discount_label, is_active, valid_until)",
       )
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: masAntiguos }),
     admin
       .from("appeals")
       .select("id, folio, status, center_id")
@@ -102,22 +104,33 @@ export default async function AdminCentrosPage({
           💸 Pagos a centros →
         </a>
       </div>
-      <FilterChips
-        basePath="/admin/centros"
-        current={estado}
-        allLabel="Todos"
-        options={[
-          { value: "pending", label: "Pendientes" },
-          { value: "approved", label: "Aprobados" },
-          { value: "rejected", label: "Rechazados" },
-          ...(isSuper
-            ? [
-                { value: "apelacion", label: "⚖️ Apelaciones" },
-                { value: "bajas", label: "🕊️ Bajas" },
-              ]
-            : []),
-        ]}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterChips
+          basePath="/admin/centros"
+          current={estado}
+          keep={{ orden }}
+          allLabel="Todos"
+          options={[
+            { value: "pending", label: "Pendientes" },
+            { value: "approved", label: "Aprobados" },
+            { value: "rejected", label: "Rechazados" },
+            ...(isSuper
+              ? [
+                  { value: "apelacion", label: "⚖️ Apelaciones" },
+                  { value: "bajas", label: "🕊️ Bajas" },
+                ]
+              : []),
+          ]}
+        />
+        <FilterChips
+          basePath="/admin/centros"
+          current={orden}
+          param="orden"
+          keep={{ estado }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguos", label: "Más antiguos" }]}
+        />
+      </div>
 
       {!verApelaciones && !verBajas && (
         <h2 className="font-display text-lg text-ink-title">

@@ -28,9 +28,11 @@ const one = <T,>(v: T | T[] | null): T | null =>
 export default async function AdminApelacionesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; orden?: string }>;
 }) {
-  const { estado } = await searchParams;
+  const { estado, orden } = await searchParams;
+  // Por omisión las más recientes arriba, con filtro para invertir (Fase 4)
+  const masAntiguas = orden === "antiguas";
   // Las apelaciones son EXCLUSIVAS del super admin (regla del sitio vivo)
   const supabase = await createClient();
   const {
@@ -49,7 +51,7 @@ export default async function AdminApelacionesPage({
     .select(
       "id, folio, reason, status, created_at, resolution_notes, reimbursement_id, pet_id, center_id, profiles!user_id(first_name, last_name, email), reimbursements(folio, rejection_reason), pets(name, approval_notes), wellness_centers(name, rejection_reason)",
     )
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: masAntiguas });
 
   const rows = (data ?? []).map((r) => ({
     ...r,
@@ -61,7 +63,7 @@ export default async function AdminApelacionesPage({
 
   const filtered = rows.filter((a) => !estado || a.status === estado);
   const pending = filtered.filter((a) => a.status === "pending");
-  const resolved = filtered.filter((a) => a.status !== "pending").reverse();
+  const resolved = filtered.filter((a) => a.status !== "pending");
 
   const memberName = (a: Row) =>
     a.profiles?.first_name
@@ -93,16 +95,27 @@ export default async function AdminApelacionesPage({
         </p>
       </div>
 
-      <FilterChips
-        basePath="/admin/apelaciones"
-        current={estado}
-        options={[
-          { value: "pending", label: "Por revisar" },
-          { value: "approved", label: "Aceptadas" },
-          { value: "rejected", label: "Mantenidas" },
-          { value: "closed", label: "Cerradas" },
-        ]}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterChips
+          basePath="/admin/apelaciones"
+          current={estado}
+          keep={{ orden }}
+          options={[
+            { value: "pending", label: "Por revisar" },
+            { value: "approved", label: "Aceptadas" },
+            { value: "rejected", label: "Mantenidas" },
+            { value: "closed", label: "Cerradas" },
+          ]}
+        />
+        <FilterChips
+          basePath="/admin/apelaciones"
+          current={orden}
+          param="orden"
+          keep={{ estado }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguas", label: "Más antiguas" }]}
+        />
+      </div>
       <h2 className="font-display text-lg text-ink-title">Por revisar</h2>
       <div className="flex flex-col gap-2.5">
         {pending.map((a) => (
