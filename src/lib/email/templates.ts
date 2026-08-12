@@ -20,9 +20,7 @@ export type EmailTemplateDef = {
   html: string;
 };
 
-const FOOTER = `<p style="color:#6B7C79;font-size:13px">Club Pata Amiga · Protección para tu manada</p>`;
-const WRAP = (inner: string) =>
-  `<div style="font-family:sans-serif;color:#3D524F;line-height:1.6">${inner}${FOOTER}</div>`;
+const FOOTER = `<p style="margin:0;color:#6B7C79;font-size:13px">Club Pata Amiga · Protección para tu manada</p>`;
 
 /**
  * Logo para correos (los clientes de correo no soportan SVG).
@@ -34,6 +32,26 @@ const WRAP = (inner: string) =>
  * de Auth de Supabase son las mismas en staging y producción.
  */
 const EMAIL_HEADER_IMG = "https://www.pataamiga.mx/brand/email-header.png";
+
+/**
+ * Cascarón brandeado de TODOS los correos transaccionales (Fase 5: "que
+ * todos los correos vayan con la marca"). Antes era un <div> pelón sin logo
+ * ni tarjeta — el correo de la campaña sí iba brandeado y el resto no. Solo
+ * tablas + estilos inline (Gmail/Outlook no soportan flexbox ni <style>),
+ * 600px, mismo encabezado teal con logo que el correo de campaña.
+ */
+const WRAP = (inner: string) =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAF7F1;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+      <tr><td style="background-color:#1CBCAD;border-radius:20px 20px 0 0;padding:22px 20px;text-align:center;">
+        <img src="${EMAIL_HEADER_IMG}" width="170" alt="Club Pata Amiga" style="display:inline-block;width:170px;max-width:60%;height:auto;border-radius:12px;">
+      </td></tr>
+      <tr><td style="background-color:#FFFFFF;padding:30px 32px 22px;color:#3D524F;font-size:15px;line-height:1.65;">${inner}</td></tr>
+      <tr><td style="background-color:#FFFFFF;border-radius:0 0 20px 20px;border-top:1px solid #F2EEE4;padding:16px 32px;text-align:center;">${FOOTER}</td></tr>
+    </table>
+  </td></tr>
+</table>`;
 
 /**
  * Correo brandeado de la campaña de regalo — HTML apto para clientes de
