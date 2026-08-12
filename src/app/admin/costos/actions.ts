@@ -193,41 +193,47 @@ export async function recalcularAutomaticos(mes: string) {
   const siguiente = `${Math.floor(siguienteTotal / 12)}-${String((siguienteTotal % 12) + 1).padStart(2, "0")}`;
   const hasta = new Date(`${siguiente}-01T00:00:00-06:00`);
 
+  /**
+   * Borra el renglón automático del mes y lo vuelve a insertar.
+   *
+   * NO se usa `upsert`: la llave única de los automáticos es PARCIAL
+   * (`where origen = 'automatico'`) y Postgres no puede inferir un índice
+   * parcial desde ON CONFLICT — devuelve 42P10 y no guarda nada. Como el
+   * error no se revisaba, la pantalla anunciaba "IA: $0.08 · Comisiones:
+   * $109.84 ✓" mientras la tabla seguía vacía.
+   */
   const guardar = async (
     proveedor: string,
     concepto: string,
     categoria: Categoria,
     centavosMxn: number,
-  ) => {
-    if (centavosMxn <= 0) {
-      // Sin consumo no se deja un renglón en cero: el mes se lee mejor sin él
-      await admin
-        .from("platform_costs")
-        .delete()
-        .eq("proveedor", proveedor)
-        .eq("concepto", concepto)
-        .eq("periodo", `${mes}-01`)
-        .eq("origen", "automatico");
-      return;
-    }
-    await admin.from("platform_costs").upsert(
-      {
-        proveedor,
-        concepto,
-        categoria,
-        periodo: `${mes}-01`,
-        monto_centavos: centavosMxn,
-        moneda: "MXN",
-        monto_mxn_centavos: centavosMxn,
-        tipo_cambio: 1,
-        origen: "automatico",
-        recurrente: false,
-        prorratear_meses: null,
-        nota: "Calculado por la plataforma",
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "proveedor,concepto,periodo" },
-    );
+  ): Promise<string | null> => {
+    await admin
+      .from("platform_costs")
+      .delete()
+      .eq("proveedor", proveedor)
+      .eq("concepto", concepto)
+      .eq("periodo", `${mes}-01`)
+      .eq("origen", "automatico");
+    // Sin consumo no se deja un renglón en cero: el mes se lee mejor sin él
+    if (centavosMxn <= 0) return null;
+
+    const { error } = await admin.from("platform_costs").insert({
+      proveedor,
+      concepto,
+      categoria,
+      periodo: `${mes}-01`,
+      monto_centavos: centavosMxn,
+      moneda: "MXN",
+      monto_mxn_centavos: centavosMxn,
+      tipo_cambio: 1,
+      origen: "automatico",
+      recurrente: false,
+      prorratear_meses: null,
+      nota: "Calculado por la plataforma",
+      updated_at: new Date().toISOString(),
+    });
+    return error ? `No se pudo guardar «${concepto}».` : null;
   };
 
   // --- IA: suma real de lo que costaron las llamadas del mes ---
@@ -240,7 +246,14 @@ export async function recalcularAutomaticos(mes: string) {
     (acc, u) => acc + Number(u.cost_cents ?? 0),
     0,
   );
-  await guardar("anthropic", "Consumo de agentes IA", "ia", iaCentavos);
+  const fallos: string[] = [];
+  const falloIa = await guardar(
+    "anthropic",
+    "Consumo de agentes IA",
+    "ia",
+    iaCentavos,
+  );
+  if (falloIa) fallos.push(falloIa);
 
   // --- Stripe: comisiones cobradas en el mes ---
   let stripeCentavos = 0;
@@ -266,16 +279,21 @@ export async function recalcularAutomaticos(mes: string) {
     // Que Stripe no responda no debe tumbar el recálculo de la IA
     stripeError = "No pudimos leer las comisiones de Stripe.";
   }
-  if (!stripeError)
-    await guardar(
+  if (!stripeError) {
+    const falloStripe = await guardar(
       "stripe",
       "Comisiones por transacción",
       "comisiones",
       stripeCentavos,
     );
+    if (falloStripe) fallos.push(falloStripe);
+  }
 
   revalidatePath("/admin/costos");
   revalidatePath("/admin/finanzas");
+  // Si algo no se guardó se dice: un "✓" con la tabla vacía es peor que un
+  // error, porque nadie va a volver a revisar.
+  if (fallos.length > 0) return { error: fallos.join(" ") };
   return {
     ok: true as const,
     iaCentavos,
