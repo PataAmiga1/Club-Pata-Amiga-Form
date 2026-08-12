@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ZONA_MX } from "@/lib/zona-horaria";
-import { fetchEventosAdmin } from "@/lib/admin/eventos";
+import { fetchEventosAdmin, FUENTES_EVENTO } from "@/lib/admin/eventos";
+import { FilterChips } from "@/components/panel/FilterChips";
 
 /**
  * Notificaciones: la misma actividad que alimenta la campanita del
@@ -9,10 +10,20 @@ import { fetchEventosAdmin } from "@/lib/admin/eventos";
  * historial por fuente y con hora exacta. Los eventos se arman en
  * src/lib/admin/eventos.ts: UNA sola fuente para las dos superficies, así
  * los enlaces "al detalle" no se desalinean entre campanita y página.
+ * Con filtro por fuente y por orden (Fase 4: filtros en todas las listas).
  */
-export default async function AdminNotificacionesPage() {
+export default async function AdminNotificacionesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ fuente?: string; orden?: string }>;
+}) {
+  const { fuente, orden } = await searchParams;
+  const masAntiguas = orden === "antiguas";
   const admin = createAdminClient();
   const events = await fetchEventosAdmin(admin, 20);
+
+  const filtrados = events.filter((e) => !fuente || e.fuente === fuente);
+  const lista = masAntiguas ? [...filtrados].reverse() : filtrados;
 
   const cuando = (iso: string) =>
     new Intl.DateTimeFormat("es-MX", {
@@ -34,8 +45,26 @@ export default async function AdminNotificacionesPage() {
           landings y errores del sistema.
         </p>
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterChips
+          basePath="/admin/notificaciones"
+          current={fuente}
+          param="fuente"
+          keep={{ orden }}
+          allLabel="Todas"
+          options={[...FUENTES_EVENTO]}
+        />
+        <FilterChips
+          basePath="/admin/notificaciones"
+          current={orden}
+          param="orden"
+          keep={{ fuente }}
+          allLabel="Más recientes"
+          options={[{ value: "antiguas", label: "Más antiguas" }]}
+        />
+      </div>
       <div className="flex flex-col rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
-        {events.map((e) => (
+        {lista.map((e) => (
           <Link
             key={e.id}
             href={e.href}
@@ -50,9 +79,9 @@ export default async function AdminNotificacionesPage() {
             </span>
           </Link>
         ))}
-        {events.length === 0 && (
+        {lista.length === 0 && (
           <span className="py-3 text-sm text-ink-secondary">
-            Sin actividad todavía.
+            Sin actividad {fuente ? "de esta fuente" : "todavía"}.
           </span>
         )}
       </div>

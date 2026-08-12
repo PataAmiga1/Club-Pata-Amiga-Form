@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateEs } from "@/lib/dates";
 import { MiniBarChart } from "@/components/panel/MiniBarChart";
+import { FilterChips } from "@/components/panel/FilterChips";
 
 export const metadata = { title: "Orientación vet 24/7 · Panel" };
 
@@ -9,7 +10,15 @@ export const metadata = { title: "Orientación vet 24/7 · Panel" };
  * "Orientaciones vet" del resumen: conversaciones por mes y las más
  * recientes, con el miembro y su volumen de mensajes.
  */
-export default async function AdminVetPage() {
+export default async function AdminVetPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; orden?: string }>;
+}) {
+  const { q, orden } = await searchParams;
+  const query = q?.trim().toLowerCase() ?? "";
+  // Por omisión las más recientes arriba, con filtro para invertir (Fase 4)
+  const masAntiguas = orden === "antiguas";
   const admin = createAdminClient();
 
   const yearAgo = new Date();
@@ -63,6 +72,21 @@ export default async function AdminVetPage() {
       ? `${m.first_name} ${m.last_name ?? ""}`.trim()
       : m.email;
   };
+
+  // Búsqueda por miembro y orden de la tabla (Fase 4: filtros en todas las
+  // listas). Las tarjetas y la gráfica siguen contando TODO: el filtro solo
+  // acota la tabla de conversaciones.
+  const emailOf = (p: unknown) => {
+    const m = (Array.isArray(p) ? p[0] : p) as { email?: string } | null;
+    return m?.email ?? "";
+  };
+  const tabla = rows.filter(
+    (c) =>
+      !query ||
+      memberOf(c.profiles).toLowerCase().includes(query) ||
+      emailOf(c.profiles).toLowerCase().includes(query),
+  );
+  if (masAntiguas) tabla.reverse();
 
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
@@ -132,16 +156,43 @@ export default async function AdminVetPage() {
       />
 
       <div className="flex flex-col gap-2.5 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
-        <h2 className="font-display text-lg text-ink-title">
-          Conversaciones recientes
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-lg text-ink-title">
+            Conversaciones recientes
+          </h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <FilterChips
+              basePath="/admin/vet"
+              current={orden}
+              param="orden"
+              keep={{ q: query || undefined }}
+              allLabel="Más recientes"
+              options={[{ value: "antiguas", label: "Más antiguas" }]}
+            />
+            <form action="/admin/vet" className="flex items-center gap-2">
+              {orden && <input type="hidden" name="orden" value={orden} />}
+              <input
+                name="q"
+                defaultValue={q ?? ""}
+                placeholder="Buscar miembro…"
+                className="h-9 w-[190px] rounded-full border-[1.5px] border-border-input bg-white px-3.5 text-[12.5px] text-ink-title outline-none focus:border-teal"
+              />
+              <button
+                type="submit"
+                className="grid h-9 place-items-center rounded-full bg-teal px-4 text-xs font-bold text-white transition-colors hover:bg-teal-deep"
+              >
+                Buscar
+              </button>
+            </form>
+          </div>
+        </div>
         <div className="flex flex-col overflow-x-auto">
           <div className="grid min-w-[480px] grid-cols-[1fr_130px_110px] gap-2 border-b-[1.5px] border-[#F2EEE4] py-2 text-[10.5px] font-extrabold tracking-[.05em] text-ink-placeholder">
             <span>MIEMBRO</span>
             <span>INICIO</span>
             <span>MENSAJES</span>
           </div>
-          {rows.slice(0, 20).map((c) => (
+          {tabla.slice(0, 20).map((c) => (
             <div
               key={c.id}
               className="grid min-w-[480px] grid-cols-[1fr_130px_110px] items-center gap-2 border-b border-[#F2EEE4] py-[10px] text-[12.5px] text-ink-body"
@@ -151,9 +202,11 @@ export default async function AdminVetPage() {
               <span>{c.vet_messages?.length ?? 0}</span>
             </div>
           ))}
-          {rows.length === 0 && (
+          {tabla.length === 0 && (
             <span className="py-3 text-sm text-ink-secondary">
-              Aún no hay conversaciones.
+              {query
+                ? "Sin conversaciones de ese miembro."
+                : "Aún no hay conversaciones."}
             </span>
           )}
         </div>

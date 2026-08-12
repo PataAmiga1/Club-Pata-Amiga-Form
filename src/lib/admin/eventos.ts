@@ -8,7 +8,20 @@ export type EventoAdmin = {
   text: string;
   href: string;
   created_at: string;
+  /** Fuente del evento — alimenta el filtro de /admin/notificaciones. */
+  fuente: FuenteEvento;
 };
+
+export const FUENTES_EVENTO = [
+  { value: "reintegros", label: "💚 Reintegros" },
+  { value: "apelaciones", label: "⚖️ Apelaciones" },
+  { value: "embajadores", label: "🤝 Embajadores" },
+  { value: "centros", label: "📍 Centros" },
+  { value: "landings", label: "🎯 Landings" },
+  { value: "errores", label: "⚠️ Errores" },
+] as const;
+
+export type FuenteEvento = (typeof FUENTES_EVENTO)[number]["value"];
 
 /**
  * Actividad reciente del panel — la MISMA fuente para la campanita del
@@ -63,6 +76,7 @@ export async function fetchEventosAdmin(
       text: `Nueva solicitud de reintegro ${r.folio}`,
       href: `/admin/reintegros/${r.id}`,
       created_at: r.created_at,
+      fuente: "reintegros" as const,
     })),
     ...(evAppeals.data ?? []).map((a) => ({
       id: `a-${a.id}`,
@@ -70,6 +84,7 @@ export async function fetchEventosAdmin(
       text: `Apelación ${a.folio} presentada`,
       href: "/admin/apelaciones",
       created_at: a.created_at,
+      fuente: "apelaciones" as const,
     })),
     ...(evAmb.data ?? []).map((a) => ({
       id: `e-${a.id}`,
@@ -78,6 +93,7 @@ export async function fetchEventosAdmin(
       // Al expediente particular, no a la lista (equipo, 11-ago)
       href: `/admin/embajadores/${a.id}`,
       created_at: a.created_at,
+      fuente: "embajadores" as const,
     })),
     ...(evCenters.data ?? []).map((c) => ({
       id: `c-${c.id}`,
@@ -86,6 +102,7 @@ export async function fetchEventosAdmin(
       // Los centros no tienen página de detalle todavía (Fase 4)
       href: "/admin/centros",
       created_at: c.created_at,
+      fuente: "centros" as const,
     })),
     ...(evLeads.data ?? []).map((l) => ({
       id: `l-${l.id}`,
@@ -93,6 +110,7 @@ export async function fetchEventosAdmin(
       text: `${l.first_name} se registró en la landing «${l.campaign}»`,
       href: "/admin/landings",
       created_at: l.created_at,
+      fuente: "landings" as const,
     })),
     ...(evErrors.data ?? []).map((e) => ({
       id: `x-${e.id}`,
@@ -100,6 +118,7 @@ export async function fetchEventosAdmin(
       text: `Error en ${e.context}`,
       href: "/admin",
       created_at: e.created_at,
+      fuente: "errores" as const,
     })),
   ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 }
