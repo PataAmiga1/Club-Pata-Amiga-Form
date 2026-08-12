@@ -66,7 +66,7 @@ export function AsistenteWidget() {
           onClick={() => setOpen(true)}
           aria-label="Abrir asistente"
           title="Asistente"
-          className="fixed bottom-[152px] right-4 z-30 grid size-14 place-items-center rounded-full bg-teal text-[22px] text-white shadow-[0_6px_20px_rgba(30,83,80,.35)] transition-transform hover:scale-105 md:bottom-[84px] md:right-6"
+          className="fixed bottom-[176px] right-4 z-30 grid size-14 place-items-center rounded-full bg-teal text-[22px] text-white shadow-[0_6px_20px_rgba(30,83,80,.35)] transition-transform hover:scale-105 md:bottom-[148px] md:right-6"
         >
           <span aria-hidden>💬</span>
         </button>
