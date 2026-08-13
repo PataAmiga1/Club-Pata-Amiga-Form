@@ -116,6 +116,8 @@ export default async function PetFichaPage({
           id: pet.id,
           userId: pet.user_id,
           name: pet.name,
+          species: pet.species as "dog" | "cat",
+          breed: pet.breed,
           isSenior: pet.is_senior,
           infoRequested: pet.info_requested,
           sex: pet.sex,

@@ -23,6 +23,8 @@ async function ownPet(petId: string) {
 }
 
 export type PetFichaInput = {
+  /** Se captura aquí desde el 12-ago: el alta se redujo a tipo, nombre y edad. */
+  breed?: string;
   sex?: string;
   coatColor?: string;
   noseColor?: string;
@@ -43,6 +45,7 @@ export async function updatePetFicha(petId: string, input: PetFichaInput) {
   const { error } = await ctx.admin
     .from("pets")
     .update({
+      breed: input.breed?.trim() || null,
       sex: input.sex || null,
       coat_color: input.coatColor?.trim() || null,
       nose_color: input.noseColor?.trim() || null,

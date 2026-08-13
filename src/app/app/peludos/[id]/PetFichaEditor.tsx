@@ -5,14 +5,18 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField, SelectField } from "@/components/ui/Field";
+import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { Button } from "@/components/ui/Button";
 import { PET_GALLERY_MAX, SENIOR_PET_AGE_YEARS } from "@/lib/constants";
+import { DOG_BREED_NAMES, CAT_BREED_NAMES } from "@/data/pet-catalogs";
 import { updatePetFicha, replyPetThread, deactivatePet } from "./actions";
 
 export type PetFicha = {
   id: string;
   userId: string;
   name: string;
+  species: "dog" | "cat";
+  breed: string | null;
   isSenior: boolean;
   infoRequested: boolean;
   sex: string | null;
@@ -57,6 +61,7 @@ export function PetFichaEditor({
   const [photoUrl, setPhotoUrl] = useState(pet.photoUrl);
   const [gallery, setGallery] = useState<string[]>(pet.galleryPhotos);
   const [certUrl, setCertUrl] = useState(pet.vetCertificateUrl);
+  const [breed, setBreed] = useState(pet.breed ?? "");
   const [sex, setSex] = useState(pet.sex ?? "");
   const [coat, setCoat] = useState(pet.coatColor ?? "");
   const [nose, setNose] = useState(pet.noseColor ?? "");
@@ -92,6 +97,7 @@ export function PetFichaEditor({
     setNotice(null);
     try {
       const result = await updatePetFicha(pet.id, {
+        breed,
         sex,
         coatColor: coat,
         noseColor: nose,
@@ -221,6 +227,21 @@ export function PetFichaEditor({
           DATOS DE {pet.name.toUpperCase()}
         </span>
         <div className="grid gap-3.5 sm:grid-cols-2">
+          {/* La raza se pide AQUÍ desde el 12-ago: el alta quedó en tres datos
+              (tipo, nombre y edad) y todo lo demás se completa ya pagado. Sin
+              este campo no habría dónde capturarla nunca. */}
+          <AutocompleteField
+            label="Raza"
+            options={
+              pet.species === "dog"
+                ? ["Mestizo", ...DOG_BREED_NAMES]
+                : ["Doméstico", ...CAT_BREED_NAMES]
+            }
+            value={breed}
+            onChange={setBreed}
+            placeholder={pet.species === "dog" ? "Mestizo, Labrador…" : "Doméstico, Siamés…"}
+            hint="Escribe y elige una sugerencia. Si no aparece, escríbela tal cual."
+          />
           <SelectField label="Sexo" value={sex} onChange={(e) => setSex(e.target.value)}>
             <option value="">Elige</option>
             <option value="male">Macho</option>
