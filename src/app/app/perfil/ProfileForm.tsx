@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField } from "@/components/ui/Field";
+import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 
@@ -270,7 +271,20 @@ export function ProfileForm({
       return;
     }
     if (finalize && completion === 100) {
-      router.push("/app");
+      // El registro dejó a los peludos con lo mínimo (tipo, nombre y edad),
+      // así que en cuanto el contratante queda completo se sigue con ELLOS,
+      // uno por uno, en vez de devolver a la persona al inicio a que adivine
+      // qué falta (PM, 12-ago).
+      const { data: pendientes } = await supabase
+        .from("pets")
+        .select("id, breed, sex, photo_url")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+      const siguiente = (pendientes ?? []).find(
+        (p) => !p.breed || !p.sex || !p.photo_url,
+      );
+      router.push(siguiente ? `/app/peludos/${siguiente.id}?completar=1` : "/app");
     } else if (finalize) {
       setMessage(
         "Guardado. Aún faltan datos o documentos para completar el perfil.",
@@ -437,40 +451,39 @@ export function ProfileForm({
             onChange={(e) => setCp(e.target.value.replace(/\D/g, ""))}
             autoComplete="postal-code"
           />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-semibold text-ink-title">
-              Colonia{" "}
-              <span className="font-medium text-ink-tertiary">
-                (auto-completada)
-              </span>
-            </label>
-            {colonies.length > 0 ? (
-              <select
-                className="h-12 w-full appearance-none rounded-[12px] border-[1.5px] border-border-input bg-white px-4 text-[15px] text-ink-title outline-none focus:border-2 focus:border-teal"
-                value={colony}
-                onChange={(e) => setColony(e.target.value)}
-              >
-                {colonies.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="h-12 w-full rounded-[12px] border-[1.5px] border-border-input bg-white px-4 text-[15px] text-ink-title placeholder:text-ink-placeholder outline-none focus:border-2 focus:border-teal"
-                placeholder="Escribe tu colonia"
-                value={colony}
-                onChange={(e) => setColony(e.target.value)}
-              />
-            )}
-          </div>
+          {/* El código postal propone la colonia, pero SIEMPRE se puede
+              escribir otra: el catálogo se equivoca o le falta la de alguien
+              (PM, 12-ago). Antes era una lista cerrada. */}
+          <AutocompleteField
+            label="Colonia"
+            options={colonies}
+            value={colony}
+            onChange={setColony}
+            placeholder="Escribe o elige tu colonia"
+            hint={
+              colonies.length > 0
+                ? "La proponemos por tu código postal; si no es la tuya, escríbela."
+                : undefined
+            }
+          />
         </div>
-        {stateMx && (
-          <span className="-mt-1 text-[12.5px] text-ink-tertiary">
-            {city}, {stateMx}
-          </span>
-        )}
+        {/* Alcaldía y estado: se llenan solos con el CP y ahora SE PUEDEN
+            CORREGIR. Antes eran texto fijo, así que un dato equivocado del
+            catálogo no había forma de arreglarlo (PM, 12-ago). */}
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+          <TextField
+            label="Alcaldía o municipio"
+            placeholder="Gustavo A. Madero"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+          <TextField
+            label="Estado"
+            placeholder="Ciudad de México"
+            value={stateMx}
+            onChange={(e) => setStateMx(e.target.value)}
+          />
+        </div>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1fr_120px_120px]">
           <TextField
             label="Calle"

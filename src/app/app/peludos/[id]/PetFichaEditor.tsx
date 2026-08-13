@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField, SelectField } from "@/components/ui/Field";
 import { AutocompleteField } from "@/components/ui/AutocompleteField";
@@ -54,6 +54,8 @@ export function PetFichaEditor({
   thread: ThreadMessage[];
 }) {
   const router = useRouter();
+  // ?completar=1 → venimos del flujo guiado que arranca en "completa tu perfil"
+  const enCadena = useSearchParams().get("completar") === "1";
   const mainRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const certRef = useRef<HTMLInputElement>(null);
@@ -91,6 +93,18 @@ export function PetFichaEditor({
     return supabase.storage.from("pet-photos").getPublicUrl(path).data.publicUrl;
   }
 
+  /** Siguiente peludo del mismo dueño al que todavía le falten datos. */
+  const siguientePeludoPendiente = async (userId: string, actual: string) => {
+    const { data } = await createClient()
+      .from("pets")
+      .select("id, breed, sex, photo_url")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .neq("id", actual)
+      .order("created_at", { ascending: true });
+    return (data ?? []).find((p) => !p.breed || !p.sex || !p.photo_url)?.id ?? null;
+  };
+
   const save = async (patch: Parameters<typeof updatePetFicha>[1] = {}) => {
     setBusy("save");
     setError(null);
@@ -110,7 +124,16 @@ export function PetFichaEditor({
         ...patch,
       });
       if (result.error) setError(result.error);
-      else setNotice("Ficha guardada ✓");
+      else {
+        setNotice("Ficha guardada ✓");
+        // Venimos de "completa tu perfil": se encadena con el siguiente
+        // peludo que aún deba datos, y al terminar todos se va al inicio.
+        // Así la persona no tiene que ir buscando qué le falta (PM, 12-ago).
+        if (enCadena) {
+          const siguiente = await siguientePeludoPendiente(pet.userId, pet.id);
+          router.push(siguiente ? `/app/peludos/${siguiente}?completar=1` : "/app");
+        }
+      }
     } finally {
       setBusy(null);
     }

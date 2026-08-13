@@ -116,7 +116,15 @@ export function PetCard({ pet }: { pet: PetRow }) {
             {docsCompletos
               ? "Su ficha está en revisión del comité — el período de espera empieza al aprobarse · "
               : "Su período de espera empieza cuando el comité apruebe su ficha · "}
-            <Link href="/app/peludos" className="font-semibold text-teal-deep">
+            {/* A la ficha DE ESE peludo, no a la lista: desde el inicio
+                llevaba a la pestaña de peludos, y dentro de la pestaña
+                llevaba a la misma pantalla — o sea, no hacía nada
+                (PM, 12-ago). El ?completar=1 encadena con el siguiente
+                peludo al que le falten datos. */}
+            <Link
+              href={`/app/peludos/${pet.id}?completar=1`}
+              className="font-semibold text-teal-deep"
+            >
               {docsCompletos ? "Ver ficha" : "Completar documentos"}
             </Link>
           </span>
