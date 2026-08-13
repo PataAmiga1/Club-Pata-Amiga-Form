@@ -6,7 +6,7 @@ import { submitAppeal } from "@/app/app/apelaciones/actions";
 
 /**
  * Botón "Apelar decisión" con formulario inline para reintegros rechazados
- * y fichas de mascota denegadas. Una segunda revisión del comité.
+ * y perfiles de mascota denegados. Una segunda revisión del comité.
  */
 export function AppealButton({
   reimbursementId,

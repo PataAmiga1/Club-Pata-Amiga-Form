@@ -166,7 +166,7 @@ export const NOTIFY_EVENTS = [
   {
     key: "notify_appeals",
     label: "Nueva apelación",
-    hint: "Aviso cuando un miembro apela un reintegro o una ficha de mascota.",
+    hint: "Aviso cuando un miembro apela un reintegro o un perfil de mascota.",
   },
   {
     key: "notify_emergencies",

@@ -11,7 +11,7 @@ const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   rejected: { text: "RECHAZADO", cls: "bg-error-bg text-error-text" },
 };
 
-/** Ficha completa de la mascota: fotos, datos e hilo con el comité. */
+/** Perfil completo de la mascota: fotos, datos e hilo con el comité. */
 export default async function PetFichaPage({
   params,
 }: {
@@ -92,14 +92,14 @@ export default async function PetFichaPage({
       <p className="-mt-2 text-[13px] text-ink-secondary">
         {pet.breed ?? "Sin raza registrada"} · {ageLabel} ·{" "}
         {wait.done
-          ? "período de espera completado ✓"
-          : `período de espera: ${wait.elapsed}/${wait.total} días`}
+          ? "tiempo de espera completado ✓"
+          : `tiempo de espera: ${wait.elapsed}/${wait.total} días`}
         {pet.approval_status === "rejected" && pet.approval_notes
           ? ` · Observaciones: ${pet.approval_notes}`
           : ""}
       </p>
 
-      {/* Período de espera cumplido: acceso directo a los beneficios */}
+      {/* Tiempo de espera cumplido: acceso directo a los beneficios */}
       {wait.done &&
         pet.approval_status === "approved" &&
         pet.is_active !== false && (

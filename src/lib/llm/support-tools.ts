@@ -13,13 +13,13 @@ export const SUPPORT_TOOLS: AgentTool[] = [
   {
     name: "mis_mascotas",
     description:
-      "Lista las mascotas registradas del miembro con su período de espera: fecha en que termina, días restantes y si ya está activa para reintegros.",
+      "Lista las mascotas registradas del miembro con su tiempo de espera: fecha en que termina, días restantes y si ya está activa para reintegros.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
     name: "mi_membresia",
     description:
-      "Devuelve el estado de la membresía del miembro: plan (mensual/anual), estatus, fecha de renovación y período de espera del contratante.",
+      "Devuelve el estado de la membresía del miembro: plan (mensual/anual), estatus, fecha de renovación y tiempo de espera del contratante.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -82,7 +82,7 @@ export async function executeSupportTool(
         .eq("status", "active")
         .maybeSingle(),
     ]);
-    // El contratante NO tiene período de espera (PM, 11-ago): el bot no debe
+    // El contratante NO tiene tiempo de espera (PM, 11-ago): el bot no debe
     // reportar una espera que ya no existe. La espera es por mascota.
     return JSON.stringify(
       {

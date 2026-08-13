@@ -38,7 +38,7 @@ export type DefinicionBeneficio = {
    * pregunta que exige la migración de cohortes: "¿cuánta gente queda peor?".
    * Y sin esa respuesta la compuerta legal no tendría de qué agarrarse.
    *
-   * Ojo con los que se leen al revés: en los períodos de espera y en las horas
+   * Ojo con los que se leen al revés: en los tiempos de espera y en las horas
    * de compromiso, MENOS es mejor.
    */
   mejorSi: "mayor" | "menor" | "verdadero";
@@ -46,15 +46,15 @@ export type DefinicionBeneficio = {
 };
 
 export const CATALOGO_BENEFICIOS = {
-  // --- Períodos de espera ---------------------------------------------------
+  // --- Tiempos de espera ---------------------------------------------------
   // `espera_contratante_dias` se QUITÓ el 11-ago-2026: el contratante NO tiene
-  // período de espera — al pagar es miembro, sin aprobación ni espera (PM).
+  // tiempo de espera — al pagar es miembro, sin aprobación ni espera (PM).
   // `espera_mascota_reemplazo_dias` se QUITÓ el mismo día: el reemplazo ya no
   // tiene días propios — se evalúa con las condiciones normales (120/150/180),
   // solo que sin el beneficio del embajador (PM). Los snapshots viejos que aún
   // traen estas llaves las ignoran (migración 20260811000005).
   espera_mascota_estandar_dias: {
-    label: "Período de espera por mascota — estándar",
+    label: "Tiempo de espera por mascota — estándar",
     tipo: "entero",
     unidad: "días",
     consumidoPor: ["alta de mascota", "reintegros"],
@@ -64,7 +64,7 @@ export const CATALOGO_BENEFICIOS = {
     porOmision: 180,
   },
   espera_mascota_adoptada_raza_dias: {
-    label: "Período de espera — adoptado de raza",
+    label: "Tiempo de espera — adoptado de raza",
     tipo: "entero",
     unidad: "días",
     consumidoPor: ["alta de mascota"],
@@ -74,7 +74,7 @@ export const CATALOGO_BENEFICIOS = {
     porOmision: 150,
   },
   espera_mascota_adoptada_mestizo_dias: {
-    label: "Período de espera — adoptado mestizo",
+    label: "Tiempo de espera — adoptado mestizo",
     tipo: "entero",
     unidad: "días",
     consumidoPor: ["alta de mascota"],
@@ -84,7 +84,7 @@ export const CATALOGO_BENEFICIOS = {
     porOmision: 120,
   },
   espera_mascota_con_embajador_dias: {
-    label: "Período de espera — con código de embajador",
+    label: "Tiempo de espera — con código de embajador",
     tipo: "entero",
     unidad: "días",
     consumidoPor: ["alta de mascota"],

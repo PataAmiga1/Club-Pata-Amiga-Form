@@ -275,8 +275,8 @@ export default async function AdminMiembroDetailPage({
               {formatDateEs(new Date(sub.current_period_end))}
             </span>
           )}
-          {/* El contratante ya no tiene período de espera (PM, 11-ago): la
-              espera es por mascota y se ve en cada ficha. */}
+          {/* El contratante ya no tiene tiempo de espera (PM, 11-ago): la
+              espera es por mascota y se ve en cada perfil. */}
         </div>
 
         {/* Cancelaciones con motivo (equipo, 5-ago) */}

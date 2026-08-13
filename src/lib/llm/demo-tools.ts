@@ -31,7 +31,7 @@ export const DEMO_TOOLS: AgentTool[] = [
   {
     name: "periodos_de_espera",
     description:
-      "Los períodos de espera vigentes por tipo de alta (estándar, adoptado, con código de embajador, reemplazo) y el del contratante.",
+      "Los tiempos de espera vigentes por tipo de alta (estándar, adoptado, con código de embajador, reemplazo) y el del contratante.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -118,8 +118,8 @@ export async function executeDemoTool(
     case "periodos_de_espera": {
       const b = beneficiosDe(null); // los valores vigentes del catálogo
       return [
-        `Contratante: sin período de espera — la membresía queda activa al pagar.`,
-        `La espera es por mascota y empieza cuando el comité aprueba su ficha:`,
+        `Contratante: sin tiempo de espera — la membresía queda activa al pagar.`,
+        `La espera es por mascota y empieza cuando el comité aprueba su perfil:`,
         `Mascota estándar: ${b.espera_mascota_estandar_dias} días.`,
         `Mascota adoptada de raza: ${b.espera_mascota_adoptada_raza_dias} días.`,
         `Mascota adoptada mestiza: ${b.espera_mascota_adoptada_mestizo_dias} días.`,
@@ -139,7 +139,7 @@ export async function executeDemoTool(
         `Compromiso de transferencia: ${b.horas_compromiso_reintegro} horas desde la aprobación.`,
         `Apelaciones por caso: ${b.apelaciones_max}.`,
         "Para solicitar se sube la factura o el recibo del veterinario y los datos bancarios del titular.",
-        "El reintegro aplica cuando ya pasó el período de espera de esa mascota.",
+        "El reintegro aplica cuando ya pasó el tiempo de espera de esa mascota.",
       ].join("\n");
     }
 

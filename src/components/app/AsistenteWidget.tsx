@@ -6,7 +6,7 @@ import Link from "next/link";
 type Msg = { role: "user" | "assistant"; content: string };
 
 const WELCOME =
-  "¡Hola! 🐾 Soy el asistente de Club Pata Amiga. Puedo ayudarte con dudas de tu membresía, tus reintegros y los períodos de espera de tus peludos.\n\nSi lo tuyo es la salud de tu peludo (síntomas, qué hacer, si es urgente), eso lo ve la Orientación veterinaria 24/7, que es otro asistente:";
+  "¡Hola! 🐾 Soy el asistente de Club Pata Amiga. Puedo ayudarte con dudas de tu membresía, tus reintegros y los tiempos de espera de tus peludos.\n\nSi lo tuyo es la salud de tu peludo (síntomas, qué hacer, si es urgente), eso lo ve la Orientación veterinaria 24/7, que es otro asistente:";
 
 /**
  * Widget flotante del asistente IA en el portal de miembros. Botón burbuja

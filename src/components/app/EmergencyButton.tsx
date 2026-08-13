@@ -76,7 +76,7 @@ export function EmergencyButton({ phone }: { phone: string }) {
               </li>
               <li>
                 <strong>3. Guarda tus facturas:</strong> los gastos de urgencia
-                aplican para reintegro si el período de espera de tu peludo ya
+                aplican para reintegro si el tiempo de espera de tu peludo ya
                 se cumplió.
               </li>
             </ol>

@@ -11,7 +11,7 @@ import { attachIdentity, type IdentityKind } from "@/lib/crm/contacts";
  * un botón no protege nada (docs/portal-ventas/00, principio 3).
  *
  * Cada cambio relevante emite su evento con emitEvent, para que la línea de
- * tiempo de la ficha cuente la historia completa sin que nadie tenga que
+ * tiempo del perfil cuente la historia completa sin que nadie tenga que
  * acordarse de escribirla.
  */
 
@@ -196,7 +196,7 @@ export async function actualizarContacto(
   return { ok: true as const };
 }
 
-/** Agrega un correo o teléfono al contacto (el ⊕ de la ficha). */
+/** Agrega un correo o teléfono al contacto (el ⊕ del perfil). */
 export async function agregarIdentidad(
   contactId: string,
   kind: IdentityKind,

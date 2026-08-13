@@ -298,7 +298,7 @@ export async function requestCenterDeactivation(reason: string) {
     "Baja voluntaria de centro aliado 🕊️",
     `<h2 style="color:#1E5350">${ctx.center.name} se dio de baja del directorio</h2>
      <p><strong>Motivo:</strong> ${motivo}</p>
-     <p>Su ficha ya no aparece en el directorio. Puede verse en el panel → Centros → Bajas.</p>`,
+     <p>Su perfil ya no aparece en el directorio. Puede verse en el panel → Centros → Bajas.</p>`,
   );
 
   refreshCenterPages();

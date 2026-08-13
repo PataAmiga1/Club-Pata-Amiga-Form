@@ -74,7 +74,7 @@ export default async function NuevaSolicitudPage() {
       name: p.name,
       species: p.species as "dog" | "cat",
       eligible: p.approval_status === "approved" && wait.done,
-      waitLabel: wait.done ? "disponible" : `en período de espera (${wait.elapsed}/${wait.total})`,
+      waitLabel: wait.done ? "disponible" : `en tiempo de espera (${wait.elapsed}/${wait.total})`,
       pendingApproval: p.approval_status !== "approved" && wait.done,
     };
   });

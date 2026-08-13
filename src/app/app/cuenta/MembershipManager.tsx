@@ -21,7 +21,7 @@ const BENEFITS_LOST = [
   "🐾 Reintegros: hasta $3,000 MXN en gastos veterinarios, $2,000 por fallecimiento y $300 en vacunas",
   "📍 Beneficios y promociones en la red de centros aliados",
   "👨‍👩‍👧 Protección de hasta 3 mascotas con una sola membresía",
-  "⏳ El período de espera ya avanzado — si vuelves después, empieza de nuevo",
+  "⏳ El tiempo de espera ya avanzado — si vuelves después, empieza de nuevo",
 ];
 
 export function MembershipManager({

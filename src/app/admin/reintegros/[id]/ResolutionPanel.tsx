@@ -183,7 +183,7 @@ export function ResolutionPanel({
             SUPER ADMIN
           </span>
           <span className="text-[13px] leading-normal text-white/85">
-            Bypass de período de espera disponible para esta mascota.
+            Bypass de tiempo de espera disponible para esta mascota.
           </span>
           <button
             type="button"
@@ -191,7 +191,7 @@ export function ResolutionPanel({
             onClick={() => run(() => bypassWaitingPeriod(petId))}
             className="grid h-10 place-items-center rounded-full border-[1.5px] border-white/35 text-[12.5px] font-bold text-white transition-colors hover:bg-white/10 disabled:opacity-60"
           >
-            Forzar fin de período de espera
+            Forzar fin de tiempo de espera
           </button>
         </div>
       )}

@@ -138,7 +138,7 @@ export function PlanSelector({
             <div className="flex gap-2.5">{CHECK}Sin plazos forzosos</div>
             <div className="flex gap-2.5">{CHECK}Orientación veterinaria 24/7</div>
             <div className="flex gap-2.5">
-              {CHECK}Reintegros al cumplir período de espera
+              {CHECK}Reintegros al cumplir tiempo de espera
             </div>
             <div className="flex gap-2.5">{CHECK}Red de centros de bienestar</div>
           </div>
@@ -188,7 +188,7 @@ export function PlanSelector({
             <div className="flex gap-2.5">{CHECK}Tranquilidad los 365 días</div>
             <div className="flex gap-2.5">{CHECK}Orientación veterinaria 24/7</div>
             <div className="flex gap-2.5">
-              {CHECK}Reintegros al cumplir período de espera
+              {CHECK}Reintegros al cumplir tiempo de espera
             </div>
             <div className="flex gap-2.5">{CHECK}Reintegros en 72 hrs</div>
           </div>

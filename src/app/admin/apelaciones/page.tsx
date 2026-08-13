@@ -79,7 +79,7 @@ export default async function AdminApelacionesPage({
     a.reimbursement_id
       ? (a.reimbursements?.rejection_reason ?? "Rechazado")
       : a.pet_id
-        ? (a.pets?.approval_notes ?? "Ficha rechazada")
+        ? (a.pets?.approval_notes ?? "Perfil rechazado")
         : (a.wellness_centers?.rejection_reason ?? "Solicitud rechazada");
 
   return (
@@ -90,7 +90,7 @@ export default async function AdminApelacionesPage({
         </h1>
         <p className="max-w-[560px] text-sm text-ink-secondary">
           Segundas revisiones solicitadas por los miembros. Aceptar una
-          apelación reabre el reintegro (vuelve a la cola) o aprueba la ficha
+          apelación reabre el reintegro (vuelve a la cola) o aprueba el perfil
           de la mascota.
         </p>
       </div>

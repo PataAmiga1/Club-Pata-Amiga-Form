@@ -7,7 +7,7 @@ type Msg = { role: "user" | "assistant"; content: string };
 const BIENVENIDA =
   "¡Hola! 🐾 Soy el asistente de Club Pata Amiga, en versión de demostración.\n\n" +
   "Pregúntame lo que quieras de la membresía: qué incluye, cuánto cuesta, cómo " +
-  "funcionan los reintegros o los períodos de espera. Cuando te hagas miembro " +
+  "funcionan los reintegros o los tiempos de espera. Cuando te hagas miembro " +
   "respondo con la información de tus peludos.";
 
 /**

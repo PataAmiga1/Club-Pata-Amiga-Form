@@ -11,7 +11,7 @@ import {
 } from "@/components/panel/contactos/FichaLateral";
 import { NotasYTareas } from "@/components/panel/contactos/NotasYTareas";
 
-export const metadata = { title: "Ficha de contacto · Portal de ventas" };
+export const metadata = { title: "Perfil de contacto · Portal de ventas" };
 
 /** Iconos de la línea de tiempo por tipo de evento. */
 const ICONO_EVENTO: Record<string, string> = {

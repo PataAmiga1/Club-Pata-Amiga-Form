@@ -41,7 +41,7 @@ const AGE_OPTIONS: {
  * Formulario de alta de mascota, compartido entre:
  * - mode="registro": paso 2 del registro (pre-pago) → sigue a elegir plan.
  * - mode="member":   miembro activo agrega otro peludo → vuelve a Mis peludos
- *   (sin stepper ni plan; su período de espera corre desde hoy).
+ *   (sin stepper ni plan; su tiempo de espera corre desde hoy).
  *
  * Reglas del sitio vivo: raza y colores con autocompletado (se puede escribir
  * un valor libre si no aparece), edad por rangos, aviso senior a los
@@ -166,7 +166,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       }
     }
 
-    // Certificado del senior (mismo bucket que usa la ficha)
+    // Certificado del senior (mismo bucket que usa el perfil)
     let certUrl: string | null = null;
     if (cert && showsSeniorNote) {
       const path = `${userId}/cert-${Date.now()}-${cert.name}`;
@@ -199,8 +199,8 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     };
 
     if (mode === "member") {
-      // Miembro activo: solo se valida el cupo; el período de espera (incluido
-      // el caso de reemplazo) lo determina el comité al aprobar la ficha.
+      // Miembro activo: solo se valida el cupo; el tiempo de espera (incluido
+      // el caso de reemplazo) lo determina el comité al aprobar el perfil.
       const { count: activeCount } = await supabase
         .from("pets")
         .select("id", { count: "exact", head: true })
@@ -211,9 +211,9 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
         setLoading(false);
         return;
       }
-      // La espera arranca cuando el COMITÉ APRUEBA la ficha (PM, 11-ago), no
+      // La espera arranca cuando el COMITÉ APRUEBA el perfil (PM, 11-ago), no
       // al registrar: la fecha la fija resolvePet vía iniciarEsperaDeMascota.
-      // Mientras la ficha está en revisión no corre ningún conteo.
+      // Mientras el perfil está en revisión no corre ningún conteo.
       const { error: saveError } = await supabase.from("pets").insert(petData);
       if (saveError) {
         setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
@@ -225,7 +225,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     }
 
     // Registro pre-pago: volver a este paso actualiza lo ya capturado.
-    // Su período de espera se fija al pagar (webhook), donde ya se conoce
+    // Su tiempo de espera se fija al pagar (webhook), donde ya se conoce
     // si hubo código de embajador (90 días).
     const { data: existing, error: lookupError } = await supabase
       .from("pets")
@@ -260,7 +260,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
 
     // Se emparejan con lo que ya existía (por si regresó a este paso): el
     // i-ésimo actualiza al i-ésimo, y lo que sobre se elimina — son capturas
-    // pre-pago de esta misma persona, sin período de espera todavía.
+    // pre-pago de esta misma persona, sin tiempo de espera todavía.
     for (const [i, datos] of todos.entries()) {
       const previo = existing?.[i];
       const { error: saveError } = previo
@@ -292,7 +292,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       {/* ===== ALTA (pre-pago): SOLO tipo, nombre y edad =====
           Decisión de la PM (12-ago): pedir raza, sexo, colores y foto antes de
           pagar mete fricción justo donde la persona todavía está decidiendo.
-          Todo eso se completa después del pago, en la ficha del peludo. */}
+          Todo eso se completa después del pago, en el perfil del peludo. */}
       {mode === "registro" && (
         <>
           <ToggleGroup
@@ -441,7 +441,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           </span>
           <span className="text-[12.5px] text-ink-tertiary">
             {mode === "member"
-              ? "Podrás agregar más fotos en su ficha"
+              ? "Podrás agregar más fotos en su perfil"
               : "Opcional ahora, la pedimos al completar el perfil"}
           </span>
         </div>
@@ -569,7 +569,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           />
           <span className="text-xs text-ink-tertiary">
             Al compartir su historia nos autorizas a incluirla en la página y
-            redes de Pata Amiga. 💚 Los adoptados tienen un período de espera
+            redes de Pata Amiga. 💚 Los adoptados tienen un tiempo de espera
             más corto.
           </span>
         </div>
@@ -579,7 +579,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           <span>
             Como tu peludo tiene {SENIOR_PET_AGE_YEARS} años o más, te pedimos
             un certificado veterinario para conocer su estado de salud. Puedes
-            subirlo aquí mismo o después desde su ficha. 🐾
+            subirlo aquí mismo o después desde su perfil. 🐾
           </span>
           <input
             ref={certRef}

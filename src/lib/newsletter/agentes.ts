@@ -140,7 +140,7 @@ REGLAS QUE NO SE NEGOCIAN
    revisión anual, según <fuente>"; no puedes decir qué hacer con un animal
    enfermo, ni sugerir tratamientos, dosis o diagnósticos.
 4. Terminología vinculante desde el primer borrador: nunca seguro, póliza,
-   cobertura ni carencia. Se dice membresía, beneficios y período de espera.`;
+   cobertura ni carencia. Se dice membresía, beneficios y tiempo de espera.`;
 
 export type ResultadoCorrida<T> =
   | { ok: true; datos: T; costoCentavos: number; demo: boolean; runId: string }

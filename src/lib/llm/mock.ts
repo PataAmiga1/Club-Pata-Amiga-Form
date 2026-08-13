@@ -115,7 +115,7 @@ export class MockProvider implements LLMProvider {
     return (
       `🛠️ [Modo demo — sin IA conectada] Recibí tu mensaje. Con la IA conectada ` +
       `(LLM_PROVIDER=anthropic) respondería cualquier duda sobre Club Pata Amiga — ` +
-      `planes, reintegros, períodos de espera y más. 🐾`
+      `planes, reintegros, tiempos de espera y más. 🐾`
     );
   }
 

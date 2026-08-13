@@ -43,8 +43,8 @@ export default async function PeludosPage({
     <div className="flex flex-col gap-4 px-5 py-6 md:gap-[22px] md:px-[34px] md:py-[30px]">
       {registrado && (
         <div className="rounded-[14px] bg-success-bg px-4 py-3 text-sm font-semibold text-success-text">
-          🐾 ¡Listo! Tu peludo quedó registrado. El comité revisará su ficha y
-          su período de espera ya corre.
+          🐾 ¡Listo! Tu peludo quedó registrado. El comité revisará su perfil y
+          su tiempo de espera ya corre.
         </div>
       )}
       <div className="flex items-center justify-between">
@@ -54,7 +54,7 @@ export default async function PeludosPage({
           </h1>
           <p className="text-[12.5px] text-ink-secondary md:text-sm">
             {active.length} de {MAX_ACTIVE_PETS} peludos activos. Toca «Ver
-            ficha» para fotos, datos completos y mensajes del comité.
+            perfil» para fotos, datos completos y mensajes del comité.
           </p>
         </div>
         {active.length < MAX_ACTIVE_PETS && (
@@ -77,7 +77,7 @@ export default async function PeludosPage({
                 href={`/app/peludos/${pet.id}`}
                 className="self-start text-[13px] font-bold text-teal-deep hover:underline"
               >
-                Ver ficha completa →
+                Ver perfil completo →
               </Link>
               {pet.approval_status === "rejected" &&
                 (pending ? (
@@ -87,7 +87,7 @@ export default async function PeludosPage({
                 ) : mine.length < APPEAL_MAX_PER_SUBJECT ? (
                   <AppealButton
                     petId={pet.id}
-                    subjectLabel={`la ficha de ${pet.name}`}
+                    subjectLabel={`el perfil de ${pet.name}`}
                   />
                 ) : null)}
             </div>

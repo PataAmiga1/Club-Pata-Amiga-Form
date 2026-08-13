@@ -202,11 +202,11 @@ export async function resolvePet(
       ? {
           type: "pet_approved",
           title: `¡${pet.name} fue aprobado por el comité! 🐾`,
-          message: `La ficha de ${pet.name} quedó aprobada. Su período de espera sigue corriendo con normalidad.`,
+          message: `El perfil de ${pet.name} quedó aprobado. Su tiempo de espera sigue corriendo con normalidad.`,
         }
       : {
           type: "pet_rejected",
-          title: `La ficha de ${pet.name} necesita atención`,
+          title: `El perfil de ${pet.name} necesita atención`,
           message: `Observaciones del comité: ${notes}`,
         },
     decision.approve
@@ -831,7 +831,7 @@ export async function resolveAppeal(
       // Aprobada por apelación = aprobada: su espera arranca hoy, igual que
       // en resolvePet (los dos caminos comparten la misma regla).
       await iniciarEsperaDeMascota(admin, appeal.pet_id);
-      outcome = `la ficha de ${pet?.name ?? "tu mascota"} quedó aprobada`;
+      outcome = `el perfil de ${pet?.name ?? "tu mascota"} quedó aprobado`;
     } else if (appeal.center_id) {
       await admin
         .from("wellness_centers")
@@ -850,7 +850,7 @@ export async function resolveAppeal(
   const subjectLabel = appeal.reimbursement_id
     ? `tu reintegro ${reimbursement?.folio ?? ""}`
     : appeal.pet_id
-      ? `la ficha de ${pet?.name ?? "tu mascota"}`
+      ? `el perfil de ${pet?.name ?? "tu mascota"}`
       : `la solicitud del centro ${center?.name ?? ""}`;
 
   if (closing) {
@@ -897,7 +897,7 @@ export async function resolveAppeal(
 /**
  * "Solicitar información" del expediente (sistema anterior): el comité pide
  * fotos/documentos o escribe al miembro sobre una mascota. Queda en el hilo
- * (pet_messages), enciende la bandera en la ficha y avisa por campana+correo.
+ * (pet_messages), enciende la bandera en el perfil y avisa por campana+correo.
  */
 export async function requestPetInfo(
   petId: string,
@@ -937,7 +937,7 @@ export async function requestPetInfo(
     {
       type: "pet_info_request",
       title: `El comité necesita información sobre ${pet.name}`,
-      message: text || "Revisa la ficha para ver lo solicitado.",
+      message: text || "Revisa el perfil para ver lo solicitado.",
     },
     {
       template: "pet_info_request",
@@ -1199,7 +1199,7 @@ export async function resetEmailTemplate(key: string) {
   return { ok: true as const };
 }
 
-/** Super admin only: "Forzar fin de período de espera". */
+/** Super admin only: "Forzar fin de tiempo de espera". */
 export async function bypassWaitingPeriod(petId: string) {
   const { admin } = await requireAdmin(true);
   await admin

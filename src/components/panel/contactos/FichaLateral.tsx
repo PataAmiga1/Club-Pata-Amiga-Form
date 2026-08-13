@@ -50,7 +50,7 @@ const CANALES_DND = [
 const TIPOS = ["lead", "miembro", "embajador", "centro", "otro"];
 
 /**
- * Panel derecho de la ficha, con la misma disposición que el equipo ya usa en
+ * Panel derecho del perfil, con la misma disposición que el equipo ya usa en
  * LynSales: Propietario · Seguidores · Etiquetas · pestañas
  * "Todos los campos / DND / Acciones" · grupos de campos.
  *

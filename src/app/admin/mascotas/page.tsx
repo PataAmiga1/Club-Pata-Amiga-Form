@@ -171,7 +171,7 @@ export default async function AdminMascotasPage({
               registered: formatDateEs(new Date(p.created_at)),
             }}
             detailSlot={
-              <DetailModal title={`Ficha de ${p.name}`}>
+              <DetailModal title={`Perfil de ${p.name}`}>
                 {/* Toda la información de la mascota y su dueño (patrón del sitio vivo) */}
                 <div className="flex flex-col gap-4">
                   {/* Faltantes visibles de un vistazo (equipo, 5-ago), incluidos
@@ -237,15 +237,15 @@ export default async function AdminMascotasPage({
                         p.is_senior
                           ? "Sí 👴"
                           : // Vinculación edad ↔ clasificación (equipo, 11-ago): si la
-                            // edad guardada indica senior pero la ficha dice que no, el
-                            // comité lo ve — la ficha NO se recalcula sola (Regla X).
+                            // edad guardada indica senior pero el perfil dice que no, el
+                            // comité lo ve — el perfil NO se recalcula solo (Regla X).
                             (p.age_years ?? 0) >= SENIOR_PET_AGE_YEARS && !p.age_months
                             ? "No ⚠ (la edad indica senior)"
                             : "No"
                       }
                     />
                     <DetailItem
-                      label="PERÍODO DE ESPERA"
+                      label="TIEMPO DE ESPERA"
                       value={
                         p.waiting_period_end_date
                           ? `termina el ${formatDateEs(p.waiting_period_end_date)}`
@@ -344,7 +344,7 @@ export default async function AdminMascotasPage({
               return (
                 <DetailModal
                   key={p.id}
-                  title={`Ficha de ${p.name}`}
+                  title={`Perfil de ${p.name}`}
                   trigger={
                     <div className="flex items-center gap-3 border-b border-[#F2EEE4] px-1 py-2.5 text-[13px] text-ink-body">
                       <span aria-hidden>{p.species === "dog" ? "🐕" : "🐈"}</span>
@@ -405,10 +405,10 @@ export default async function AdminMascotasPage({
                       />
                       <DetailItem label="NOTAS DEL COMITÉ" value={p.approval_notes} />
                       <DetailItem
-                        label="PERÍODO DE ESPERA"
+                        label="TIEMPO DE ESPERA"
                         value={
                           p.waiting_period_bypassed
-                            ? "Sin período de espera"
+                            ? "Sin tiempo de espera"
                             : p.waiting_period_end_date
                               ? `Termina el ${formatDateEs(new Date(p.waiting_period_end_date + "T00:00:00"))}`
                               : null

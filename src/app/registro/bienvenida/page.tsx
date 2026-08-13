@@ -45,7 +45,7 @@ export default async function BienvenidaPage({
     .order("created_at", { ascending: true })
     .limit(1);
   const pet = pets?.[0];
-  // La espera arranca al APROBARSE la ficha (PM, 11-ago): recién pagado, la
+  // La espera arranca al APROBARSE el perfil (PM, 11-ago): recién pagado, la
   // mascota aún no tiene fechas. Si las tiene (ya la aprobaron), se muestran.
   const days =
     pet?.waiting_period_end_date && pet?.waiting_period_start_date
@@ -95,14 +95,14 @@ export default async function BienvenidaPage({
             (days ? (
               <>
                 {" "}
-                {pet.name} entra a revisión del comité y su período de espera
+                {pet.name} entra a revisión del comité y su tiempo de espera
                 de {days} días ya está en curso.
               </>
             ) : (
               <>
                 {" "}
-                {pet.name} entra a revisión del comité; en cuanto su ficha sea
-                aprobada empezará su período de espera.
+                {pet.name} entra a revisión del comité; en cuanto su perfil sea
+                aprobada empezará su tiempo de espera.
               </>
             ))}
         </p>

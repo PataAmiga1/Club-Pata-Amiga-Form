@@ -182,7 +182,7 @@ export default async function ReintegrosPage({
         {(rows ?? []).length === 0 && (
           <div className="rounded-[20px] bg-white p-6 text-sm text-ink-secondary shadow-[var(--shadow-card)]">
             Aún no tienes solicitudes de reintegro. Cuando tu peludo cumpla su
-            período de espera podrás enviar la primera.
+            tiempo de espera podrás enviar la primera.
           </div>
         )}
       </div>

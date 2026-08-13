@@ -4,7 +4,7 @@
  * /admin/comunicados (tabla email_templates). Las variables se escriben
  * {{asi}} y se sustituyen al enviar.
  *
- * Terminología VINCULANTE (CLAUDE.md): reintegro, período de espera,
+ * Terminología VINCULANTE (CLAUDE.md): reintegro, tiempo de espera,
  * orientación veterinaria 24/7 — nunca seguro, póliza, cobertura, carencia.
  */
 
@@ -130,12 +130,12 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     variables: {
       firstName: "Nombre del miembro (puede venir vacío)",
       petNotice:
-        "Frase sobre la primera mascota y su período de espera (vacía si no aplica)",
+        "Frase sobre la primera mascota y su tiempo de espera (vacía si no aplica)",
     },
     sample: {
       firstName: "Cipatli",
       petNotice:
-        "<strong>Max</strong> entra a revisión del comité y su período de espera de 120 días corre desde hoy.",
+        "<strong>Max</strong> entra a revisión del comité y su tiempo de espera de 120 días corre desde hoy.",
     },
     subject: "¡Bienvenido a la manada! 🐾",
     html: WRAP(`<h1 style="color:#1E5350">¡Bienvenido a la manada, {{firstName}}!</h1>
@@ -195,24 +195,24 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   {
     key: "pet_approved",
     name: "Mascota aprobada",
-    description: "Cuando el comité aprueba la ficha de una mascota.",
+    description: "Cuando el comité aprueba el perfil de una mascota.",
     variables: { petName: "Nombre de la mascota" },
     sample: { petName: "Max" },
     subject: "¡{{petName}} fue aprobado por el comité! 🐾",
     html: WRAP(`<h2 style="color:#1E5350">¡{{petName}} fue aprobado por el comité! 🐾</h2>
-<p>Su ficha quedó aprobada y su período de espera sigue corriendo con normalidad.</p>`),
+<p>Su perfil quedó aprobado y su tiempo de espera sigue corriendo con normalidad.</p>`),
   },
   {
     key: "pet_rejected",
     name: "Mascota con observaciones",
-    description: "Cuando la ficha de una mascota necesita correcciones.",
+    description: "Cuando el perfil de una mascota necesita correcciones.",
     variables: {
       petName: "Nombre de la mascota",
       notes: "Observaciones del comité",
     },
     sample: { petName: "Max", notes: "Falta el certificado veterinario." },
-    subject: "La ficha de {{petName}} necesita atención",
-    html: WRAP(`<h2 style="color:#1E5350">La ficha de {{petName}} necesita atención</h2>
+    subject: "El perfil de {{petName}} necesita atención",
+    html: WRAP(`<h2 style="color:#1E5350">El perfil de {{petName}} necesita atención</h2>
 <p><strong>Observaciones del comité:</strong> {{notes}}</p>
 <p>Entra a tu cuenta para actualizar la información o los documentos.</p>`),
   },
@@ -226,7 +226,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       petName: "Nombre de la mascota",
       itemsList: "Lista de lo solicitado (puede venir vacía)",
       message: "Mensaje del comité",
-      fichaUrl: "URL de la ficha de la mascota",
+      fichaUrl: "URL del perfil de la mascota",
     },
     sample: {
       firstName: "Cipatli",
@@ -237,10 +237,10 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     },
     subject: "El comité necesita información sobre {{petName}} 🐾",
     html: WRAP(`<h2 style="color:#1E5350">Necesitamos tu ayuda con {{petName}}</h2>
-<p>Hola {{firstName}}, el comité te escribió sobre la ficha de <strong>{{petName}}</strong>:</p>
+<p>Hola {{firstName}}, el comité te escribió sobre el perfil de <strong>{{petName}}</strong>:</p>
 <ul>{{itemsList}}</ul>
 <p style="background:#FAF7F1;border-radius:12px;padding:12px">{{message}}</p>
-<p style="text-align:center;margin:16px 0"><a href="{{fichaUrl}}" style="background:#1CBCAD;color:#fff;padding:12px 26px;border-radius:999px;font-weight:700;text-decoration:none">Abrir la ficha de {{petName}}</a></p>`),
+<p style="text-align:center;margin:16px 0"><a href="{{fichaUrl}}" style="background:#1CBCAD;color:#fff;padding:12px 26px;border-radius:999px;font-weight:700;text-decoration:none">Abrir el perfil de {{petName}}</a></p>`),
   },
   {
     key: "ambassador_received",
@@ -379,7 +379,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     variables: {
       firstName: "Nombre del miembro",
       folio: "Folio de la apelación (ej. A-0001)",
-      subject: "Qué se apela (ej. 'el reintegro R-0001' o 'la ficha de Max')",
+      subject: "Qué se apela (ej. 'el reintegro R-0001' o 'el perfil de Max')",
     },
     sample: { firstName: "Cipatli", folio: "A-0001", subject: "el reintegro R-0001" },
     subject: "Recibimos tu apelación {{folio}}",
@@ -394,7 +394,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     variables: {
       firstName: "Nombre del miembro",
       folio: "Folio de la apelación",
-      outcome: "Qué pasa ahora (ej. 'tu solicitud volvió a revisión' / 'la ficha de Max quedó aprobada')",
+      outcome: "Qué pasa ahora (ej. 'tu solicitud volvió a revisión' / 'el perfil de Max quedó aprobado')",
     },
     sample: {
       firstName: "Cipatli",

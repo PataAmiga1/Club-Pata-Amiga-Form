@@ -1,6 +1,6 @@
 /**
  * Business constants — Club Pata Amiga.
- * Terminology is BINDING (see CLAUDE.md): "reintegro", "período de espera",
+ * Terminology is BINDING (see CLAUDE.md): "reintegro", "tiempo de espera",
  * "orientación veterinaria 24/7". Never: seguro, póliza, cobertura, carencia.
  */
 
@@ -10,14 +10,14 @@ export const PLANS = {
 };
 
 /**
- * Período de espera del contratante, desde el pago. El de cada mascota es
+ * Tiempo de espera del contratante, desde el pago. El de cada mascota es
  * variable (adopción, raza, código de embajador, reemplazo) — ver
  * src/lib/waiting-period.ts (reglas del sitio vivo, confirmadas 15-jul-2026).
  */
 /**
- * ELIMINADO el 11-ago-2026 (PM): el contratante NO tiene período de espera —
+ * ELIMINADO el 11-ago-2026 (PM): el contratante NO tiene tiempo de espera —
  * al pagar es miembro, sin aprobación ni espera. La espera es POR MASCOTA
- * (src/lib/waiting-period.ts) y arranca cuando el comité aprueba la ficha.
+ * (src/lib/waiting-period.ts) y arranca cuando el comité aprueba el perfil.
  * `profiles.waiting_period_end_date` quedó como columna huérfana con fechas
  * viejas; ya nadie la escribe ni la lee.
  */
@@ -41,7 +41,7 @@ export const REIMBURSEMENT_CATEGORY_LABELS: Record<
 /** Motivos predeterminados de rechazo de reintegros. */
 export const REJECTION_REASONS = [
   "Factura ilegible",
-  "Fuera de período de espera",
+  "Fuera de tiempo de espera",
   "Servicio no incluido",
   "Tope excedido",
 ] as const;

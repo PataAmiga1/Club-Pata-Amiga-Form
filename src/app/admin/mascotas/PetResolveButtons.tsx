@@ -6,7 +6,7 @@ import { resolvePet } from "@/app/admin/actions";
 
 /**
  * Aprobar / Denegar con notas. Vive suelto para poder usarse tanto en la fila
- * de la lista como dentro de la ficha (popup) — petición del equipo: resolver
+ * de la lista como dentro del perfil (popup) — petición del equipo: resolver
  * sin salir del popup.
  */
 export function PetResolveButtons({ petId }: { petId: string }) {

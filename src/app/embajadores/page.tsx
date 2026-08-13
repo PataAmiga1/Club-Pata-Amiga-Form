@@ -75,7 +75,7 @@ export default function EmbajadoresPage() {
           ))}
           <p className="px-1 text-xs leading-relaxed text-ink-tertiary">
             El programa de embajadores es de difusión: el código no reduce
-            períodos de espera ni modifica los beneficios de la membresía.
+            tiempos de espera ni modifica los beneficios de la membresía.
             Registro con revisión del comité — solo mayores de edad.
           </p>
         </div>

@@ -57,8 +57,8 @@ export async function submitAppeal(input: AppealInput) {
     if (!p || p.user_id !== user.id)
       return { error: "No encontramos esa mascota." };
     if (p.approval_status !== "rejected")
-      return { error: "Solo se apelan fichas rechazadas." };
-    subjectLabel = `la ficha de ${p.name}`;
+      return { error: "Solo se apelan perfiles rechazados." };
+    subjectLabel = `el perfil de ${p.name}`;
   } else if (input.centerId) {
     const { data: c } = await admin
       .from("wellness_centers")
