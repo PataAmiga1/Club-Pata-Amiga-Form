@@ -92,6 +92,20 @@ export async function registerCenter(input: CenterRegistrationInput) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // …pero solo si el correo del formulario ES el de esa sesión.
+  //
+  // Antes, con sesión abierta se ligaba la solicitud a la cuenta de la sesión
+  // SIN MIRAR el correo escrito: el correo y la contraseña del formulario se
+  // ignoraban en silencio y no nacía cuenta para ese correo. Así fue como un
+  // centro capturado desde la sesión del comité quedó colgado de la cuenta del
+  // comité, y "recuperar contraseña" con el correo del formulario no mandaba
+  // nada — esa cuenta nunca existió (reporte de la PM, 12-ago).
+  if (user && (user.email ?? "").toLowerCase() !== email) {
+    return {
+      error: `Tienes la sesión abierta con ${user.email}. Para registrar el centro con ${email}, cierra sesión y vuelve a enviar la solicitud; si el centro es de esta cuenta, usa ${user.email} en el formulario.`,
+    };
+  }
+
   if (user) {
     const { data: mine } = await admin
       .from("wellness_centers")

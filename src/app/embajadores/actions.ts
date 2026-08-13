@@ -96,6 +96,16 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Solo si el correo del formulario ES el de la sesión. Con otro correo, la
+  // solicitud se colgaba de la cuenta abierta y el correo/contraseña escritos
+  // se ignoraban: no nacía cuenta para ese correo y su "recuperar contraseña"
+  // no mandaba nada (mismo caso que se detectó en centros, 12-ago).
+  if (user && (user.email ?? "").toLowerCase() !== email) {
+    return {
+      error: `Tienes la sesión abierta con ${user.email}. Para enviar la solicitud con ${email}, cierra sesión y vuelve a intentarlo; si la solicitud es de esta cuenta, usa ${user.email} en el formulario.`,
+    };
+  }
+
   if (user) {
     const { data: mine } = await admin
       .from("ambassadors")
