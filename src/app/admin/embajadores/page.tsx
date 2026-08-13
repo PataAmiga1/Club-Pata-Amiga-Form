@@ -4,6 +4,7 @@ import { formatDateEs } from "@/lib/dates";
 import { formatMxn } from "@/lib/format";
 import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
 import { inicioDelMes } from "@/lib/zona-horaria";
+import { ligaFirmadaDeIne } from "@/lib/documentos-ine";
 import {
   DetailModal,
   DetailItem,
@@ -17,6 +18,61 @@ import {
   AmbassadorDeactivateButton,
 } from "./AmbassadorResolveButtons";
 import { PayCutButton } from "./PayCutButton";
+
+type LigasFirmadas = { frente: string | null; reverso: string | null };
+
+/**
+ * Ligas a la INE del embajador.
+ *
+ * Distingue tres casos, porque para el comité NO son lo mismo: nunca la subió,
+ * la subió y aquí está, o hay algo guardado pero el archivo no se pudo firmar.
+ * Ese tercer caso existe de verdad: las 18 filas heredadas de la plataforma
+ * anterior apuntan a archivos que en el proyecto de pruebas no están (se copió
+ * la base, no el bucket). Antes se pintaba una liga a "#" que no llevaba a
+ * ningún lado y parecía que el documento estaba roto.
+ */
+function LigasIne({
+  firmadas,
+  guardado,
+}: {
+  firmadas: LigasFirmadas | undefined;
+  guardado: { frente: string | null; reverso: string | null };
+}) {
+  const lados = [
+    { etiqueta: "Ver frente ↗", url: firmadas?.frente, hay: Boolean(guardado.frente) },
+    { etiqueta: "Ver reverso ↗", url: firmadas?.reverso, hay: Boolean(guardado.reverso) },
+  ].filter((l) => l.hay);
+
+  if (lados.length === 0)
+    return (
+      <span className="text-[12.5px] text-warning-text">
+        Sin identificación — se registró antes de que el alta la pidiera. Puede
+        subirla desde su portal.
+      </span>
+    );
+
+  return (
+    <span className="flex flex-wrap gap-3 text-[12.5px]">
+      {lados.map((l) =>
+        l.url ? (
+          <a
+            key={l.etiqueta}
+            href={l.url}
+            target="_blank"
+            className="font-bold text-teal-deep hover:underline"
+          >
+            {l.etiqueta}
+          </a>
+        ) : (
+          <span key={l.etiqueta} className="text-ink-tertiary">
+            {l.etiqueta.replace("Ver ", "").replace(" ↗", "")}: archivo no
+            disponible
+          </span>
+        ),
+      )}
+    </span>
+  );
+}
 
 type Row = {
   id: string;
@@ -73,6 +129,25 @@ export default async function AdminEmbajadoresPage({
 
   const rows = ((data ?? []) as Row[]).filter(
     (a) => !estado || a.status === estado,
+  );
+
+  // Ligas de INE FIRMADAS (13-ago): el bucket `ine-documents` es privado, así
+  // que lo que se guarda es la ruta y la liga hay que firmarla al pintar. Las
+  // filas heredadas traían la URL pública completa y daban 400 al abrirlas —
+  // `ligaFirmadaDeIne` entiende las dos formas.
+  const ineFirmadas = new Map<string, { frente: string | null; reverso: string | null }>(
+    await Promise.all(
+      rows.map(
+        async (a) =>
+          [
+            a.id,
+            {
+              frente: await ligaFirmadaDeIne(a.ine_front_url),
+              reverso: await ligaFirmadaDeIne(a.ine_back_url),
+            },
+          ] as const,
+      ),
+    ),
   );
   const pending = rows.filter((a) => a.status === "pending");
   const approved = rows.filter((a) => a.status === "approved");
@@ -253,6 +328,19 @@ export default async function AdminEmbajadoresPage({
                       «{a.motivation}»
                     </p>
                   )}
+                  {/* La INE, EN EL POPUP DONDE SE APRUEBA (13-ago): desde que
+                      el registro la pide, el comité tiene que poder verla justo
+                      aquí. Antes solo aparecía en el detalle de los ya
+                      aprobados, o sea después de haber decidido a ciegas. */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                      IDENTIFICACIÓN (INE)
+                    </span>
+                    <LigasIne
+                      firmadas={ineFirmadas.get(a.id)}
+                      guardado={{ frente: a.ine_front_url, reverso: a.ine_back_url }}
+                    />
+                  </div>
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
                       REDES SOCIALES
@@ -442,26 +530,13 @@ export default async function AdminEmbajadoresPage({
                           label="INE"
                           value={
                             a.ine_front_url || a.ine_back_url ? (
-                              <span className="flex gap-2.5">
-                                {a.ine_front_url && (
-                                  <a
-                                    href={a.ine_front_url}
-                                    target="_blank"
-                                    className="font-bold text-teal-deep hover:underline"
-                                  >
-                                    Frente ↗
-                                  </a>
-                                )}
-                                {a.ine_back_url && (
-                                  <a
-                                    href={a.ine_back_url}
-                                    target="_blank"
-                                    className="font-bold text-teal-deep hover:underline"
-                                  >
-                                    Reverso ↗
-                                  </a>
-                                )}
-                              </span>
+                              <LigasIne
+                                firmadas={ineFirmadas.get(a.id)}
+                                guardado={{
+                                  frente: a.ine_front_url,
+                                  reverso: a.ine_back_url,
+                                }}
+                              />
                             ) : null
                           }
                         />

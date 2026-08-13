@@ -10,6 +10,7 @@ import {
   esMayorDeEdad,
   fechaDeNacimientoDeCurp,
 } from "@/lib/edad";
+import { esFotoValida, guardarFotoIne } from "@/lib/documentos-ine";
 
 export type AmbassadorApplicationInput = {
   firstName: string;
@@ -35,6 +36,13 @@ export type AmbassadorApplicationInput = {
   birthDate?: string;
   /** Por qué quiere ser embajador (equipo, 5-ago) */
   motivation?: string;
+  /**
+   * INE por los DOS lados, como data URL de imagen ya comprimida en el
+   * navegador (equipo, 13-ago). Obligatorias: el comité valida identidad con
+   * ellas y las comisiones se pagan a nombre de esa persona.
+   */
+  ineFront?: string;
+  ineBack?: string;
   /**
    * Contraseña de la cuenta que se crea AL APLICAR (equipo, 11-ago).
    * Antes no se pedía: la solicitud se guardaba sin cuenta, así que el
@@ -79,6 +87,14 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
   if (fechaCurp && !esMayorDeEdad(fechaCurp))
     return {
       error: `Tu CURP indica que aún no cumples ${EDAD_MINIMA} años. El programa de embajadores es para mayores de edad.`,
+    };
+
+  // INE por los dos lados, obligatoria (equipo, 13-ago). Se valida aquí y no
+  // solo en el formulario: sin ella el comité no puede aprobar a nadie.
+  if (!esFotoValida(input.ineFront) || !esFotoValida(input.ineBack))
+    return {
+      error:
+        "Falta la foto de tu INE. Necesitamos los dos lados: frente y reverso.",
     };
 
   // Al menos una red social. Se limpia antes de validar para que un campo con
@@ -193,6 +209,13 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     ambassadorUserId = created.user.id;
   }
 
+  // La INE se sube AHORA, con la cuenta ya creada: el bucket es privado y su
+  // ruta arranca con el id del usuario, que hasta este punto no existía.
+  const [ineFrontPath, ineBackPath] = await Promise.all([
+    guardarFotoIne(ambassadorUserId, "ine_front", input.ineFront ?? ""),
+    guardarFotoIne(ambassadorUserId, "ine_back", input.ineBack ?? ""),
+  ]);
+
   const { error } = await admin.from("ambassadors").insert({
     user_id: ambassadorUserId,
     first_name: firstName,
@@ -209,6 +232,8 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     birth_date:
       birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
     motivation: input.motivation?.trim() || null,
+    ine_front_url: ineFrontPath,
+    ine_back_url: ineBackPath,
     status: "pending",
   });
   if (error) {

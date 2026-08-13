@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { TextField, SelectField } from "@/components/ui/Field";
 import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
+import { FotoDocumento } from "@/components/ui/FotoDocumento";
 import { createClient } from "@/lib/supabase/client";
 import {
   EDAD_MINIMA,
@@ -39,6 +40,12 @@ export function AmbassadorForm() {
     tiktok: "",
     youtube: "",
   });
+  // INE por los DOS LADOS (confirmado 13-ago). El comité la necesita para
+  // aprobar y para pagar comisiones a nombre de alguien; el registro nunca la
+  // había pedido, así que los embajadores dados de alta con el sitio nuevo
+  // salían en el panel marcados como "falta INE" para siempre.
+  const [ineFront, setIneFront] = useState("");
+  const [ineBack, setIneBack] = useState("");
 
   /** CP → colonia y alcaldía/municipio. Editable: el catálogo puede fallar. */
   const onCpChange = (cp: string) => {
@@ -77,6 +84,12 @@ export function AmbassadorForm() {
       );
       return;
     }
+    if (!ineFront || !ineBack) {
+      setError(
+        "Falta la foto de tu INE. Necesitamos los dos lados: frente y reverso.",
+      );
+      return;
+    }
     setBusy(true);
     try {
       const result = await registerAmbassador({
@@ -95,6 +108,8 @@ export function AmbassadorForm() {
         postalCode,
         colony,
         socialLinks: social,
+        ineFront,
+        ineBack,
       });
       if (result.error) {
         setError(result.error);
@@ -224,6 +239,33 @@ export function AmbassadorForm() {
         hint="La usamos para validar que eres mayor de edad."
         required
       />
+      {/* INE por los dos lados: el comité valida identidad con ella y las
+          comisiones se pagan a nombre de esa persona (equipo, 13-ago). */}
+      <div className="flex flex-col gap-3 rounded-[14px] bg-cream/60 p-4">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[13px] font-semibold text-ink-title">
+            Tu identificación oficial (INE)
+          </span>
+          <span className="text-xs text-ink-tertiary">
+            Los dos lados. Solo la ve el comité, para validar tu identidad y
+            pagarte tus comisiones a tu nombre.
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FotoDocumento
+            label="INE — frente"
+            hint="El lado de tu foto."
+            value={ineFront}
+            onChange={setIneFront}
+          />
+          <FotoDocumento
+            label="INE — reverso"
+            hint="El lado del código de barras."
+            value={ineBack}
+            onChange={setIneBack}
+          />
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
           label="Código postal"

@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/app/LogoutButton";
 import { AmbassadorNav } from "./AmbassadorNav";
 import { PaymentDataCard } from "./PaymentDataCard";
 import { ExtrasCard } from "./ExtrasCard";
+import { IneCard } from "./IneCard";
 import { getAmbassadorContext } from "./shared";
 
 /** Lo que se desbloquea al ser aprobado — se muestra en gris mientras tanto. */
@@ -147,6 +148,10 @@ export default async function EmbajadorLayout({
                   initialClabe={ambassador.clabe}
                   initialHolder={ambassador.bank_holder}
                   initialRfc={ambassador.rfc}
+                />
+                <IneCard
+                  tieneFrente={Boolean(ambassador.ine_front_url)}
+                  tieneReverso={Boolean(ambassador.ine_back_url)}
                 />
                 <ExtrasCard initialLinks={ambassador.social_links} />
                 <ChangePasswordCard />

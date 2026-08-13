@@ -1,6 +1,7 @@
 import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
 import { LogoutButton } from "@/components/app/LogoutButton";
 import { PaymentDataCard } from "../PaymentDataCard";
+import { IneCard } from "../IneCard";
 import { ExtrasCard, BajaEmbajadorCard } from "../ExtrasCard";
 import { getAmbassadorContext } from "../shared";
 
@@ -23,6 +24,10 @@ export default async function EmbajadorCuentaPage() {
           initialClabe={ambassador.clabe}
           initialHolder={ambassador.bank_holder}
           initialRfc={ambassador.rfc}
+        />
+        <IneCard
+          tieneFrente={Boolean(ambassador.ine_front_url)}
+          tieneReverso={Boolean(ambassador.ine_back_url)}
         />
         <ExtrasCard initialLinks={ambassador.social_links} />
         <ChangePasswordCard />

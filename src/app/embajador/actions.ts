@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AMBASSADOR_CODE_PREFIX } from "@/lib/constants";
 import { BANCO_OTRO, bankFromClabe, isValidClabe } from "@/lib/banks";
 import { RFC_REGEX } from "@/lib/rfc";
+import { esFotoValida, guardarFotoIne } from "@/lib/documentos-ine";
 
 /**
  * Datos de pago del embajador (banco + CLABE + RFC) para recibir el corte
@@ -63,6 +64,62 @@ export async function savePaymentData(
 
   revalidatePath("/embajador");
   return { ok: true as const, bankName };
+}
+
+/**
+ * INE del embajador desde su propio portal (equipo, 13-ago).
+ *
+ * El registro ya la pide, pero esto hace falta igual por dos motivos: los
+ * embajadores que se dieron de alta ANTES de que existiera el campo no tienen
+ * ninguna, y a quien mande una foto borrosa hay que dejarlo reemplazarla sin
+ * escribirle al comité. Se puede guardar un solo lado a la vez.
+ */
+export async function saveAmbassadorIne(input: {
+  ineFront?: string;
+  ineBack?: string;
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Inicia sesión de nuevo." };
+
+  const hayFrente = esFotoValida(input.ineFront);
+  const hayReverso = esFotoValida(input.ineBack);
+  if (!hayFrente && !hayReverso)
+    return { error: "Elige la foto de tu INE antes de guardar." };
+
+  const admin = createAdminClient();
+  // Sin filtrar por status: un embajador EN REVISIÓN es justo quien más
+  // necesita poder mandar su INE, porque sin ella no lo aprueban.
+  const { data: ambassador } = await admin
+    .from("ambassadors")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!ambassador) return { error: "No encontramos tu perfil de embajador." };
+
+  const cambios: Record<string, string> = {};
+  if (hayFrente) {
+    const ruta = await guardarFotoIne(user.id, "ine_front", input.ineFront!);
+    if (!ruta) return { error: "No pudimos guardar el frente. Intenta de nuevo." };
+    cambios.ine_front_url = ruta;
+  }
+  if (hayReverso) {
+    const ruta = await guardarFotoIne(user.id, "ine_back", input.ineBack!);
+    if (!ruta) return { error: "No pudimos guardar el reverso. Intenta de nuevo." };
+    cambios.ine_back_url = ruta;
+  }
+
+  const { error } = await admin
+    .from("ambassadors")
+    .update(cambios)
+    .eq("id", ambassador.id);
+  if (error) return { error: "No pudimos guardar tu INE. Intenta de nuevo." };
+
+  revalidatePath("/embajador");
+  revalidatePath("/embajador/cuenta");
+  return { ok: true as const };
 }
 
 /**
