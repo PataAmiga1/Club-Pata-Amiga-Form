@@ -146,11 +146,9 @@ export default async function EmbajadorLayout({
                   initialBank={ambassador.bank_name}
                   initialClabe={ambassador.clabe}
                   initialHolder={ambassador.bank_holder}
-                />
-                <ExtrasCard
                   initialRfc={ambassador.rfc}
-                  initialLinks={ambassador.social_links}
                 />
+                <ExtrasCard initialLinks={ambassador.social_links} />
                 <ChangePasswordCard />
                 <LockedPreview />
               </div>

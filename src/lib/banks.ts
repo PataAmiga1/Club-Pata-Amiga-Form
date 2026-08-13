@@ -52,6 +52,13 @@ export const BANK_CODES: Record<string, string> = {
   "903": "CoDi Valida",
 };
 
+/**
+ * Última opción de la lista: al elegirla se abre un campo para ESCRIBIR el
+ * banco (equipo, 13-ago). Antes se guardaba la palabra "Otro" tal cual y el
+ * layout bancario salía sin saber a qué institución iba el dinero.
+ */
+export const BANCO_OTRO = "Otro";
+
 /** Lista para dropdowns (como el paso bancario del sistema anterior). */
 export const BANK_OPTIONS = [
   "BBVA",
@@ -68,7 +75,7 @@ export const BANK_OPTIONS = [
   "Hey Banco",
   "Mercado Pago",
   "Spin by OXXO",
-  "Otro",
+  BANCO_OTRO,
 ] as const;
 
 /**

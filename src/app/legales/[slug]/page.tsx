@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PublicHeader } from "@/components/public/PublicHeader";
 import { LEGAL_DOCS } from "@/lib/site";
 import { LEGAL_TEXTS } from "@/data/legal-texts";
+import { limpiarMarcasLegales } from "@/lib/legal-format";
 
 /**
  * Placeholder de documentos legales — la redacción final llega en el
@@ -38,7 +39,7 @@ export default async function LegalDocPage({
         <h1 className="font-display text-[30px] text-ink-title">{doc.title}</h1>
         {text ? (
           <div className="whitespace-pre-line rounded-[18px] bg-white p-6 text-[13.5px] leading-relaxed text-ink-body shadow-[0_2px_12px_rgba(30,83,80,.06)] sm:p-8">
-            {text}
+            {limpiarMarcasLegales(text)}
           </div>
         ) : (
           <div className="rounded-[18px] bg-white p-6 text-sm leading-relaxed text-ink-secondary shadow-[0_2px_12px_rgba(30,83,80,.06)]">

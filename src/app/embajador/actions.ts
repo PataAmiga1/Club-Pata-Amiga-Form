@@ -4,17 +4,23 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AMBASSADOR_CODE_PREFIX } from "@/lib/constants";
-import { bankFromClabe, isValidClabe } from "@/lib/banks";
+import { BANCO_OTRO, bankFromClabe, isValidClabe } from "@/lib/banks";
+import { RFC_REGEX } from "@/lib/rfc";
 
 /**
- * Datos de pago del embajador (banco + CLABE) para recibir el corte mensual
- * por SPEI. La CLABE se valida con dígito de control; el banco se detecta
- * automáticamente y puede corregirse con el selector.
+ * Datos de pago del embajador (banco + CLABE + RFC) para recibir el corte
+ * mensual por SPEI. La CLABE se valida con dígito de control; el banco se
+ * detecta automáticamente y puede corregirse con el selector.
+ *
+ * El RFC se guarda AQUÍ desde el 13-ago (equipo): se pide junto con lo
+ * bancario, porque es lo que ampara el comprobante de la comisión. Antes
+ * vivía en otra tarjeta, revuelto con las redes sociales.
  */
 export async function savePaymentData(
   bankNameRaw: string,
   clabeRaw: string,
   holderRaw?: string,
+  rfcRaw?: string,
 ) {
   const supabase = await createClient();
   const {
@@ -25,10 +31,20 @@ export async function savePaymentData(
   const clabe = clabeRaw?.replace(/\D/g, "") ?? "";
   if (!isValidClabe(clabe))
     return { error: "Revisa tu CLABE — deben ser 18 dígitos válidos." };
-  const bankName = bankNameRaw?.trim() || bankFromClabe(clabe) || "Otro";
+  // "Otro" a secas no es un banco: si llega la palabra sin el nombre real, se
+  // usa el que delata la CLABE antes que guardar algo inservible para el corte.
+  const escrito = bankNameRaw?.trim() ?? "";
+  const bankName =
+    (escrito.toLowerCase() === BANCO_OTRO.toLowerCase() ? "" : escrito) ||
+    bankFromClabe(clabe) ||
+    "";
+  if (!bankName) return { error: "Escribe el nombre de tu banco." };
   const holder = holderRaw?.trim() || null;
   if (!holder)
     return { error: "Escribe el nombre del titular de la cuenta." };
+  const rfc = rfcRaw?.trim().toUpperCase() || null;
+  if (rfc && !RFC_REGEX.test(rfc))
+    return { error: "Revisa tu RFC — el formato no parece válido." };
 
   const admin = createAdminClient();
   const { data: ambassador } = await admin
@@ -41,7 +57,7 @@ export async function savePaymentData(
 
   const { error } = await admin
     .from("ambassadors")
-    .update({ bank_name: bankName, clabe, bank_holder: holder })
+    .update({ bank_name: bankName, clabe, bank_holder: holder, rfc })
     .eq("id", ambassador.id);
   if (error) return { error: "No pudimos guardar tus datos. Intenta de nuevo." };
 
@@ -49,9 +65,11 @@ export async function savePaymentData(
   return { ok: true as const, bankName };
 }
 
-/** RFC y redes sociales del embajador — los captura él mismo (equipo, 5-ago). */
+/**
+ * Redes sociales del embajador — las captura él mismo (equipo, 5-ago).
+ * El RFC dejó de pasar por aquí el 13-ago: se guarda con los datos de pago.
+ */
 export async function saveAmbassadorExtras(input: {
-  rfc?: string;
   instagram?: string;
   facebook?: string;
   tiktok?: string;
@@ -61,10 +79,6 @@ export async function saveAmbassadorExtras(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Inicia sesión de nuevo." };
-
-  const rfc = input.rfc?.trim().toUpperCase() || null;
-  if (rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc))
-    return { error: "Revisa tu RFC — el formato no parece válido." };
 
   const links: Record<string, string> = {};
   for (const key of ["instagram", "facebook", "tiktok"] as const) {
@@ -83,7 +97,7 @@ export async function saveAmbassadorExtras(input: {
 
   const { error } = await admin
     .from("ambassadors")
-    .update({ rfc, social_links: links })
+    .update({ social_links: links })
     .eq("id", ambassador.id);
   if (error) return { error: "No pudimos guardar. Intenta de nuevo." };
 

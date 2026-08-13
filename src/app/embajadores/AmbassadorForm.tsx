@@ -4,8 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { TextField, SelectField } from "@/components/ui/Field";
-import { PhoneField } from "@/components/ui/PhoneField";
+import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
 import { createClient } from "@/lib/supabase/client";
+import {
+  EDAD_MINIMA,
+  esMayorDeEdad,
+  fechaMaximaParaSerMayor,
+} from "@/lib/edad";
 import { registerAmbassador } from "./actions";
 
 export function AmbassadorForm() {
@@ -55,8 +60,23 @@ export function AmbassadorForm() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
+  const menorDeEdad =
+    /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && !esMayorDeEdad(birthDate);
+
   const submit = async () => {
     setError(null);
+    if (!telefonoCompleto(phone)) {
+      setError(
+        "Revisa tu teléfono — con lada de México son 10 dígitos, sin el código de país.",
+      );
+      return;
+    }
+    if (!esMayorDeEdad(birthDate)) {
+      setError(
+        `El programa de embajadores es para mayores de ${EDAD_MINIMA} años. Revisa tu fecha de nacimiento.`,
+      );
+      return;
+    }
     setBusy(true);
     try {
       const result = await registerAmbassador({
@@ -172,7 +192,7 @@ export function AmbassadorForm() {
           required
           value={phone}
           onChange={setPhone}
-          hint="10 dígitos, sin lada internacional."
+          hint="Elige tu país si no es México."
         />
       </div>
       <TextField
@@ -245,12 +265,27 @@ export function AmbassadorForm() {
           onChange={(e) => setState(e.target.value)}
         />
       </div>
+      {/* Obligatoria y validada desde el 13-ago: la casilla de "soy mayor de
+          edad" era la única barrera y no comprobaba nada. */}
       <TextField
         label="Fecha de nacimiento"
         type="date"
+        required
         value={birthDate}
+        max={fechaMaximaParaSerMayor()}
         onChange={(e) => setBirthDate(e.target.value)}
+        hint={
+          menorDeEdad
+            ? undefined
+            : `El programa es para mayores de ${EDAD_MINIMA} años.`
+        }
       />
+      {menorDeEdad && (
+        <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">
+          Con esa fecha aún no cumples {EDAD_MINIMA} años, así que todavía no
+          puedes ser embajador. ¡Te esperamos cuando los cumplas! 🐾
+        </div>
+      )}
       <TextField
         label="¿Por qué quieres ser embajador?"
         value={motivation}
@@ -308,7 +343,7 @@ export function AmbassadorForm() {
         </div>
       )}
 
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" disabled={busy || menorDeEdad}>
         {busy ? "Enviando…" : "Quiero ser embajador"}
       </Button>
     </form>

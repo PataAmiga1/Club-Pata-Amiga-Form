@@ -207,7 +207,12 @@ export function RequestForm({
                   type="button"
                   disabled={disabled}
                   onClick={() => setPetId(p.id)}
-                  className={`flex h-[52px] flex-1 items-center gap-2.5 rounded-[12px] px-3.5 text-sm ${
+                  /* `min-w-0`: sin él, el ancho mínimo de cada botón es el de
+                     su texto completo (min-width:auto de flex), así que con
+                     tres peludos la fila se salía de la tarjeta blanca en vez
+                     de recortar el nombre — el recuadro rojo del equipo,
+                     13-ago. El `truncate` de adentro nunca llegaba a actuar. */
+                  className={`flex h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded-[12px] px-3.5 text-sm ${
                     selected
                       ? "bg-teal font-bold text-white"
                       : disabled
@@ -232,6 +237,15 @@ export function RequestForm({
               );
             })}
           </div>
+          {/* Con todos los peludos en espera o en revisión, los botones salían
+              grises y sin explicación: parecía que la pantalla estaba rota. */}
+          {pets.length > 0 && pets.every((p) => !p.eligible) && (
+            <span className="mt-1 text-[12.5px] leading-relaxed text-ink-secondary">
+              Ninguno de tus peludos puede solicitar reintegros todavía: el
+              comité tiene que aprobar su perfil y después corre su tiempo de
+              espera. Te avisamos en cuanto el primero quede disponible.
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">

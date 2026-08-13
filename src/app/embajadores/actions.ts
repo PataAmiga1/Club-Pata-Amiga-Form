@@ -5,6 +5,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
 import { validateCurp } from "@/lib/curp";
+import {
+  EDAD_MINIMA,
+  esMayorDeEdad,
+  fechaDeNacimientoDeCurp,
+} from "@/lib/edad";
 
 export type AmbassadorApplicationInput = {
   firstName: string;
@@ -58,6 +63,23 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
   const curpCheck = validateCurp(curp ?? "");
   if (!curpCheck.isValid)
     return { error: curpCheck.error ?? "Revisa tu CURP (18 caracteres, formato oficial)." };
+
+  // 18+ DE VERDAD (equipo, 13-ago). Hasta hoy la única barrera era la casilla
+  // "confirmo que soy mayor de edad", que cualquiera palomea. Ahora se calcula
+  // la edad con la fecha capturada y, además, con la que trae la propia CURP:
+  // si la CURP dice que es menor, no hay fecha que valga.
+  const birthDate = input.birthDate?.trim();
+  if (!birthDate)
+    return { error: "Necesitamos tu fecha de nacimiento." };
+  if (!esMayorDeEdad(birthDate))
+    return {
+      error: `El programa de embajadores es para mayores de ${EDAD_MINIMA} años.`,
+    };
+  const fechaCurp = fechaDeNacimientoDeCurp(curp ?? "");
+  if (fechaCurp && !esMayorDeEdad(fechaCurp))
+    return {
+      error: `Tu CURP indica que aún no cumples ${EDAD_MINIMA} años. El programa de embajadores es para mayores de edad.`,
+    };
 
   // Al menos una red social. Se limpia antes de validar para que un campo con
   // espacios no cuente como red llenada.
@@ -171,7 +193,6 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     ambassadorUserId = created.user.id;
   }
 
-  const birthDate = input.birthDate?.trim();
   const { error } = await admin.from("ambassadors").insert({
     user_id: ambassadorUserId,
     first_name: firstName,

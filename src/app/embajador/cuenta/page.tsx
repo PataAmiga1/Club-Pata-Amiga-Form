@@ -7,8 +7,9 @@ import { getAmbassadorContext } from "../shared";
 export const metadata = { title: "Mi cuenta de embajador · Club Pata Amiga" };
 
 /**
- * Ajustes del embajador: datos de pago (con titular), RFC y redes sociales,
- * contraseña y baja voluntaria (equipo, 5-ago).
+ * Ajustes del embajador: datos de pago (titular y RFC), redes sociales,
+ * contraseña y baja voluntaria (equipo, 5-ago; RFC movido a la tarjeta
+ * bancaria el 13-ago).
  */
 export default async function EmbajadorCuentaPage() {
   const { ambassador } = await getAmbassadorContext();
@@ -21,11 +22,9 @@ export default async function EmbajadorCuentaPage() {
           initialBank={ambassador.bank_name}
           initialClabe={ambassador.clabe}
           initialHolder={ambassador.bank_holder}
-        />
-        <ExtrasCard
           initialRfc={ambassador.rfc}
-          initialLinks={ambassador.social_links}
         />
+        <ExtrasCard initialLinks={ambassador.social_links} />
         <ChangePasswordCard />
         <BajaEmbajadorCard />
       </div>

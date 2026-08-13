@@ -13,17 +13,20 @@ const REDES = [
   { key: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@tuperfil" },
 ] as const;
 
-/** RFC + redes sociales del embajador, línea por red (equipo, 5-ago). */
+/**
+ * Redes sociales del embajador, línea por red (equipo, 5-ago).
+ *
+ * El RFC salió de aquí el 13-ago: se pide junto con los datos bancarios, que
+ * es donde tiene sentido (ampara el comprobante de la comisión). Esta tarjeta
+ * quedó dedicada a las redes, que son otra categoría.
+ */
 export function ExtrasCard({
-  initialRfc,
   initialLinks,
 }: {
-  initialRfc: string | null;
   initialLinks: Record<string, string> | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [rfc, setRfc] = useState(initialRfc ?? "");
   const [links, setLinks] = useState<Record<string, string>>({
     instagram: initialLinks?.instagram ?? "",
     facebook: initialLinks?.facebook ?? "",
@@ -34,21 +37,8 @@ export function ExtrasCard({
   return (
     <div className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)]">
       <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
-        RFC Y REDES SOCIALES
+        REDES SOCIALES
       </span>
-      <label className="flex flex-col gap-1 text-[12px] font-bold text-ink-secondary">
-        RFC (para tus comprobantes de comisión)
-        <input
-          value={rfc}
-          onChange={(e) => {
-            setRfc(e.target.value.toUpperCase());
-            setMsg(null);
-          }}
-          placeholder="XAXX010101000"
-          maxLength={13}
-          className="h-10 rounded-[10px] border-[1.5px] border-border-input px-3 text-[13px] font-normal tracking-wide text-ink-title outline-none focus:border-teal"
-        />
-      </label>
       {REDES.map((r) => (
         <label
           key={r.key}
@@ -71,7 +61,7 @@ export function ExtrasCard({
         disabled={pending}
         onClick={() =>
           startTransition(async () => {
-            const res = await saveAmbassadorExtras({ rfc, ...links });
+            const res = await saveAmbassadorExtras(links);
             setMsg("error" in res && res.error ? res.error : "Guardado ✓");
             router.refresh();
           })

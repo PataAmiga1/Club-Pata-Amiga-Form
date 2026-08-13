@@ -9,9 +9,14 @@ import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { Stepper } from "@/components/registro/Stepper";
 import { TextField } from "@/components/ui/Field";
-import { PhoneField } from "@/components/ui/PhoneField";
+import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
+import {
+  EDAD_MINIMA,
+  esMayorDeEdad,
+  fechaMaximaParaSerMayor,
+} from "@/lib/edad";
 
 // Los textos legales pesan miles de líneas: el popup se carga SOLO cuando
 // alguien lo abre, no viaja con la página de registro.
@@ -25,6 +30,10 @@ export default function RegistroPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
+  // Fecha de nacimiento en el ALTA (equipo, 13-ago): la cuenta no debe llegar
+  // a crearse si quien la abre no tiene 18. Antes solo se preguntaba después,
+  // al completar el perfil, cuando la cuenta ya existía.
+  const [birthDate, setBirthDate] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +51,20 @@ export default function RegistroPage() {
       setError("La contraseña debe tener mínimo 8 caracteres.");
       return;
     }
-    if (phone.length !== 10) {
-      setError("El teléfono debe tener 10 dígitos.");
+    if (!telefonoCompleto(phone)) {
+      setError(
+        "Revisa tu teléfono — con lada de México son 10 dígitos, sin el código de país.",
+      );
+      return;
+    }
+    if (!birthDate) {
+      setError("Falta tu fecha de nacimiento.");
+      return;
+    }
+    if (!esMayorDeEdad(birthDate)) {
+      setError(
+        `Para abrir una cuenta necesitas tener ${EDAD_MINIMA} años o más. Si un adulto de tu casa quiere ser el titular, puede registrarse con sus datos.`,
+      );
       return;
     }
     setLoading(true);
@@ -52,7 +73,9 @@ export default function RegistroPage() {
       email: cleanEmail,
       password,
       options: {
-        data: { phone: `+52${phone}` },
+        // birth_date viaja en los metadatos y el disparador de Supabase la
+        // copia al perfil, para no volver a pedirla en "Completa tu perfil".
+        data: { phone, birth_date: birthDate },
         // La liga del correo de confirmación abre en pestaña nueva: aterriza
         // en una página de marca que invita a cerrarla (el registro sigue solo
         // en la pestaña original). Requiere la URL en la lista de redirecciones
@@ -186,7 +209,17 @@ export default function RegistroPage() {
                   required
                   value={phone}
                   onChange={setPhone}
-                  hint="10 dígitos, sin lada internacional."
+                  hint="Elige tu país si no es México."
+                />
+                <TextField
+                  label="Fecha de nacimiento"
+                  type="date"
+                  required
+                  value={birthDate}
+                  max={fechaMaximaParaSerMayor()}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  autoComplete="bday"
+                  hint={`El titular de la membresía debe tener ${EDAD_MINIMA} años o más.`}
                 />
                 {error && (
                   <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">

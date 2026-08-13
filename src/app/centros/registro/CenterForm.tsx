@@ -316,11 +316,10 @@ export function CenterForm() {
               value={loc.state}
               onChange={(e) => patchLocation(i, { state: e.target.value })}
             />
-            <TextField
+            <PhoneField
               label="Teléfono de esta sucursal (opcional)"
-              type="tel"
               value={loc.phone ?? ""}
-              onChange={(e) => patchLocation(i, { phone: e.target.value })}
+              onChange={(t) => patchLocation(i, { phone: t })}
             />
           </div>
         </section>
