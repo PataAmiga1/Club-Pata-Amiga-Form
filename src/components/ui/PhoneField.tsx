@@ -155,9 +155,14 @@ export function PhoneField({
             onChange={(e) => onChange(armaTelefono(e.target.value, nacional))}
             className="absolute inset-0 size-full cursor-pointer opacity-0"
           >
+            {/* Sin bandera en las opciones (equipo, 15-ago): en Windows el
+                emoji no existe y el navegador lo dibuja como las dos letras
+                del país, así que se leía "MX México (+52)". El nombre y la
+                lada bastan. La banderita del recuadro sí se queda: donde no
+                se dibuja, esas dos letras funcionan como código de país. */}
             {lista.map((p) => (
               <option key={p.iso} value={p.iso}>
-                {p.bandera} {p.nombre} (+{p.lada})
+                {p.nombre} (+{p.lada})
               </option>
             ))}
           </select>

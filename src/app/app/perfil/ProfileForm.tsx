@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { TextField, SelectField } from "@/components/ui/Field";
+import { TextField } from "@/components/ui/Field";
 import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
-import { paises } from "@/data/countries";
+import { nombresDePaises } from "@/data/countries";
 import { EDAD_MINIMA, esMayorDeEdad, fechaMaximaParaSerMayor } from "@/lib/edad";
 
 import { validateCurp, curpCoincide } from "@/lib/curp";
@@ -201,14 +201,12 @@ export function ProfileForm({
     );
   })();
 
-  // Nacionalidad como lista, no texto libre (equipo, 13-ago): llegaban valores
-  // a medio escribir ("Chil") y con eso no hay forma de saber si la persona es
-  // extranjera y le toca pasaporte. Si el perfil ya traía algo que no está en
-  // el catálogo, se conserva como opción para no borrárselo sin avisar.
-  const listaPaises = paises();
-  const nacionalidadFueraDeCatalogo =
-    nationality.trim().length > 0 &&
-    !listaPaises.some((p) => p.nombre === nationality);
+  // Nacionalidad con sugerencias, no texto libre a secas (equipo, 13 y 15-ago):
+  // llegaban valores a medio escribir ("Chil") y con eso no hay forma de saber
+  // si la persona es extranjera y le toca pasaporte. Lo que ya estaba guardado
+  // se respeta aunque no coincida con el catálogo — el campo acepta texto
+  // libre, así que a nadie se le borra lo suyo por no estar en la lista.
+  const listaPaises = nombresDePaises();
 
   // Mayoría de edad (equipo, 13-ago): el alta ya la valida, pero los perfiles
   // migrados y los creados con Google llegan sin fecha y la capturan aquí.
@@ -422,21 +420,17 @@ export function ProfileForm({
                 : `El titular de la membresía debe tener ${EDAD_MINIMA} años o más.`
             }
           />
-          <SelectField
+          {/* Autocompletado, no lista cerrada (equipo, 15-ago): con 216 países
+              bajar a "Chile" era un scroll larguísimo. Se escribe y la lista
+              se angosta sola; el orden pone México y Latinoamérica arriba. */}
+          <AutocompleteField
             label="Nacionalidad"
+            options={listaPaises}
             value={nationality}
-            onChange={(e) => setNationality(e.target.value)}
-          >
-            <option value="">Elige tu país</option>
-            {nacionalidadFueraDeCatalogo && (
-              <option value={nationality}>{nationality}</option>
-            )}
-            {listaPaises.map((p) => (
-              <option key={p.iso} value={p.nombre}>
-                {p.bandera} {p.nombre}
-              </option>
-            ))}
-          </SelectField>
+            onChange={setNationality}
+            placeholder="Escribe tu país"
+            hint="Empieza a escribir y elige de la lista."
+          />
         </div>
         {menorDeEdad && (
           <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">

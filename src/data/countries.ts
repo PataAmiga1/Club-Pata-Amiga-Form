@@ -83,12 +83,32 @@ export function nombreDePais(iso: string): string {
 export type Pais = { iso: string; lada: string; nombre: string; bandera: string };
 
 /**
- * Países listos para pintar: México primero y el resto alfabético en español.
+ * Orden por cercanía, no alfabético a secas (equipo, 15-ago).
  *
- * El orden se resuelve con una comparación de cadenas sin acentos, NO con
- * `localeCompare("es")`: la tabla de intercalación también viene del ICU del
- * entorno y, como con los nombres, servidor y navegador podrían no coincidir.
- * Se calcula una sola vez por proceso.
+ * Los miembros son de México casi siempre, y cuando no, de la región. Una
+ * lista alfabética pura pone Afganistán y Albania arriba y obliga a bajar
+ * decenas de renglones para llegar a lo probable. Aquí van primero México,
+ * después Latinoamérica, después Estados Unidos y Canadá, y al final el resto
+ * del mundo en orden alfabético.
+ */
+const LATINOAMERICA = [
+  "AR", "BO", "BR", "CL", "CO", "CR", "CU", "DO", "EC", "GT",
+  "HN", "NI", "PA", "PE", "PR", "PY", "SV", "UY", "VE",
+];
+const NORTEAMERICA = ["US", "CA"];
+
+function prioridad(iso: string): number {
+  if (iso === "MX") return 0;
+  if (LATINOAMERICA.includes(iso)) return 1;
+  if (NORTEAMERICA.includes(iso)) return 2;
+  return 3;
+}
+
+/**
+ * Dentro de cada grupo, alfabético. La comparación va sin acentos y NO con
+ * `localeCompare("es")`: la tabla de intercalación viene del ICU del entorno
+ * y, como pasó con los nombres, servidor y navegador podrían no coincidir y
+ * romper la hidratación.
  */
 const sinAcentos = (s: string) =>
   s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -96,18 +116,34 @@ const sinAcentos = (s: string) =>
 let cache: Pais[] | null = null;
 export function paises(): Pais[] {
   if (cache) return cache;
-  const lista = COUNTRY_DIAL_CODES.map(([iso, lada, nombre]) => ({
+  cache = COUNTRY_DIAL_CODES.map(([iso, lada, nombre]) => ({
     iso,
     lada,
     nombre,
     bandera: banderaDe(iso),
-  }));
-  const mexico = lista.filter((p) => p.iso === "MX");
-  const resto = lista
-    .filter((p) => p.iso !== "MX")
-    .sort((a, b) => (sinAcentos(a.nombre) < sinAcentos(b.nombre) ? -1 : 1));
-  cache = [...mexico, ...resto];
+  })).sort((a, b) => {
+    const pa = prioridad(a.iso);
+    const pb = prioridad(b.iso);
+    if (pa !== pb) return pa - pb;
+    return sinAcentos(a.nombre) < sinAcentos(b.nombre) ? -1 : 1;
+  });
   return cache;
+}
+
+/**
+ * Solo los nombres, en el mismo orden. Es lo que come el autocompletado de
+ * nacionalidad, que trabaja con cadenas sueltas.
+ *
+ * SIN BANDERA a propósito: el emoji de bandera no existe en la tipografía de
+ * Windows y el navegador lo dibuja como las dos letras del país. En el panel
+ * del equipo se leía "CL Chile", "BR Brasil", y lo reportaron como si
+ * fueran abreviaturas que sobraban (equipo, 15-ago). No sobraban: eran las
+ * banderas rotas.
+ */
+let cacheNombres: string[] | null = null;
+export function nombresDePaises(): string[] {
+  if (!cacheNombres) cacheNombres = paises().map((p) => p.nombre);
+  return cacheNombres;
 }
 
 /** Lada de un país (sin "+"). "52" si el ISO no está en el catálogo. */
