@@ -18,8 +18,14 @@ import { limpiarMarcasLegales } from "@/lib/legal-format";
  *   texto se lee aquí mismo.
  * - TODO EN UN SOLO SCROLL (equipo, 13-ago): antes cada documento vivía en su
  *   pestaña y había que descubrirlas. Ahora van uno tras otro en la misma
- *   lectura; el índice de arriba solo salta, no cambia de contenido, y quien
- *   abre desde "Términos y condiciones" aterriza en ese documento.
+ *   lectura, y quien abre desde "Términos y condiciones" aterriza en ese
+ *   documento.
+ * - SIN ÍNDICE ARRIBA (equipo, 15-ago): el primer intento conservó una fila de
+ *   ligas para saltar entre documentos. Se pidió quitarla y dejar solo el
+ *   texto: se seguía leyendo como una barra de pestañas, que era justo lo que
+ *   se quería eliminar. El salto al documento con el que se abre se conserva
+ *   —es lo que hace que "Aviso de privacidad" lleve al aviso—, solo desaparece
+ *   la fila.
  */
 
 export function LegalPopup({
@@ -49,26 +55,19 @@ export function LegalPopup({
   }, [onClose]);
 
   /**
-   * Lleva el scroll al inicio de un documento.
+   * La lectura empieza en el documento con el que se abrió (Términos, Aviso…),
+   * no siempre arriba del todo.
    *
    * Se mide con `getBoundingClientRect`, no con `offsetTop`: el contenedor que
    * scrollea es `position: static`, así que `offsetTop` se cuenta desde otro
-   * ancestro y el salto caía en el lugar equivocado. Y sin `behavior:"smooth"`
-   * a propósito — con 100 000 px de texto la animación no arrancaba y el
-   * índice simplemente no hacía nada (probado en el navegador, 13-ago).
+   * ancestro y el salto caía en el lugar equivocado.
    */
-  const irA = (slug: string) => {
+  useEffect(() => {
     const caja = contentRef.current;
-    const destino = caja?.querySelector(`[data-doc="${CSS.escape(slug)}"]`);
+    const destino = caja?.querySelector(`[data-doc="${CSS.escape(initialSlug)}"]`);
     if (!caja || !(destino instanceof HTMLElement)) return;
     caja.scrollTop +=
       destino.getBoundingClientRect().top - caja.getBoundingClientRect().top;
-  };
-
-  // La lectura empieza en el documento con el que se abrió (Términos, Aviso…),
-  // no siempre arriba del todo.
-  useEffect(() => {
-    irA(initialSlug);
   }, [initialSlug]);
 
   if (docs.length === 0) return null;
@@ -99,23 +98,6 @@ export function LegalPopup({
           >
             ✕
           </button>
-        </div>
-
-        {/* Índice: salta dentro de la MISMA lectura, no cambia el contenido */}
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5 border-b border-border-divider px-5 py-3">
-          <span className="text-[11.5px] font-bold uppercase tracking-[.06em] text-ink-tertiary">
-            Ir a
-          </span>
-          {docs.map((d) => (
-            <button
-              key={d.slug}
-              type="button"
-              onClick={() => irA(d.slug)}
-              className="text-[12.5px] font-semibold text-teal-deep underline decoration-teal/40 underline-offset-2 transition-colors hover:text-teal"
-            >
-              {d.title}
-            </button>
-          ))}
         </div>
 
         <div

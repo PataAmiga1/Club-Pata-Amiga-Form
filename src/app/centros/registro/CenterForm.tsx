@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { TextField, SelectField } from "@/components/ui/Field";
+import { TextField } from "@/components/ui/Field";
+import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
 import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
@@ -274,7 +275,12 @@ export function CenterForm() {
             }}
             required
           />
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* El CP se queda angosto y la colonia se lleva el resto: nombres
+              como "Nueva Industrial Vallejo" salían cortados en la lista
+              cerrada (equipo, 15-ago). De paso pasa a autocompletado, igual
+              que en el perfil del miembro: el catálogo se equivoca o le falta
+              la colonia de alguien, y así siempre se puede escribir otra. */}
+          <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
             <TextField
               label="Código postal"
               inputMode="numeric"
@@ -285,43 +291,39 @@ export function CenterForm() {
               }
               required
             />
-            {loc.colonies.length > 0 ? (
-              <SelectField
-                label="Colonia"
-                value={loc.colony}
-                onChange={(e) => patchLocation(i, { colony: e.target.value })}
-              >
-                {loc.colonies.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </SelectField>
-            ) : (
-              <TextField
-                label="Colonia"
-                value={loc.colony}
-                onChange={(e) => patchLocation(i, { colony: e.target.value })}
-              />
-            )}
-            <TextField
-              label="Ciudad"
-              value={loc.city}
-              onChange={(e) => patchLocation(i, { city: e.target.value })}
+            <AutocompleteField
+              label="Colonia"
+              options={loc.colonies}
+              value={loc.colony}
+              onChange={(colony) => patchLocation(i, { colony })}
+              placeholder="Escribe o elige tu colonia"
+              hint={
+                loc.colonies.length > 0
+                  ? "La sugerimos según tu código postal; si no es correcta, puedes cambiarla."
+                  : undefined
+              }
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* "Alcaldía o municipio", no "Ciudad" (equipo, 15-ago): en la
+                CDMX son alcaldías y en el resto del país municipios, y el
+                catálogo de Sepomex devuelve justo eso. */}
+            <TextField
+              label="Alcaldía o municipio"
+              value={loc.city}
+              onChange={(e) => patchLocation(i, { city: e.target.value })}
+            />
             <TextField
               label="Estado"
               value={loc.state}
               onChange={(e) => patchLocation(i, { state: e.target.value })}
             />
-            <PhoneField
-              label="Teléfono de esta sucursal (opcional)"
-              value={loc.phone ?? ""}
-              onChange={(t) => patchLocation(i, { phone: t })}
-            />
           </div>
+          <PhoneField
+            label="Teléfono de esta sucursal (opcional)"
+            value={loc.phone ?? ""}
+            onChange={(t) => patchLocation(i, { phone: t })}
+          />
         </section>
       ))}
 

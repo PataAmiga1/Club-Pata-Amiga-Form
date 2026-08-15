@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { AMBASSADOR_CODE_PREFIX } from "@/lib/constants";
 import { BANCO_OTRO, bankFromClabe, isValidClabe } from "@/lib/banks";
 import { RFC_REGEX } from "@/lib/rfc";
-import { esFotoValida, guardarFotoIne } from "@/lib/documentos-ine";
+import { esDocumentoValido, guardarFotoIne } from "@/lib/documentos-ine";
 
 /**
  * Datos de pago del embajador (banco + CLABE + RFC) para recibir el corte
@@ -84,10 +84,10 @@ export async function saveAmbassadorIne(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "Inicia sesión de nuevo." };
 
-  const hayFrente = esFotoValida(input.ineFront);
-  const hayReverso = esFotoValida(input.ineBack);
+  const hayFrente = esDocumentoValido(input.ineFront);
+  const hayReverso = esDocumentoValido(input.ineBack);
   if (!hayFrente && !hayReverso)
-    return { error: "Elige la foto de tu INE antes de guardar." };
+    return { error: "Elige el archivo de tu INE antes de guardar." };
 
   const admin = createAdminClient();
   // Sin filtrar por status: un embajador EN REVISIÓN es justo quien más

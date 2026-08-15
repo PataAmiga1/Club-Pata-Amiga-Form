@@ -10,7 +10,7 @@ import {
   esMayorDeEdad,
   fechaDeNacimientoDeCurp,
 } from "@/lib/edad";
-import { esFotoValida, guardarFotoIne } from "@/lib/documentos-ine";
+import { esDocumentoValido, guardarFotoIne } from "@/lib/documentos-ine";
 
 export type AmbassadorApplicationInput = {
   firstName: string;
@@ -91,10 +91,10 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
 
   // INE por los dos lados, obligatoria (equipo, 13-ago). Se valida aquí y no
   // solo en el formulario: sin ella el comité no puede aprobar a nadie.
-  if (!esFotoValida(input.ineFront) || !esFotoValida(input.ineBack))
+  if (!esDocumentoValido(input.ineFront) || !esDocumentoValido(input.ineBack))
     return {
       error:
-        "Falta la foto de tu INE. Necesitamos los dos lados: frente y reverso.",
+        "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
     };
 
   // Al menos una red social. Se limpia antes de validar para que un campo con

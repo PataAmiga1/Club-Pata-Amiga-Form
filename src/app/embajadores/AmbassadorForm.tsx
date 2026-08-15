@@ -86,7 +86,7 @@ export function AmbassadorForm() {
     }
     if (!ineFront || !ineBack) {
       setError(
-        "Falta la foto de tu INE. Necesitamos los dos lados: frente y reverso.",
+        "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
       );
       return;
     }
@@ -247,8 +247,8 @@ export function AmbassadorForm() {
             Tu identificación oficial (INE)
           </span>
           <span className="text-xs text-ink-tertiary">
-            Los dos lados. Solo la ve el comité, para validar tu identidad y
-            pagarte tus comisiones a tu nombre.
+            Los dos lados, en foto o PDF. Solo la ve el comité, para validar tu
+            identidad y pagarte tus comisiones a tu nombre.
           </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">

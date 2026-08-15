@@ -169,7 +169,7 @@ export function ServiciosCard({
             {input("address", "Calle y número", true)}
             {input("colony", "Colonia")}
             {input("postalCode", "Código postal")}
-            {input("city", "Ciudad")}
+            {input("city", "Alcaldía o municipio")}
             {input("state", "Estado")}
             {telefonoSucursal}
             <div className="col-span-2 flex gap-2">
@@ -230,7 +230,7 @@ export function ServiciosCard({
           {input("address", "Calle y número", true)}
           {input("colony", "Colonia")}
           {input("postalCode", "Código postal")}
-          {input("city", "Ciudad")}
+          {input("city", "Alcaldía o municipio")}
           {input("state", "Estado")}
           {telefonoSucursal}
           <div className="col-span-2 flex gap-2">

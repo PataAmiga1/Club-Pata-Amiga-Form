@@ -84,10 +84,13 @@ function DocUpload({
           : "flex flex-col items-center gap-1 rounded-[14px] border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] p-[18px] transition-colors hover:border-teal"
       }
     >
+      {/* `application/pdf` explícito además de la extensión: en algunos
+          Android el filtro por ".pdf" a secas deja los PDF en gris y no se
+          pueden elegir (equipo, 15-ago). */}
       <input
         ref={ref}
         type="file"
-        accept="image/*,.pdf"
+        accept="image/*,application/pdf,.pdf"
         className="hidden"
         onChange={handleFile}
       />
@@ -100,8 +103,15 @@ function DocUpload({
         {label}
       </span>
       <span className="max-w-full truncate text-[11px] text-ink-tertiary">
-        {busy ? "Subiendo…" : error ? "Error, intenta de nuevo" : (fileName ?? "Subir foto")}
+        {busy
+          ? "Subiendo…"
+          : error
+            ? "Error, intenta de nuevo"
+            : (fileName ?? "Subir archivo")}
       </span>
+      {!uploaded && (
+        <span className="text-[11px] text-ink-tertiary">JPG, PNG o PDF</span>
+      )}
     </button>
   );
 }
@@ -531,7 +541,7 @@ export function ProfileForm({
             placeholder="Escribe o elige tu colonia"
             hint={
               colonies.length > 0
-                ? "La proponemos por tu código postal; si no es la tuya, escríbela."
+                ? "La sugerimos según tu código postal; si no es correcta, puedes cambiarla."
                 : undefined
             }
           />

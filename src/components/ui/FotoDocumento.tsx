@@ -16,10 +16,30 @@ import { useRef, useState } from "react";
  * MB, y el cuerpo de una Server Action de Next tiene tope. Se reescala a 1400 px
  * y se guarda en JPEG, que deja el archivo en 150-350 KB — de sobra para que el
  * comité lea una credencial, y sin arriesgar el envío.
+ *
+ * TAMBIÉN ACEPTA PDF (equipo, 15-ago): mucha gente tiene su identificación
+ * escaneada en PDF y antes solo cabían imágenes. Un PDF NO pasa por el
+ * compresor —el canvas solo sabe de imágenes— así que viaja tal cual y lo
+ * único que se revisa es que no pase del tope. Tampoco tiene vista previa:
+ * en su lugar se muestra el nombre del archivo.
  */
 
 const LADO_MAX = 1400;
 const CALIDAD = 0.78;
+/** Tope para un PDF sin comprimir. Por encima de esto no cabe en el envío. */
+const PDF_MAX_MB = 4;
+
+const esPdf = (dataUrl: string) => dataUrl.startsWith("data:application/pdf");
+
+/** Lee un archivo tal cual, sin tocarlo. Devuelve su data URL. */
+function leerTalCual(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onload = () => resolve(String(lector.result));
+    lector.onerror = () => reject(new Error("no se pudo leer"));
+    lector.readAsDataURL(file);
+  });
+}
 
 /** Reescala y recomprime en el navegador. Devuelve un data URL JPEG. */
 async function comprimir(file: File): Promise<string> {
@@ -45,13 +65,14 @@ export function FotoDocumento({
 }: {
   label: string;
   hint?: string;
-  /** Data URL de la foto ya comprimida, o "" si todavía no hay. */
+  /** Data URL del documento (JPEG ya comprimido, o PDF tal cual). "" si no hay. */
   value: string;
   onChange: (dataUrl: string) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nombre, setNombre] = useState<string | null>(null);
 
   const elegir = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,9 +83,21 @@ export function FotoDocumento({
     setError(null);
     setBusy(true);
     try {
-      onChange(await comprimir(file));
+      if (file.type === "application/pdf") {
+        if (file.size > PDF_MAX_MB * 1024 * 1024) {
+          setError(
+            `Ese PDF pesa demasiado (máximo ${PDF_MAX_MB} MB). Prueba con una foto de tu identificación.`,
+          );
+          return;
+        }
+        setNombre(file.name);
+        onChange(await leerTalCual(file));
+      } else {
+        setNombre(null);
+        onChange(await comprimir(file));
+      }
     } catch {
-      setError("No pudimos leer esa imagen. Intenta con otra foto.");
+      setError("No pudimos leer ese archivo. Intenta con otro.");
     } finally {
       setBusy(false);
     }
@@ -86,16 +119,28 @@ export function FotoDocumento({
         <input
           ref={ref}
           type="file"
-          accept="image/*"
-          /* En celular abre la cámara directo, que es como la va a tomar
-             casi todo el mundo. */
-          capture="environment"
+          /* Sin `capture`: forzaba la cámara y dejaba fuera al que ya tiene su
+             identificación escaneada en el teléfono o en PDF (equipo, 15-ago).
+             Sin el atributo, el celular ofrece cámara Y archivos. */
+          accept="image/*,application/pdf"
           className="hidden"
           onChange={elegir}
         />
         {busy ? (
           <span className="text-[13px] font-semibold text-teal-deep">
-            Preparando la foto…
+            Preparando el archivo…
+          </span>
+        ) : value && esPdf(value) ? (
+          <span className="flex flex-col items-center gap-1 px-3">
+            <span className="text-xl" aria-hidden>
+              📄
+            </span>
+            <span className="max-w-full truncate text-[12.5px] font-semibold text-success-text">
+              {nombre ?? "Documento PDF"}
+            </span>
+            <span className="text-[11.5px] text-ink-tertiary">
+              ✓ Listo — toca para cambiarlo
+            </span>
           </span>
         ) : value ? (
           <>
@@ -115,8 +160,9 @@ export function FotoDocumento({
               🪪
             </span>
             <span className="text-[13px] font-semibold text-teal-deep">
-              Tomar o subir foto
+              Tomar foto o subir archivo
             </span>
+            <span className="text-[11px] text-ink-tertiary">JPG, PNG o PDF</span>
           </>
         )}
       </button>

@@ -21,14 +21,20 @@ const PESO_MAX = 8 * 1024 * 1024;
 
 export type LadoIne = "ine_front" | "ine_back";
 
-/** ¿Es un data URL de imagen utilizable? */
-export function esFotoValida(dataUrl: string | null | undefined): boolean {
-  return Boolean(dataUrl && /^data:image\/(jpeg|jpg|png|webp);base64,/.test(dataUrl));
+/**
+ * Formatos que se aceptan como identificación. El PDF entró el 15-ago: mucha
+ * gente tiene su INE escaneada y antes solo cabían fotos.
+ */
+const FORMATOS = /^data:(image\/(jpeg|jpg|png|webp)|application\/pdf);base64,/;
+
+/** ¿Es un data URL de documento utilizable? */
+export function esDocumentoValido(dataUrl: string | null | undefined): boolean {
+  return Boolean(dataUrl && FORMATOS.test(dataUrl));
 }
 
 /**
- * Sube una foto y devuelve su ruta dentro del bucket.
- * Devuelve null si la foto no sirve o si Storage la rechaza — nunca lanza:
+ * Sube el documento y devuelve su ruta dentro del bucket.
+ * Devuelve null si el archivo no sirve o si Storage lo rechaza — nunca lanza:
  * un fallo aquí no debe tumbar el alta de un embajador.
  */
 export async function guardarFotoIne(
@@ -36,13 +42,14 @@ export async function guardarFotoIne(
   lado: LadoIne,
   dataUrl: string,
 ): Promise<string | null> {
-  if (!esFotoValida(dataUrl)) return null;
+  if (!esDocumentoValido(dataUrl)) return null;
   const [cabecera, base64] = dataUrl.split(",", 2);
   if (!base64) return null;
   const mime = cabecera.slice(5, cabecera.indexOf(";"));
   const bytes = Buffer.from(base64, "base64");
   if (bytes.length === 0 || bytes.length > PESO_MAX) return null;
 
+  // "image/jpeg" → jpg · "application/pdf" → pdf
   const extension = mime.split("/")[1]?.replace("jpeg", "jpg") ?? "jpg";
   const ruta = `${userId}/${lado}-${Date.now()}.${extension}`;
   const { error } = await createAdminClient()

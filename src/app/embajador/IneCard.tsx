@@ -79,7 +79,7 @@ export function IneCard({
           <p className="text-[12.5px] leading-relaxed text-ink-secondary">
             {completa
               ? "Sube solo el lado que quieras reemplazar; el otro se queda como está."
-              : "Necesitamos los dos lados de tu identificación oficial. Solo la ve el comité, para validar tu identidad y pagarte tus comisiones a tu nombre."}
+              : "Necesitamos los dos lados de tu identificación oficial, en foto o PDF. Solo la ve el comité, para validar tu identidad y pagarte tus comisiones a tu nombre."}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <FotoDocumento
