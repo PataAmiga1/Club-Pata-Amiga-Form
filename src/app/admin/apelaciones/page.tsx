@@ -16,6 +16,8 @@ type Row = {
   reimbursement_id: string | null;
   pet_id: string | null;
   center_id: string | null;
+  /** Adjuntos que mandó el miembro con su apelación (equipo, 15-ago). */
+  documents: { path: string; name: string; type: string }[] | null;
   profiles: { first_name: string | null; last_name: string | null; email: string | null } | null;
   reimbursements: { folio: string; rejection_reason: string | null } | null;
   pets: { name: string; approval_notes: string | null } | null;
@@ -49,7 +51,7 @@ export default async function AdminApelacionesPage({
   const { data } = await admin
     .from("appeals")
     .select(
-      "id, folio, reason, status, created_at, resolution_notes, reimbursement_id, pet_id, center_id, profiles!user_id(first_name, last_name, email), reimbursements(folio, rejection_reason), pets(name, approval_notes), wellness_centers(name, rejection_reason)",
+      "id, folio, reason, status, created_at, resolution_notes, reimbursement_id, pet_id, center_id, documents, profiles!user_id(first_name, last_name, email), reimbursements(folio, rejection_reason), pets(name, approval_notes), wellness_centers(name, rejection_reason)",
     )
     .order("created_at", { ascending: masAntiguas });
 
@@ -62,6 +64,25 @@ export default async function AdminApelacionesPage({
   })) as Row[];
 
   const filtered = rows.filter((a) => !estado || a.status === estado);
+
+  // Ligas FIRMADAS de los adjuntos: `appeal-documents` es privado, así que la
+  // ruta guardada no sirve por sí sola. Se firman al pintar, como la INE.
+  const adjuntosFirmados = new Map<string, { name: string; url: string }[]>(
+    await Promise.all(
+      filtered.map(async (a) => {
+        const docs = a.documents ?? [];
+        const firmados = await Promise.all(
+          docs.map(async (d) => {
+            const { data } = await admin.storage
+              .from("appeal-documents")
+              .createSignedUrl(d.path, 3600);
+            return { name: d.name, url: data?.signedUrl ?? "" };
+          }),
+        );
+        return [a.id, firmados.filter((f) => f.url)] as const;
+      }),
+    ),
+  );
   const pending = filtered.filter((a) => a.status === "pending");
   const resolved = filtered.filter((a) => a.status !== "pending");
 
@@ -161,6 +182,27 @@ export default async function AdminApelacionesPage({
                       «{a.reason}»
                     </p>
                   </div>
+                  {/* Lo que adjuntó el miembro: es la razón de ser de la
+                      apelación cuando lo rechazado fue una foto. */}
+                  {(adjuntosFirmados.get(a.id)?.length ?? 0) > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                        LO QUE ADJUNTÓ
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {adjuntosFirmados.get(a.id)!.map((d) => (
+                          <a
+                            key={d.url}
+                            href={d.url}
+                            target="_blank"
+                            className="rounded-full border-[1.5px] border-border-input px-3 py-1.5 text-[12px] font-bold text-teal-deep transition-colors hover:border-teal"
+                          >
+                            📎 {d.name} ↗
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </DetailModal>
             }
