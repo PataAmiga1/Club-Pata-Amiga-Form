@@ -8,6 +8,16 @@ export type AmbassadorContext = {
     id: string;
     first_name: string;
     last_name: string | null;
+    /** Datos que capturó al aplicar — se los mostramos en "Mi cuenta" (15-ago). */
+    second_last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    curp: string | null;
+    birth_date: string | null;
+    postal_code: string | null;
+    colony: string | null;
+    city: string | null;
+    state: string | null;
     referral_code: string | null;
     code_change_count: number;
     status: string;
@@ -26,7 +36,7 @@ export type AmbassadorContext = {
 };
 
 const AMBASSADOR_COLS =
-  "id, first_name, last_name, referral_code, code_change_count, status, rejection_reason, bank_name, clabe, bank_holder, rfc, social_links, ine_front_url, ine_back_url";
+  "id, first_name, last_name, second_last_name, email, phone, curp, birth_date, postal_code, colony, city, state, referral_code, code_change_count, status, rejection_reason, bank_name, clabe, bank_holder, rfc, social_links, ine_front_url, ine_back_url";
 
 /**
  * Contexto del portal del embajador: exige sesión, resuelve el perfil de

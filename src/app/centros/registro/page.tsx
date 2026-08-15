@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { PublicHeader } from "@/components/public/PublicHeader";
+import { datosConocidos } from "@/lib/datos-conocidos";
 import { CenterForm } from "./CenterForm";
 
 export const metadata: Metadata = {
   title: "Quiero ser centro aliado · Club Pata Amiga",
 };
 
-export default function CentroRegistroPage() {
+export default async function CentroRegistroPage() {
+  // Con sesión abierta el formulario llega lleno con lo que ya dio (15-ago).
+  const conocidos = await datosConocidos();
   return (
     <div className="min-h-dvh bg-cream">
       <PublicHeader />
@@ -19,7 +22,7 @@ export default function CentroRegistroPage() {
           de Pata Amiga y recibe a miembros de toda la manada con un beneficio
           exclusivo.
         </p>
-        <CenterForm />
+        <CenterForm conocidos={conocidos} />
       </div>
     </div>
   );

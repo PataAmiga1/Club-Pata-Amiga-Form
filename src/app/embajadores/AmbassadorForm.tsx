@@ -12,28 +12,42 @@ import {
   esMayorDeEdad,
   fechaMaximaParaSerMayor,
 } from "@/lib/edad";
+import type { DatosConocidos } from "@/lib/datos-conocidos";
 import { registerAmbassador } from "./actions";
 
-export function AmbassadorForm() {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [curp, setCurp] = useState("");
-  const [state, setState] = useState("");
-  const [city, setCity] = useState("");
+/**
+ * `conocidos` llega del servidor cuando hay sesión: lo que la persona ya
+ * capturó como miembro o en un registro anterior (equipo, 15-ago). Antes cada
+ * rol volvía a preguntar lo mismo desde cero.
+ */
+export function AmbassadorForm({
+  conocidos,
+}: {
+  conocidos: DatosConocidos | null;
+}) {
+  const [firstName, setFirstName] = useState(conocidos?.firstName ?? "");
+  const [lastName, setLastName] = useState(conocidos?.lastName ?? "");
+  const [email, setEmail] = useState(conocidos?.email ?? "");
+  const [phone, setPhone] = useState(conocidos?.phone ?? "");
+  const [curp, setCurp] = useState(conocidos?.curp ?? "");
+  const [state, setState] = useState(conocidos?.state ?? "");
+  const [city, setCity] = useState(conocidos?.city ?? "");
   const [isAdult, setIsAdult] = useState(false);
   // Fecha de nacimiento y motivación (equipo, 5-ago)
-  const [birthDate, setBirthDate] = useState("");
+  const [birthDate, setBirthDate] = useState(conocidos?.birthDate ?? "");
   const [motivation, setMotivation] = useState("");
   // Contraseña: la cuenta se crea al aplicar (equipo, 11-ago)
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   // Apellido materno, CP y redes sociales (equipo, 11-ago)
-  const [secondLastName, setSecondLastName] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [colony, setColony] = useState("");
-  const [colonies, setColonies] = useState<string[]>([]);
+  const [secondLastName, setSecondLastName] = useState(
+    conocidos?.secondLastName ?? "",
+  );
+  const [postalCode, setPostalCode] = useState(conocidos?.postalCode ?? "");
+  const [colony, setColony] = useState(conocidos?.colony ?? "");
+  const [colonies, setColonies] = useState<string[]>(
+    conocidos?.colony ? [conocidos.colony] : [],
+  );
   const [social, setSocial] = useState<Record<string, string>>({
     facebook: "",
     instagram: "",
@@ -172,6 +186,12 @@ export function AmbassadorForm() {
         submit();
       }}
     >
+      {conocidos && (
+        <div className="rounded-[12px] bg-info-bg px-4 py-3 text-[12.5px] leading-relaxed text-info-text">
+          Llenamos lo que ya sabemos de ti con los datos de tu cuenta. Revísalos
+          y corrige lo que haya cambiado.
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField
           label="Nombre(s)"
@@ -210,26 +230,31 @@ export function AmbassadorForm() {
           hint="Elige tu país si no es México."
         />
       </div>
-      <TextField
-        label="Contraseña"
-        type={showPassword ? "text" : "password"}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        autoComplete="new-password"
-        minLength={8}
-        placeholder="Mínimo 8 caracteres"
-        hint="Con ella entras a tu portal de embajador, aunque tu solicitud siga en revisión."
-        required
-        rightSlot={
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="text-[13px] font-semibold text-teal-deep"
-          >
-            {showPassword ? "Ocultar" : "Mostrar"}
-          </button>
-        }
-      />
+      {/* Sin contraseña cuando YA hay sesión: la cuenta existe y pedirla otra
+          vez solo confunde. La acción del servidor ya la trata como opcional
+          en ese caso (equipo, 15-ago). */}
+      {!conocidos && (
+        <TextField
+          label="Contraseña"
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          placeholder="Mínimo 8 caracteres"
+          hint="Con ella entras a tu portal de embajador, aunque tu solicitud siga en revisión."
+          required
+          rightSlot={
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="text-[13px] font-semibold text-teal-deep"
+            >
+              {showPassword ? "Ocultar" : "Mostrar"}
+            </button>
+          }
+        />
+      )}
       <TextField
         label="CURP"
         value={curp}

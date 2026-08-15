@@ -1,6 +1,7 @@
 import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
 import { LogoutButton } from "@/components/app/LogoutButton";
 import { PaymentDataCard } from "../PaymentDataCard";
+import { DatosCard } from "../DatosCard";
 import { IneCard } from "../IneCard";
 import { ExtrasCard, BajaEmbajadorCard } from "../ExtrasCard";
 import { getAmbassadorContext } from "../shared";
@@ -19,6 +20,7 @@ export default async function EmbajadorCuentaPage() {
     <div className="mx-auto flex w-full max-w-[980px] flex-col gap-4 px-5 py-5 sm:px-8">
       <h1 className="font-display text-[24px] text-ink-title">Mi cuenta</h1>
       <div className="grid items-start gap-4 lg:grid-cols-2">
+        <DatosCard datos={ambassador} />
         <PaymentDataCard
           initialBank={ambassador.bank_name}
           initialClabe={ambassador.clabe}

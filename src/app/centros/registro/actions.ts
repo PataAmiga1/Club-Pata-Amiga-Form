@@ -21,6 +21,8 @@ export type CenterRegistrationInput = {
   email: string;
   phone: string;
   website?: string;
+  /** Redes del centro, cada una en su campo (equipo, 15-ago). */
+  socialLinks?: Record<string, string>;
   services: string[];
   memberBenefit: string;
   locations: CenterLocationInput[];
@@ -181,6 +183,14 @@ export async function registerCenter(input: CenterRegistrationInput) {
       email,
       phone,
       website: input.website?.trim() || null,
+      // Se normalizan igual que las del embajador: sin vacíos y con https://
+      // adelante, para que la tarjeta del directorio pueda enlazarlas.
+      social_links: Object.fromEntries(
+        Object.entries(input.socialLinks ?? {})
+          .map(([k, v]) => [k, (v ?? "").trim()])
+          .filter(([, v]) => v.length > 0)
+          .map(([k, v]) => [k, v.startsWith("http") ? v : `https://${v}`]),
+      ),
       services,
       member_benefit: memberBenefit,
       status: "pending",

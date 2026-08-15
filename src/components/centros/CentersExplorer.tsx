@@ -41,6 +41,10 @@ const CHIP_PALETTES: Record<WellnessService, string> = {
   grooming: "bg-error-bg text-error-text",
   funeral: "bg-cream text-ink-secondary",
   walker: "bg-success-bg text-success-text",
+  // Categorías nuevas del 15-ago, con los mismos colores de la paleta
+  training: "bg-info-bg text-info-text",
+  transport: "bg-warning-bg text-warning-text",
+  photography: "bg-error-bg text-error-text",
 };
 
 const norm = (s: string) =>

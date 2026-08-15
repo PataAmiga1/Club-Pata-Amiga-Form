@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicHeader } from "@/components/public/PublicHeader";
+import { datosConocidos } from "@/lib/datos-conocidos";
 import { AmbassadorForm } from "./AmbassadorForm";
 import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
 
@@ -28,7 +29,9 @@ const PERKS = [
   },
 ];
 
-export default function EmbajadoresPage() {
+export default async function EmbajadoresPage() {
+  // Con sesión abierta el formulario llega lleno con lo que ya dio (15-ago).
+  const conocidos = await datosConocidos();
   return (
     <div className="min-h-dvh bg-cream">
       <PublicHeader />
@@ -79,7 +82,7 @@ export default function EmbajadoresPage() {
             Registro con revisión del comité — solo mayores de edad.
           </p>
         </div>
-        <AmbassadorForm />
+        <AmbassadorForm conocidos={conocidos} />
       </div>
     </div>
   );

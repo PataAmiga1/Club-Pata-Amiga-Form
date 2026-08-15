@@ -124,14 +124,37 @@ export const AMBASSADOR_COMMISSION_MXN = {
 export const AMBASSADOR_CODE_PREFIX = "PATAMIGA-";
 export const AMBASSADOR_PAYOUT_DAY = 5;
 
-/** Servicios de centros de bienestar (valores = columna services[] en BD). */
+/**
+ * Servicios de centros de bienestar (valores = columna services[] en BD).
+ *
+ * NOMBRES NUEVOS Y TRES CATEGORÍAS MÁS (equipo, 15-ago). Las seis originales
+ * CONSERVAN SU LLAVE y solo cambian de etiqueta: `store` sigue siendo `store`
+ * aunque ahora se lea "Petshop". Eso es lo que hace que ningún centro pierda
+ * la categoría que ya tenía elegida —en la base se guarda la llave, no el
+ * texto— y por lo mismo este cambio no necesita migración ni toca una fila.
+ *
+ * Equivalencias acordadas: Clínica→Clínica/Hospital · Tienda→Petshop ·
+ * Hotel→Hospedaje · Estética→Estética y grooming · Funeraria→Despedida y
+ * memorial · Paseador→Paseadores.
+ */
 export const WELLNESS_SERVICES = {
-  clinic: { label: "Clínica", plural: "Clínicas", emoji: "🏥" },
-  store: { label: "Tienda", plural: "Tiendas", emoji: "🛒" },
-  hotel: { label: "Hotel", plural: "Hoteles", emoji: "🏨" },
-  grooming: { label: "Estética", plural: "Estética", emoji: "✂️" },
-  funeral: { label: "Funeraria", plural: "Funerarias", emoji: "🕊️" },
-  walker: { label: "Paseador", plural: "Paseadores", emoji: "🐕‍🦺" },
+  clinic: { label: "Clínica/Hospital", plural: "Clínicas y hospitales", emoji: "🏥" },
+  store: { label: "Petshop", plural: "Petshops", emoji: "🛒" },
+  hotel: { label: "Hospedaje", plural: "Hospedaje", emoji: "🏨" },
+  grooming: { label: "Estética y grooming", plural: "Estética y grooming", emoji: "✂️" },
+  funeral: { label: "Despedida y memorial", plural: "Despedida y memorial", emoji: "🕊️" },
+  walker: { label: "Paseadores", plural: "Paseadores", emoji: "🐕‍🦺" },
+  training: {
+    label: "Entrenamiento y comportamiento",
+    plural: "Entrenamiento y comportamiento",
+    emoji: "🎓",
+  },
+  transport: { label: "Transporte", plural: "Transporte", emoji: "🚐" },
+  photography: {
+    label: "Fotografía y experiencias",
+    plural: "Fotografía y experiencias",
+    emoji: "📸",
+  },
 } as const;
 
 export type WellnessService = keyof typeof WELLNESS_SERVICES;

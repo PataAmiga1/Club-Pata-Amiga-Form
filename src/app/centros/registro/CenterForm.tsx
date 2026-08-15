@@ -9,6 +9,7 @@ import { PhoneField } from "@/components/ui/PhoneField";
 import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
 import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
+import type { DatosConocidos } from "@/lib/datos-conocidos";
 import { registerCenter, type CenterLocationInput } from "./actions";
 
 type LocationDraft = CenterLocationInput & { colonies: string[] };
@@ -23,12 +24,31 @@ const emptyLocation = (): LocationDraft => ({
   colonies: [],
 });
 
-export function CenterForm() {
+/**
+ * `conocidos` llega del servidor cuando hay sesión: lo que la persona ya
+ * capturó como miembro o embajadora (equipo, 15-ago). El nombre del CENTRO no
+ * se prellena —eso sí es nuevo—, solo los datos de quien lo registra.
+ */
+export function CenterForm({
+  conocidos,
+}: {
+  conocidos: DatosConocidos | null;
+}) {
+  const nombreDeContacto = conocidos
+    ? [conocidos.firstName, conocidos.lastName, conocidos.secondLastName]
+        .filter(Boolean)
+        .join(" ")
+    : "";
   const [name, setName] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [contactName, setContactName] = useState(nombreDeContacto);
+  const [email, setEmail] = useState(conocidos?.email ?? "");
+  const [phone, setPhone] = useState(conocidos?.phone ?? "");
   const [website, setWebsite] = useState("");
+  const [social, setSocial] = useState<Record<string, string>>({
+    facebook: "",
+    instagram: "",
+    tiktok: "",
+  });
   const [services, setServices] = useState<WellnessService[]>([]);
   const [memberBenefit, setMemberBenefit] = useState("");
   const [locations, setLocations] = useState<LocationDraft[]>([emptyLocation()]);
@@ -76,6 +96,7 @@ export function CenterForm() {
         email,
         phone,
         website,
+        socialLinks: social,
         services,
         memberBenefit,
         locations: locations.map(({ colonies: _c, ...loc }) => loc),
@@ -175,32 +196,68 @@ export function CenterForm() {
             required
           />
           <TextField
-            label="Sitio web o redes (opcional)"
+            label="Sitio web (opcional)"
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
             placeholder="https://…"
           />
         </div>
-        <TextField
-          label="Contraseña"
-          type={showPassword ? "text" : "password"}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="new-password"
-          minLength={8}
-          placeholder="Mínimo 8 caracteres"
-          hint="Con ella entras a tu panel para completar tu perfil, aunque tu solicitud siga en revisión."
-          required
-          rightSlot={
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="text-[13px] font-semibold text-teal-deep"
-            >
-              {showPassword ? "Ocultar" : "Mostrar"}
-            </button>
-          }
-        />
+        {/* Redes propias, cada una en su campo (equipo, 15-ago). Antes había
+            un solo "sitio web o redes" donde cabía una sola cosa, así que un
+            centro con Instagram y Facebook tenía que elegir cuál perder. */}
+        <div className="flex flex-col gap-3 rounded-[14px] bg-cream/60 p-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold text-ink-title">
+              Tus redes sociales (opcional)
+            </span>
+            <span className="text-xs text-ink-tertiary">
+              Aparecen en tu tarjeta del directorio para que los miembros te
+              encuentren.
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                ["facebook", "Facebook"],
+                ["instagram", "Instagram"],
+                ["tiktok", "TikTok"],
+              ] as const
+            ).map(([key, label]) => (
+              <TextField
+                key={key}
+                label={label}
+                value={social[key] ?? ""}
+                onChange={(e) =>
+                  setSocial((prev) => ({ ...prev, [key]: e.target.value }))
+                }
+                placeholder="usuario o liga"
+              />
+            ))}
+          </div>
+        </div>
+        {/* Sin contraseña cuando ya hay sesión: la cuenta existe (15-ago). */}
+        {!conocidos && (
+          <TextField
+            label="Contraseña"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            minLength={8}
+            placeholder="Mínimo 8 caracteres"
+            hint="Con ella entras a tu panel para completar tu perfil, aunque tu solicitud siga en revisión."
+            required
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="text-[13px] font-semibold text-teal-deep"
+              >
+                {showPassword ? "Ocultar" : "Mostrar"}
+              </button>
+            }
+          />
+        )}
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-semibold text-ink-title">
             Servicios que ofreces
