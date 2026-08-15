@@ -8,6 +8,15 @@ import { inicioDelMes } from "@/lib/zona-horaria";
  * suma por embajador de los referidos pendientes generados antes del mes en
  * curso. Se sube al portal del banco para transferencias masivas (SPEI).
  * Los embajadores sin CLABE registrada aparecen marcados para seguimiento.
+ *
+ * INCLUYE A LOS DADOS DE BAJA (14-ago). Antes filtraba `status = approved`, y
+ * eso dejaba fuera del archivo del banco a quien se dio de baja con comisiones
+ * ya ganadas — justo lo contrario de lo que su portal le promete al confirmar
+ * la baja ("las comisiones ya ganadas se pagan con normalidad en el siguiente
+ * corte"). El filtro que importa no es el estatus sino el saldo: aquí entra
+ * quien tenga dinero pendiente de un mes ya cerrado, sin importar si sigue
+ * activo. En el concepto se marca la baja para que quien revisa el archivo
+ * sepa que es el último pago de esa persona.
  */
 export async function GET() {
   const ctx = await requireAdminRoute();
@@ -20,9 +29,9 @@ export async function GET() {
   const { data } = await ctx.admin
     .from("ambassadors")
     .select(
-      "first_name, last_name, email, bank_name, clabe, referral_code, referrals(commission_amount, status, created_at)",
+      "first_name, last_name, email, bank_name, clabe, referral_code, status, referrals(commission_amount, status, created_at)",
     )
-    .eq("status", "approved");
+    .in("status", ["approved", "canceled"]);
 
   const rows = (data ?? [])
     .map((a) => {
@@ -47,7 +56,9 @@ export async function GET() {
       csvCell(`${a.first_name} ${a.last_name ?? ""}`.trim().toUpperCase()),
       csvCell(a.bank_name ?? (a.clabe ? (bankFromClabe(a.clabe) ?? "") : "")),
       total.toFixed(2),
-      csvCell(`COMISION PATA AMIGA ${a.referral_code ?? ""}`.trim()),
+      csvCell(
+        `COMISION PATA AMIGA ${a.referral_code ?? ""}${a.status === "canceled" ? " (BAJA - ULTIMO PAGO)" : ""}`.trim(),
+      ),
       csvCell(a.email),
     ].join(","),
   );

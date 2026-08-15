@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMxn } from "@/lib/format";
-import { hoyEnMexico, ZONA_MX } from "@/lib/zona-horaria";
+import {
+  hoyEnMexico,
+  ZONA_MX,
+  inicioDelMes,
+  diaEnMexico,
+} from "@/lib/zona-horaria";
 import {
   MATERIAL_SLOTS,
   ASSISTANT_PROMPT_KEY,
@@ -676,14 +681,24 @@ export async function resolveCenter(
 /**
  * Corte mensual de comisiones: agrupa los referidos pendientes generados antes
  * del mes en curso en un payout y los marca como pagados (pago el día 5).
+ *
+ * El mes sale de `inicioDelMes()`, no de `new Date()` (14-ago). El layout que
+ * se sube al banco ya usaba la hora de México y esto no: en Vercel el proceso
+ * corre en UTC, así que del último día del mes a partir de las 18:00 hora de
+ * México el servidor ya cree que es el mes siguiente. Los dos lados decidían
+ * distinto qué referidos entraban al corte, y el archivo del banco podía no
+ * cuadrar con lo que el panel marcaba como pagado.
  */
 export async function payAmbassadorCut(ambassadorId: string) {
   const { admin } = await requireAdmin();
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const periodMonth = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}-01`;
+  const monthStart = inicioDelMes();
+  // Un día antes del arranque del mes cae siempre en el mes anterior, y
+  // `inicioDelMes` lo lleva a su día 1. El corte se etiqueta con ESE mes,
+  // que es el que se está liquidando.
+  const periodMonth = diaEnMexico(
+    inicioDelMes(new Date(monthStart.getTime() - 24 * 60 * 60 * 1000)),
+  );
 
   const { data: pending } = await admin
     .from("referrals")

@@ -579,21 +579,36 @@ export default async function AdminEmbajadoresPage({
           </h2>
           <div className="flex flex-col rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
             {canceled.length > 0 ? (
-              canceled.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center gap-3 border-b border-[#F2EEE4] py-2.5 text-[13px] text-ink-body last:border-0"
-                >
-                  <span className="flex-1">
-                    <strong className="text-ink-title">{fullName(a)}</strong> ·{" "}
-                    {a.email}
-                    {a.referral_code ? ` · ${a.referral_code}` : ""}
-                  </span>
-                  <span className="rounded-full bg-cream px-2.5 py-1 text-[10.5px] font-extrabold text-ink-tertiary">
-                    🕊️ BAJA{a.deactivation_reason ? ` · ${a.deactivation_reason}` : ""}
-                  </span>
-                </div>
-              ))
+              canceled.map((a) => {
+                // Darse de baja NO borra lo ya ganado: al confirmar la baja se
+                // le promete que sus comisiones se pagan en el siguiente corte
+                // (equipo, 5-ago). Antes esa promesa no tenía cómo cumplirse —
+                // el layout del banco los excluía y aquí no había botón, así
+                // que los referidos se quedaban en "pendiente" para siempre.
+                const s = stats(a);
+                return (
+                  <div
+                    key={a.id}
+                    className="flex flex-wrap items-center gap-3 border-b border-[#F2EEE4] py-2.5 text-[13px] text-ink-body last:border-0"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <strong className="text-ink-title">{fullName(a)}</strong> ·{" "}
+                      {a.email}
+                      {a.referral_code ? ` · ${a.referral_code}` : ""}
+                    </span>
+                    {s.payableCount > 0 && (
+                      <span className="rounded-full bg-warning-bg px-2.5 py-1 text-[10.5px] font-extrabold text-warning-text">
+                        DEBE COBRAR {formatMxn(s.payable)} · {s.payableCount}{" "}
+                        {s.payableCount === 1 ? "referido" : "referidos"}
+                      </span>
+                    )}
+                    <span className="rounded-full bg-cream px-2.5 py-1 text-[10.5px] font-extrabold text-ink-tertiary">
+                      🕊️ BAJA{a.deactivation_reason ? ` · ${a.deactivation_reason}` : ""}
+                    </span>
+                    {s.payableCount > 0 && <PayCutButton ambassadorId={a.id} />}
+                  </div>
+                );
+              })
             ) : (
               <p className="text-sm text-ink-secondary">
                 Sin embajadores dados de baja.
