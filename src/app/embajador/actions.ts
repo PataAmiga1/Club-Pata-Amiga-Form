@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { AMBASSADOR_CODE_PREFIX } from "@/lib/constants";
+import {
+  normalizarCodigo,
+  revisarCodigo,
+  sugerenciasDeCodigo,
+} from "@/lib/codigo-embajador";
 import { BANCO_OTRO, bankFromClabe, isValidClabe } from "@/lib/banks";
 import { RFC_REGEX } from "@/lib/rfc";
 import { esDocumentoValido, guardarFotoIne } from "@/lib/documentos-ine";
@@ -209,32 +213,88 @@ export async function requestAmbassadorDeactivation(reason: string) {
   return { ok: true as const };
 }
 
-/** Personalizar código — permitido una sola vez (code_change_count). */
-export async function customizeCode(suffixRaw: string) {
+/**
+ * ¿Está libre este código? Se llama mientras la persona escribe, para decirle
+ * en el momento si puede quedárselo (documento de lineamientos, 16-ago).
+ *
+ * Devuelve sugerencias cuando está ocupado, como hacen las redes sociales.
+ * No escribe nada: apartar un código por teclearlo permitiría bloquear los
+ * buenos sin quedarse con ninguno.
+ */
+export async function revisarDisponibilidadCodigo(entrada: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { disponible: false, error: "Inicia sesión de nuevo." };
+
+  const codigo = normalizarCodigo(entrada);
+  const revision = revisarCodigo(codigo);
+  if (!revision.ok)
+    return { disponible: false, codigo, error: revision.error };
+
+  const admin = createAdminClient();
+  const { data: tomado } = await admin
+    .from("ambassadors")
+    .select("id, user_id")
+    .eq("referral_code", codigo)
+    .maybeSingle();
+
+  // El propio también cuenta como libre: si no, "revisar" el que ya traes
+  // diría que está ocupado por ti mismo.
+  if (tomado && tomado.user_id !== user.id) {
+    const candidatas = sugerenciasDeCodigo(codigo);
+    const { data: ocupadas } = await admin
+      .from("ambassadors")
+      .select("referral_code")
+      .in("referral_code", candidatas);
+    const yaTomadas = new Set((ocupadas ?? []).map((o) => o.referral_code));
+    return {
+      disponible: false,
+      codigo,
+      error: "Ese código ya está tomado.",
+      sugerencias: candidatas.filter((c) => !yaTomadas.has(c)),
+    };
+  }
+
+  return { disponible: true as const, codigo };
+}
+
+/**
+ * Elige (o cambia) el código de embajador.
+ *
+ * REGLAS NUEVAS (documento de lineamientos, 16-ago): el código ES lo que la
+ * persona escribe —de 3 a 8 caracteres, A-Z y 0-9—, sin el prefijo
+ * `PATAMIGA-`. Los códigos ya emitidos con prefijo siguen valiendo; esto
+ * aplica a lo que se elija de aquí en adelante.
+ *
+ * OJO, DIFERENCIA CON EL DOCUMENTO: los lineamientos dicen "no se pueden hacer
+ * cambios al código". El equipo decidió el 16-ago que SÍ se pueda cambiar, así
+ * que el tope de un solo cambio se quitó. `code_change_count` se conserva
+ * llevando la cuenta, que sirve para auditar quién cambia seguido.
+ */
+export async function customizeCode(entrada: string) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Inicia sesión de nuevo." };
 
-  const suffix = suffixRaw?.trim().toUpperCase().replace(/\s+/g, "");
-  if (!/^[A-Z0-9]{3,15}$/.test(suffix))
-    return {
-      error: "Usa de 3 a 15 letras o números, sin espacios (ej. PAOLA).",
-    };
+  const code = normalizarCodigo(entrada);
+  const revision = revisarCodigo(code);
+  if (!revision.ok) return { error: revision.error };
 
   const admin = createAdminClient();
   const { data: ambassador } = await admin
     .from("ambassadors")
-    .select("id, code_change_count, status")
+    .select("id, code_change_count, status, referral_code")
     .eq("user_id", user.id)
     .eq("status", "approved")
     .maybeSingle();
   if (!ambassador) return { error: "No encontramos tu perfil de embajador." };
-  if (ambassador.code_change_count >= 1)
-    return { error: "Tu código ya fue personalizado — solo se puede una vez." };
+  if (ambassador.referral_code === code)
+    return { ok: true as const, code };
 
-  const code = `${AMBASSADOR_CODE_PREFIX}${suffix}`;
   const { data: taken } = await admin
     .from("ambassadors")
     .select("id")
@@ -246,11 +306,12 @@ export async function customizeCode(suffixRaw: string) {
     .from("ambassadors")
     .update({
       referral_code: code,
-      code_change_count: ambassador.code_change_count + 1,
+      code_change_count: (ambassador.code_change_count ?? 0) + 1,
     })
     .eq("id", ambassador.id);
   if (error) return { error: "No pudimos actualizar el código. Intenta de nuevo." };
 
   revalidatePath("/embajador");
+  revalidatePath("/embajador/cuenta");
   return { ok: true as const, code };
 }

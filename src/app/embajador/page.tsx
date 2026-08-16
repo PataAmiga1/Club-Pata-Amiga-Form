@@ -96,7 +96,10 @@ export default async function EmbajadorResumenPage() {
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <CodeCard
           code={ambassador.referral_code ?? ""}
-          canCustomize={ambassador.code_change_count === 0}
+          /* Siempre se puede cambiar (equipo, 16-ago). Los lineamientos decían
+             "no se pueden hacer cambios", pero el equipo prefirió dejarlo
+             abierto; `code_change_count` sigue contando para poder auditar. */
+          canCustomize
         />
         {/* Finanzas del mes: KPIs y cortes mensuales juntos */}
         <div className="flex flex-col gap-3">

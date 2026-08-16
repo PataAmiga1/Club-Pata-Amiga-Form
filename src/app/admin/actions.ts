@@ -19,6 +19,11 @@ import {
   SITE_SETTINGS,
 } from "@/lib/site";
 import { CAMPAIGN_COUPON_KEYS, CAMPAIGN_PDF_SLOTS } from "@/lib/landings";
+import {
+  CODIGO_MAX,
+  normalizarCodigo,
+  revisarCodigo,
+} from "@/lib/codigo-embajador";
 import { getResend, EMAIL_FROM, destinatarioPermitido } from "@/lib/resend";
 import { perfilCompleto } from "@/lib/perfil-faltantes";
 import { notifyTeam, reportError } from "@/lib/alerts";
@@ -226,14 +231,8 @@ export async function resolvePet(
 /** Base pública para links en correos (embajadores/centros). */
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-function slugCode(firstName: string) {
-  return firstName
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 15);
-}
+/* `slugCode` se retiró el 16-ago: la normalización del código de embajador
+   vive ahora en `@/lib/codigo-embajador`, junto con sus reglas. */
 
 export async function resolveAmbassador(
   id: string,
@@ -248,10 +247,14 @@ export async function resolveAmbassador(
   if (!amb) throw new Error("Solicitud no encontrada");
 
   if (decision.approve) {
-    // Assign an initial unique code (customizable once by the ambassador)
+    // Código inicial único, que el embajador puede cambiar desde su portal.
+    // SIN el prefijo `PATAMIGA-` y con las reglas del 16-ago (3 a 8, A-Z y
+    // 0-9, sin palabras bloqueadas): si el nombre no da un código válido —es
+    // muy corto, o contiene una palabra reservada— se cae a "AMIGO".
     let code = amb.referral_code;
     if (!code) {
-      const base = `PATAMIGA-${slugCode(amb.first_name) || "AMIGO"}`;
+      const delNombre = normalizarCodigo(amb.first_name ?? "");
+      const base = revisarCodigo(delNombre).ok ? delNombre : "AMIGO";
       code = base;
       for (let n = 2; ; n++) {
         const { data: taken } = await admin
@@ -260,7 +263,8 @@ export async function resolveAmbassador(
           .eq("referral_code", code)
           .maybeSingle();
         if (!taken) break;
-        code = `${base}${n}`;
+        // El sufijo no puede empujar el código más allá del tope.
+        code = `${base.slice(0, CODIGO_MAX - String(n).length)}${n}`;
       }
     }
     await admin

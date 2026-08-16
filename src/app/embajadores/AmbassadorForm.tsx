@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/Button";
 import { TextField, SelectField } from "@/components/ui/Field";
 import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
@@ -14,6 +15,13 @@ import {
 } from "@/lib/edad";
 import type { DatosConocidos } from "@/lib/datos-conocidos";
 import { registerAmbassador } from "./actions";
+
+// Los textos legales pesan miles de líneas: el popup se carga SOLO cuando
+// alguien lo abre, no viaja con la página del formulario.
+const LegalPopup = dynamic(
+  () => import("@/components/legal/LegalPopup").then((m) => m.LegalPopup),
+  { ssr: false },
+);
 
 /**
  * `conocidos` llega del servidor cuando hay sesión: lo que la persona ya
@@ -60,6 +68,8 @@ export function AmbassadorForm({
   // salían en el panel marcados como "falta INE" para siempre.
   const [ineFront, setIneFront] = useState("");
   const [ineBack, setIneBack] = useState("");
+  // Popup de legales (equipo, 16-ago): null = cerrado
+  const [legalSlug, setLegalSlug] = useState<string | null>(null);
 
   /** CP → colonia y alcaldía/municipio. Editable: el catálogo puede fallar. */
   const onCpChange = (cp: string) => {
@@ -403,6 +413,35 @@ export function AmbassadorForm({
         Confirmo que soy mayor de edad y acepto que el comité revise mi
         solicitud.
       </label>
+
+      {/* Legales antes del botón (equipo, 16-ago). Se leen en el mismo popup
+          que en el registro de miembro: no navegan fuera, así que nadie pierde
+          lo que ya llenó del formulario. */}
+      <p className="text-[12.5px] leading-normal text-ink-tertiary">
+        Al enviar tu solicitud aceptas los{" "}
+        <button
+          type="button"
+          onClick={() => setLegalSlug("terminos-y-condiciones")}
+          className="font-semibold text-teal-deep underline"
+        >
+          Términos y condiciones
+        </button>{" "}
+        y el{" "}
+        <button
+          type="button"
+          onClick={() => setLegalSlug("aviso-de-privacidad")}
+          className="font-semibold text-teal-deep underline"
+        >
+          Aviso de privacidad
+        </button>
+        .
+      </p>
+      {legalSlug && (
+        <LegalPopup
+          initialSlug={legalSlug}
+          onClose={() => setLegalSlug(null)}
+        />
+      )}
 
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm font-semibold text-error-text">
