@@ -81,13 +81,6 @@ export function RequestForm({
   const balance = balances[category];
   const docSlots = DOCS_BY_CATEGORY[category] ?? [];
 
-  /**
-   * Gastos veterinarios y vacunas los atiende un veterinario, así que en los
-   * dos se pide quién fue y con qué cédula (equipo, 15-ago). El fallecimiento
-   * no: ahí el comprobante es funerario.
-   */
-  const pideDatosDelVeterinario =
-    category === "vet_expenses" || category === "vaccines";
 
   /**
    * ¿Hay al menos un peludo que HOY pueda pedir un reintegro?
@@ -111,14 +104,12 @@ export function RequestForm({
         `El monto solicitado (${formatMxn(amountNum)}) excede tu disponible de este año para este apoyo (${formatMxn(balance.available)} MXN).`,
       );
     if (!serviceDate) return setError("Indica la fecha.");
-    if (pideDatosDelVeterinario) {
-      if (!clinicName.trim())
-        return setError("Indica en qué veterinaria o clínica lo atendieron.");
-      if (!vetName.trim())
-        return setError("Escribe el nombre del médico veterinario que lo atendió.");
-      if (!vetLicense.trim())
-        return setError("Escribe la cédula profesional del veterinario.");
-    }
+    if (!clinicName.trim())
+      return setError("Indica en qué veterinaria o clínica lo atendieron.");
+    if (!vetName.trim())
+      return setError("Escribe el nombre del médico veterinario que lo atendió.");
+    if (!vetLicense.trim())
+      return setError("Escribe la cédula profesional del veterinario.");
     if (!files.evidence_photo)
       return setError(`Sube: ${docSlots[0]?.label ?? "la evidencia"}.`);
     if (!files.receipt)
@@ -335,37 +326,35 @@ export function RequestForm({
             value={serviceDate}
             onChange={(e) => setServiceDate(e.target.value)}
           />
-          {pideDatosDelVeterinario && (
-            <TextField
-              label="¿En qué veterinaria o clínica lo atendieron?"
-              placeholder="Nombre del consultorio"
-              value={clinicName}
-              onChange={(e) => setClinicName(e.target.value)}
-            />
-          )}
+          <TextField
+            label="¿En qué veterinaria o clínica lo atendieron?"
+            placeholder="Nombre del consultorio"
+            value={clinicName}
+            onChange={(e) => setClinicName(e.target.value)}
+          />
         </div>
 
-        {/* Quién atendió y con qué cédula. Antes solo se pedía en gastos
-            veterinarios y era opcional; desde el 15-ago se pide TAMBIÉN en
-            vacunas —que también las aplica un veterinario— y los dos campos
-            son obligatorios: son lo que permite verificar que quien firmó el
-            comprobante existe y está habilitado. */}
-        {pideDatosDelVeterinario && (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <TextField
-              label="Médico veterinario que lo atendió"
-              placeholder="Nombre del veterinario"
-              value={vetName}
-              onChange={(e) => setVetName(e.target.value)}
-            />
-            <TextField
-              label="Cédula profesional"
-              placeholder="Cédula del veterinario"
-              value={vetLicense}
-              onChange={(e) => setVetLicense(e.target.value)}
-            />
-          </div>
-        )}
+        {/* DÓNDE Y QUIÉN ATENDIÓ — en las tres categorías, y obligatorio.
+            Empezó siendo opcional y solo en gastos veterinarios. El 15-ago se
+            volvió obligatorio y se sumó a vacunas; el 16-ago, también a
+            fallecimiento. Ahí también aplica: ese reintegro exige un
+            "certificado de defunción o informe médico", y ese documento lo
+            firma un veterinario — sin su nombre y su cédula no hay forma de
+            verificar quién lo emitió. */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <TextField
+            label="Médico veterinario que lo atendió"
+            placeholder="Nombre del veterinario"
+            value={vetName}
+            onChange={(e) => setVetName(e.target.value)}
+          />
+          <TextField
+            label="Cédula profesional"
+            placeholder="Cédula del veterinario"
+            value={vetLicense}
+            onChange={(e) => setVetLicense(e.target.value)}
+          />
+        </div>
 
         {/* Documentos por motivo — cada archivo se guarda catalogado */}
         <div className="flex flex-col gap-1.5">
