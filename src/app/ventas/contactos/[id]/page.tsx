@@ -255,7 +255,7 @@ export default async function FichaContactoPage({
                   valor={membresia.desde ? formatDateEs(membresia.desde) : "—"}
                 />
                 <Dato
-                  label="MASCOTAS"
+                  label="PELUDOS"
                   valor={
                     membresia.mascotas.length > 0
                       ? membresia.mascotas

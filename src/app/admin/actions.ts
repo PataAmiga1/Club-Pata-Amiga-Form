@@ -152,7 +152,7 @@ export async function resolvePet(
     .select("id, name, user_id")
     .eq("id", petId)
     .single();
-  if (!pet) throw new Error("Mascota no encontrada");
+  if (!pet) throw new Error("Peludo no encontrado");
 
   await admin
     .from("pets")
@@ -587,7 +587,7 @@ export async function updatePetByAdmin(
   };
 
   const name = t(fields.name);
-  if (!name) return { error: "La mascota necesita nombre." };
+  if (!name) return { error: "El peludo necesita nombre." };
 
   const { data: pet, error } = await admin
     .from("pets")
@@ -871,7 +871,7 @@ export async function resolveAppeal(
       // Aprobada por apelación = aprobada: su espera arranca hoy, igual que
       // en resolvePet (los dos caminos comparten la misma regla).
       await iniciarEsperaDeMascota(admin, appeal.pet_id);
-      outcome = `el perfil de ${pet?.name ?? "tu mascota"} quedó aprobado`;
+      outcome = `el perfil de ${pet?.name ?? "tu peludo"} quedó aprobado`;
     } else if (appeal.center_id) {
       await admin
         .from("wellness_centers")
@@ -890,7 +890,7 @@ export async function resolveAppeal(
   const subjectLabel = appeal.reimbursement_id
     ? `tu reintegro ${reimbursement?.folio ?? ""}`
     : appeal.pet_id
-      ? `el perfil de ${pet?.name ?? "tu mascota"}`
+      ? `el perfil de ${pet?.name ?? "tu peludo"}`
       : `la solicitud del centro ${center?.name ?? ""}`;
 
   if (closing) {
@@ -950,7 +950,7 @@ export async function requestPetInfo(
     .select("id, name, user_id")
     .eq("id", petId)
     .single();
-  if (!pet) throw new Error("Mascota no encontrada");
+  if (!pet) throw new Error("Peludo no encontrado");
   const text = message?.trim();
   if (!text && items.length === 0)
     return { error: "Elige qué solicitar o escribe un mensaje." };
@@ -1002,7 +1002,7 @@ export async function sendPetMessage(petId: string, message: string) {
     .select("id, name, user_id")
     .eq("id", petId)
     .single();
-  if (!pet) throw new Error("Mascota no encontrada");
+  if (!pet) throw new Error("Peludo no encontrado");
   const text = message?.trim();
   if (!text) return { error: "Escribe el mensaje." };
 

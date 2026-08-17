@@ -182,7 +182,7 @@ export default async function EmbajadorLayout({
               <span className="text-[12.5px] opacity-90">
                 {wasMember
                   ? "Tu membresía no está activa. Reactívala para volver a cuidar a tus peludos."
-                  : "Como embajador aún no tienes membresía. Únete y registra hasta 3 mascotas."}
+                  : "Como embajador aún no tienes membresía. Únete y registra hasta 3 peludos."}
               </span>
             </div>
             <Link

@@ -94,7 +94,7 @@ export default async function AdminApelacionesPage({
     a.reimbursement_id
       ? `Reintegro ${a.reimbursements?.folio ?? ""}`
       : a.pet_id
-        ? `Mascota: ${a.pets?.name ?? ""}`
+        ? `Peludo: ${a.pets?.name ?? ""}`
         : `Centro: ${a.wellness_centers?.name ?? ""}`;
   const originalOf = (a: Row) =>
     a.reimbursement_id
@@ -112,7 +112,7 @@ export default async function AdminApelacionesPage({
         <p className="max-w-[560px] text-sm text-ink-secondary">
           Segundas revisiones solicitadas por los miembros. Aceptar una
           apelación reabre el reintegro (vuelve a la cola) o aprueba el perfil
-          de la mascota.
+          del peludo.
         </p>
       </div>
 

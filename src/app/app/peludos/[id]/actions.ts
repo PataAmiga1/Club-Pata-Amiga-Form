@@ -133,10 +133,10 @@ export async function deactivatePet(
 
   await notifyTeam(
     "notify_pets",
-    `Baja de mascota: ${ctx.pet.name} 🕊️`,
+    `Baja de peludo: ${ctx.pet.name} 🕊️`,
     `<h2 style="color:#1E5350">Un miembro dio de baja a ${ctx.pet.name}</h2>
      <p>Motivo: ${reason}</p>
-     <p>El miembro conserva su lugar y puede registrar otra mascota (entrará como reemplazo, 180 días de tiempo de espera).</p>`,
+     <p>El miembro conserva su lugar y puede registrar otro peludo (entrará como reemplazo, 180 días de tiempo de espera).</p>`,
   );
 
   revalidatePath("/app/peludos");

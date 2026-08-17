@@ -169,7 +169,7 @@ export default async function Home() {
               <>
                 FOTO
                 <br />
-                perro y gato mirando arriba
+                lomito y michi mirando arriba
                 <br />
                 (recorte sobre teal)
               </>
@@ -371,14 +371,14 @@ export default async function Home() {
             // Collage con fondo transparente — sin marco ni sombra
             <img
               src={assets["landing-red"]}
-              alt="Mascotas de la red Pata Amiga"
+              alt="Peludos de la red Pata Amiga"
               className="mx-auto hidden max-h-[440px] w-full object-contain lg:block"
             />
           ) : (
             <div className="hidden h-[340px] place-items-center rounded-[24px] border-2 border-dashed border-[#C9C3B4] text-center text-[13px] font-semibold text-ink-placeholder lg:grid">
               FOTO
               <br />
-              mascotas de la red
+              peludos de la red
               <br />
               (collage con fondo transparente)
             </div>

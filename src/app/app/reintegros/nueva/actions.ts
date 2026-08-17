@@ -25,7 +25,7 @@ export async function notifyReimbursementSubmitted() {
     "notify_reimbursements",
     `Nuevo reintegro ${latest.folio} — corre el compromiso de 72 hrs ⏱️`,
     `<h2 style="color:#1E5350">Nueva solicitud de reintegro</h2>
-     <p><strong>${latest.folio}</strong> · ${(pet as { name?: string } | null)?.name ?? "mascota"} · $${Number(latest.amount_requested).toLocaleString("es-MX")} MXN</p>
+     <p><strong>${latest.folio}</strong> · ${(pet as { name?: string } | null)?.name ?? "peludo"} · $${Number(latest.amount_requested).toLocaleString("es-MX")} MXN</p>
      <p>Revísala en el panel → Reintegros. El compromiso de respuesta es de 72 horas.</p>`,
   );
 }

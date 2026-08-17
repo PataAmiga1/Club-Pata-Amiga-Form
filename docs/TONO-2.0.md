@@ -61,6 +61,10 @@ palabra sea un archivo y no una cacería.
 
 ## Fases
 
+> **Estado al 16-ago: las fases A, B y D están aplicadas y verificadas en
+> pruebas.** Lo único abierto es lo de la sección «Fuera de nuestras manos» y las
+> dos preguntas del final.
+
 ### Fase A — Vocabulario (global)
 
 Reparto medido de «mascota» (72) y «perro/gato» (78) en texto visible:
@@ -77,6 +81,17 @@ Reparto medido de «mascota» (72) y «perro/gato» (78) en texto visible:
 
 Etiquetas dinámicas: solo 5 lugares pintan el literal «Perro»/«Gato» y 26 ramifican por
 especie. Todos pasan por `vocabulario.ts`.
+
+**Lo que quedó sin tocar y por qué**, para que nadie lo «arregle» después:
+
+- La ruta `/admin/mascotas` y sus `revalidatePath`. Renombrarla rompe enlaces guardados
+  y no es lo que pide el documento; solo cambió la etiqueta del menú.
+- La herramienta `mis_mascotas` del asistente: es un identificador que comparten la
+  definición, el despacho y el mock. Cambió su descripción, no su nombre.
+- Las llaves de eventos CRM (`mascota_aprobada`), los beneficios (`espera_mascota_*`,
+  `mascotas_activas_max`) y `pets.species` (`dog`/`cat`).
+- Cinco filas de `pets` cuyo NOMBRE real es «Mascota» (vienen de la migración). Son datos
+  del miembro, no copy: si se ven feas en el panel, se corrigen en la base, no en el código.
 
 ### Fase B — Las 31 pantallas
 
@@ -125,3 +140,18 @@ no necesitaban nada. Ya verificadas como **hechas** antes de empezar:
   confirmen.
 - **Pantalla 21:** cambia «el comité» por «el equipo de Pata Amiga». ¿Aplica en todas las
   pantallas donde hoy decimos «el comité»? Son bastantes. Por ahora se cambia solo ahí.
+- **El título de la pestaña** (`layout.tsx` y `page.tsx`) sigue diciendo «Protección para
+  tu manada». Con el encabezado nuevo («Salud y tranquilidad para tu manada») y la firma
+  nueva de los correos («El mejor cuidado para tu manada») ya son tres frases para lo
+  mismo. Es un título de SEO y merece decisión propia, así que no se tocó.
+
+## Lo que se corrigió y no era tono
+
+- **El código de embajador SÍ reduce la espera.** La página decía lo contrario. Corregido
+  a «de 6 a 3 meses», que es lo que hace `petWaitingPeriodDays` (180 → 90) desde el 11-jul.
+- **«En cuanto su perfil sea aprobada»** en la pantalla de bienvenida: concordancia rota
+  que dejó el barrido «ficha»→«perfil» del 13-ago. Se barrió `src/` buscando más y no
+  quedan. Es el mismo riesgo del cambio actual, con los géneros al revés.
+- **La fecha de nacimiento del perfil ya no se sincroniza con un `useEffect`**: se deriva
+  de la CURP en el mismo render. El efecto pintaba un render intermedio con la fecha
+  anterior, y el lint lo marcaba.

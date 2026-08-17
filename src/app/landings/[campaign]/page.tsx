@@ -91,7 +91,7 @@ export default async function CampaignLandingPage({
           />
 
           <p className="max-w-[420px] text-[11.5px] leading-relaxed text-white/60">
-            Membresía de salud para mascotas — no es un seguro. Tus datos solo
+            Membresía de salud para tu peludo — no es un seguro. Tus datos solo
             se usan para enviarte tu regalo y novedades de Club Pata Amiga.
           </p>
         </div>

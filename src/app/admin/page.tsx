@@ -419,7 +419,7 @@ export default async function AdminHome() {
           <form action="/admin/miembros" className="hidden lg:block">
             <input
               name="q"
-              placeholder="🔍 Buscar miembro, mascota o folio…"
+              placeholder="🔍 Buscar miembro, peludo o folio…"
               className="h-[42px] w-[260px] rounded-full bg-white px-4 text-[13px] text-ink-title shadow-[0_1px_6px_rgba(30,83,80,.06)] outline-none placeholder:text-ink-placeholder focus:ring-2 focus:ring-teal"
             />
           </form>
@@ -552,7 +552,7 @@ export default async function AdminHome() {
         {/* Pets to approve */}
         <div className="flex flex-col gap-3 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
           <h2 className="font-display text-lg text-ink-title">
-            Mascotas por aprobar
+            Peludos por aprobar
           </h2>
           <div className="flex flex-col gap-2.5">
             {(petsPending.data ?? []).map((p) => (
@@ -587,7 +587,7 @@ export default async function AdminHome() {
             ))}
             {(petsPending.data ?? []).length === 0 && (
               <span className="py-1 text-sm text-ink-secondary">
-                Sin mascotas pendientes.
+                Sin peludos pendientes.
               </span>
             )}
           </div>

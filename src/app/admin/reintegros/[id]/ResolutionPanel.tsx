@@ -183,7 +183,7 @@ export function ResolutionPanel({
             SUPER ADMIN
           </span>
           <span className="text-[13px] leading-normal text-white/85">
-            Bypass de tiempo de espera disponible para esta mascota.
+            Bypass de tiempo de espera disponible para este peludo.
           </span>
           <button
             type="button"

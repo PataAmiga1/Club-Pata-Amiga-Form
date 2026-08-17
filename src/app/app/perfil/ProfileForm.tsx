@@ -143,7 +143,11 @@ export function ProfileForm({
   const [motherLastName, setMotherLastName] = useState(
     initial.mother_last_name ?? "",
   );
-  const [birthDate, setBirthDate] = useState(initial.birth_date ?? "");
+  // Lo que la persona teclea. Para mexicanos con CURP válida NO se usa: la
+  // fecha efectiva sale de la CURP (ver `birthDate`, más abajo).
+  const [birthDateManual, setBirthDateManual] = useState(
+    initial.birth_date ?? "",
+  );
   const [nationality, setNationality] = useState(initial.nationality ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
   const [curp, setCurp] = useState(initial.curp ?? "");
@@ -225,12 +229,13 @@ export function ProfileForm({
   // Para mexicanos la fecha no se teclea: la trae la CURP, que es un dato
   // oficial y no se puede maquillar para pasar el filtro. Solo los extranjeros
   // (pasaporte, sin CURP) la capturan a mano.
-  const fechaDeCurp = !esExtranjero && curpValid
-    ? fechaDeNacimientoDeCurp(curp)
-    : null;
-  useEffect(() => {
-    if (fechaDeCurp && fechaDeCurp !== birthDate) setBirthDate(fechaDeCurp);
-  }, [fechaDeCurp, birthDate]);
+  // La fecha se DERIVA, no se sincroniza con un efecto: mientras haya CURP
+  // válida ella manda, y lo tecleado a mano solo se usa cuando no la hay. Con
+  // un `useEffect` que copiara la fecha al estado habría un render intermedio
+  // pintando todavía la fecha anterior — y el lint lo marca con razón.
+  const fechaDeCurp =
+    !esExtranjero && curpValid ? fechaDeNacimientoDeCurp(curp) : null;
+  const birthDate = fechaDeCurp ?? birthDateManual;
 
   const fechaValida = /^\d{4}-\d{2}-\d{2}$/.test(birthDate);
   const menorDeEdad = fechaValida && !esMayorDeEdad(birthDate);
@@ -445,7 +450,7 @@ export function ProfileForm({
             type="date"
             value={birthDate}
             max={fechaMaximaParaSerMayor()}
-            onChange={(e) => setBirthDate(e.target.value)}
+            onChange={(e) => setBirthDateManual(e.target.value)}
             readOnly={Boolean(fechaDeCurp)}
             autoComplete="bday"
             hint={

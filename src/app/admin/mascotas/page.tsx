@@ -11,6 +11,7 @@ import {
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { FilterChips } from "@/components/panel/FilterChips";
 import { PetReviewRow } from "./PetReviewRow";
+import { etiquetaEspecie } from "@/lib/vocabulario";
 import { PetResolveButtons } from "./PetResolveButtons";
 
 export default async function AdminMascotasPage({
@@ -124,7 +125,7 @@ export default async function AdminMascotasPage({
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
       <h1 className="font-display text-[26px] text-ink-title">
-        Mascotas por aprobar
+        Peludos por aprobar
       </h1>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterChips
@@ -217,7 +218,7 @@ export default async function AdminMascotasPage({
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                     <DetailItem label="NOMBRE" value={p.name} />
-                    <DetailItem label="TIPO" value={p.species === "dog" ? "Perro" : "Gato"} />
+                    <DetailItem label="TIPO" value={etiquetaEspecie(p.species)} />
                     <DetailItem label="RAZA" value={p.breed} />
                     <DetailItem
                       label="EDAD"
@@ -314,14 +315,14 @@ export default async function AdminMascotasPage({
         ))}
         {pending.length === 0 && !verBajas && !verApelaciones && (
           <div className="rounded-[18px] bg-white p-6 text-sm text-ink-secondary shadow-[0_2px_10px_rgba(30,83,80,.05)]">
-            Sin mascotas pendientes de revisión. 🎉
+            Sin peludos pendientes de revisión. 🎉
           </div>
         )}
         {(verBajas || verApelaciones) && resolved.length === 0 && (
           <div className="rounded-[18px] bg-white p-6 text-sm text-ink-secondary shadow-[0_2px_10px_rgba(30,83,80,.05)]">
             {verBajas
-              ? "Sin mascotas dadas de baja."
-              : "Sin mascotas con apelación."}
+              ? "Sin peludos dados de baja."
+              : "Sin peludos con apelación."}
           </div>
         )}
       </div>
@@ -385,7 +386,7 @@ export default async function AdminMascotasPage({
                       />
                     )}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                      <DetailItem label="ESPECIE" value={p.species === "dog" ? "Perro" : "Gato"} />
+                      <DetailItem label="ESPECIE" value={etiquetaEspecie(p.species)} />
                       <DetailItem label="RAZA" value={p.breed} />
                       <DetailItem label="SEXO" value={p.sex} />
                       <DetailItem label="EDAD" value={ageLabel(p)} />

@@ -381,7 +381,7 @@ export default async function AdminMiembrosPage({
           <input
             name="q"
             defaultValue={query}
-            placeholder="Nombre, correo, mascota o folio…"
+            placeholder="Nombre, correo, peludo o folio…"
             className="h-[42px] w-[280px] rounded-full border-[1.5px] border-border-input bg-white px-4 text-[13px] text-ink-title outline-none focus:border-teal"
           />
           <button
@@ -461,7 +461,7 @@ export default async function AdminMiembrosPage({
           <span className="py-4 text-sm text-ink-secondary">
             {fallaDeLectura
               ? "La lista no se pudo leer (ver el aviso de arriba). Los contadores sí son reales."
-              : "Sin resultados. Prueba con otro nombre, correo, mascota o folio."}
+              : "Sin resultados. Prueba con otro nombre, correo, peludo o folio."}
           </span>
         )}
       </div>

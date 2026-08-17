@@ -13,7 +13,7 @@ export const SUPPORT_TOOLS: AgentTool[] = [
   {
     name: "mis_mascotas",
     description:
-      "Lista las mascotas registradas del miembro con su tiempo de espera: fecha en que termina, días restantes y si ya está activa para reintegros.",
+      "Lista los peludos registrados del miembro con su tiempo de espera: fecha en que termina, días restantes y si ya está activa para reintegros.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -56,7 +56,7 @@ export async function executeSupportTool(
       const remaining = p.waiting_period_bypassed ? 0 : (daysUntil(p.waiting_period_end_date) ?? null);
       return {
         nombre: p.name,
-        especie: p.species === "dog" ? "perro" : "gato",
+        especie: p.species === "dog" ? "lomito" : "michi",
         raza: p.breed,
         activa: p.is_active,
         periodo_de_espera_termina: p.waiting_period_end_date,
@@ -83,7 +83,7 @@ export async function executeSupportTool(
         .maybeSingle(),
     ]);
     // El contratante NO tiene tiempo de espera (PM, 11-ago): el bot no debe
-    // reportar una espera que ya no existe. La espera es por mascota.
+    // reportar una espera que ya no existe. La espera es por peludo.
     return JSON.stringify(
       {
         estatus_membresia: profile?.membership_status ?? "sin membresía",
@@ -92,7 +92,7 @@ export async function executeSupportTool(
         monto_mxn: sub?.amount ?? null,
         proxima_renovacion: sub?.current_period_end ?? null,
         se_cancela_al_final_del_periodo: sub?.cancel_at_period_end ?? false,
-        periodo_de_espera_contratante: "no aplica — la espera es por mascota",
+        periodo_de_espera_contratante: "no aplica — la espera es por peludo",
       },
       null,
       2,

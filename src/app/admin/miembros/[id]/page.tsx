@@ -467,7 +467,7 @@ export default async function AdminMiembroDetailPage({
           );
         })}
         {(pets ?? []).length === 0 && (
-          <span className="text-sm text-ink-secondary">Sin mascotas registradas.</span>
+          <span className="text-sm text-ink-secondary">Sin peludos registrados.</span>
         )}
       </div>
 

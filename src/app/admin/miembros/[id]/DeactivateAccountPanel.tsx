@@ -7,7 +7,7 @@ import { deactivateMemberAccount } from "@/app/admin/actions";
 /** Motivos frecuentes de baja — clicables, con nota libre opcional (equipo, 5-ago). */
 const MOTIVOS_BAJA = [
   "Ya no puede pagar la membresía",
-  "Su mascota falleció",
+  "Su peludo falleció",
   "No usa los beneficios",
   "Inconformidad con un reintegro",
   "Se muda / cambio de circunstancias",

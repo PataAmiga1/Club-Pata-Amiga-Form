@@ -20,7 +20,7 @@ export class MockProvider implements LLMProvider {
     const pet = context.pets[0];
     const petName = pet?.name ?? "tu peludo";
     const petIntro = pet
-      ? `Como ${petName} ${pet.species === "dog" ? "es un perro" : "es un gato"}${pet.breed ? ` ${pet.breed}` : ""} de ${pet.ageLabel}, `
+      ? `Como ${petName} ${pet.species === "dog" ? "es un lomito" : "es un michi"}${pet.breed ? ` ${pet.breed}` : ""} de ${pet.ageLabel}, `
       : "";
 
     if (context.urgent) {
@@ -90,7 +90,7 @@ export class MockProvider implements LLMProvider {
       }
     }
     const toolName =
-      /mascota|peludo|perro|gato|espera/i.test(text) && has("mis_mascotas")
+      /mascota|peludo|lomito|michi|perro|gato|espera/i.test(text) && has("mis_mascotas")
         ? "mis_mascotas"
         : /reintegro|reembolso|factura|pago/i.test(text) && has("mis_reintegros")
           ? "mis_reintegros"

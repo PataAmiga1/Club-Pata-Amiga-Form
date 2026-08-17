@@ -294,7 +294,7 @@ export default async function CentroDashboardPage() {
               <span className="text-[12.5px] opacity-90">
                 {wasMember
                   ? "Tu membresía no está activa. Reactívala para volver a cuidar a tus peludos."
-                  : "Tu cuenta de centro aliado aún no tiene membresía. Únete y registra hasta 3 mascotas."}
+                  : "Tu cuenta de centro aliado aún no tiene membresía. Únete y registra hasta 3 peludos."}
               </span>
             </div>
             <Link

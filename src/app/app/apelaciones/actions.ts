@@ -73,7 +73,7 @@ export async function submitAppeal(input: AppealInput) {
       .eq("id", input.petId)
       .single();
     if (!p || p.user_id !== user.id)
-      return { error: "No encontramos esa mascota." };
+      return { error: "No encontramos ese peludo." };
     if (p.approval_status !== "rejected")
       return { error: "Solo se apelan perfiles rechazados." };
     subjectLabel = `el perfil de ${p.name}`;
