@@ -32,7 +32,7 @@ export const CAMPAIGNS: Campaign[] = [
     active: true,
     headline: "Tu regalo para consentir a tu peludo 🎁",
     subheadline:
-      "Regístrate gratis y recibe en tu correo un descuento para la membresía Club Pata Amiga y una guía de cuidado para tu mascota.",
+      "Regístrate gratis y recibe en tu correo un descuento para la membresía Club Pata Amiga y una guía de cuidado para tu peludo.",
     perks: [
       { emoji: "🏷️", text: "Cupón de descuento para tu membresía" },
       { emoji: "📘", text: "Guía de cuidado para tu peludo (PDF)" },
