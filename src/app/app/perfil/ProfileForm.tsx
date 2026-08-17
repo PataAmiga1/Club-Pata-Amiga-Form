@@ -8,7 +8,13 @@ import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 import { nombresDePaises } from "@/data/countries";
-import { EDAD_MINIMA, esMayorDeEdad, fechaMaximaParaSerMayor } from "@/lib/edad";
+import {
+  EDAD_MINIMA,
+  esMayorDeEdad,
+  fechaDeNacimientoDeCurp,
+  fechaMaximaParaSerMayor,
+} from "@/lib/edad";
+import { avisarMenorDeEdad } from "./actions";
 
 import { validateCurp, curpCoincide } from "@/lib/curp";
 
@@ -160,6 +166,8 @@ export function ProfileForm({
   const [avatar, setAvatar] = useState(avatarUrl);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  // Un solo aviso al equipo por menor de edad, aunque insista en guardar.
+  const avisoMenorEnviado = useRef(false);
 
   async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -208,12 +216,24 @@ export function ProfileForm({
   // libre, así que a nadie se le borra lo suyo por no estar en la lista.
   const listaPaises = nombresDePaises();
 
-  // Mayoría de edad (equipo, 13-ago): el alta ya la valida, pero los perfiles
-  // migrados y los creados con Google llegan sin fecha y la capturan aquí.
+  const curpValid = validateCurp(curp).isValid;
+
+  // Mayoría de edad (equipo, 13-ago). Desde el 16-ago el alta ya NO pregunta la
+  // fecha —se acortó el registro—, así que ESTE es el punto donde se comprueba
+  // que el titular tenga 18, ya con la membresía pagada.
+  //
+  // Para mexicanos la fecha no se teclea: la trae la CURP, que es un dato
+  // oficial y no se puede maquillar para pasar el filtro. Solo los extranjeros
+  // (pasaporte, sin CURP) la capturan a mano.
+  const fechaDeCurp = !esExtranjero && curpValid
+    ? fechaDeNacimientoDeCurp(curp)
+    : null;
+  useEffect(() => {
+    if (fechaDeCurp && fechaDeCurp !== birthDate) setBirthDate(fechaDeCurp);
+  }, [fechaDeCurp, birthDate]);
+
   const fechaValida = /^\d{4}-\d{2}-\d{2}$/.test(birthDate);
   const menorDeEdad = fechaValida && !esMayorDeEdad(birthDate);
-
-  const curpValid = validateCurp(curp).isValid;
   // Cruce CURP ↔ datos: SOLO MARCA, no bloquea (decisión de Pablo, 5-ago)
   const cruceCurp = curpValid
     ? curpCoincide(curp, {
@@ -265,6 +285,15 @@ export function ProfileForm({
       setMessage(
         `El titular de la membresía debe tener ${EDAD_MINIMA} años o más. Revisa tu fecha de nacimiento.`,
       );
+      // La membresía ya está pagada a estas alturas: el equipo tiene que
+      // enterarse para reembolsar y cancelar. Se avisa una sola vez por sesión
+      // —no en cada intento de guardar— y nunca frena la pantalla.
+      if (!avisoMenorEnviado.current) {
+        avisoMenorEnviado.current = true;
+        avisarMenorDeEdad(birthDate).catch(() => {
+          avisoMenorEnviado.current = false;
+        });
+      }
       return;
     }
     setSaving(true);
@@ -407,17 +436,24 @@ export function ProfileForm({
           />
         </div>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+          {/* La fecha la dicta la CURP cuando hay una válida (Pablo, 16-ago):
+              se muestra solo lectura para que la persona vea de dónde sale y no
+              pueda escribir otra distinta a la de su documento oficial. Si aún
+              no hay CURP —o es extranjera— se captura a mano como siempre. */}
           <TextField
             label="Fecha de nacimiento"
             type="date"
             value={birthDate}
             max={fechaMaximaParaSerMayor()}
             onChange={(e) => setBirthDate(e.target.value)}
+            readOnly={Boolean(fechaDeCurp)}
             autoComplete="bday"
             hint={
-              menorDeEdad
-                ? undefined
-                : `El titular de la membresía debe tener ${EDAD_MINIMA} años o más.`
+              fechaDeCurp
+                ? "La tomamos de tu CURP."
+                : menorDeEdad
+                  ? undefined
+                  : `El titular de la membresía debe tener ${EDAD_MINIMA} años o más.`
             }
           />
           {/* Autocompletado, no lista cerrada (equipo, 15-ago): con 216 países
@@ -434,10 +470,22 @@ export function ProfileForm({
         </div>
         {menorDeEdad && (
           <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">
-            Con esa fecha de nacimiento aún no cumples {EDAD_MINIMA} años. El
-            titular de la membresía debe ser mayor de edad — si hay una fecha
-            equivocada, corrígela; si no, un adulto de tu casa puede quedar como
-            titular.
+            {fechaDeCurp ? (
+              <>
+                Tu CURP dice que aún no cumples {EDAD_MINIMA} años, y el titular
+                de la membresía tiene que ser mayor de edad. Si la CURP está mal
+                escrita, corrígela arriba. Si es correcta, al guardar avisamos al
+                equipo para devolverte el pago y cancelar la membresía — y un
+                adulto de tu casa sí puede quedar como titular con sus datos.
+              </>
+            ) : (
+              <>
+                Con esa fecha de nacimiento aún no cumples {EDAD_MINIMA} años. El
+                titular de la membresía debe ser mayor de edad — si hay una fecha
+                equivocada, corrígela; si no, un adulto de tu casa puede quedar
+                como titular.
+              </>
+            )}
           </div>
         )}
         {/* Pasaporte JUNTO a la nacionalidad (equipo, 13-ago): antes vivía en

@@ -2,7 +2,7 @@
  * Reglas del código de embajador (documento "LINEAMIENTOS PARA CÓDIGO DE
  * EMBAJADOR", equipo 16-ago).
  *
- * El código ES lo que la persona escribe: de 3 a 8 caracteres, solo A-Z y 0-9.
+ * El código ES lo que la persona escribe: de 6 a 18 caracteres, solo A-Z y 0-9.
  * Ya no lleva el prefijo `PATAMIGA-` (decisión del 16-ago). Los ~40 códigos
  * que se emitieron con prefijo SIGUEN VALIENDO tal cual: la búsqueda es por
  * coincidencia exacta, así que nada se rompe; la regla nueva solo aplica a lo
@@ -12,8 +12,17 @@
  * embajador, el panel del comité y cualquier validación futura.
  */
 
-export const CODIGO_MIN = 3;
-export const CODIGO_MAX = 8;
+/**
+ * Largo del código (Pablo, 16-ago): el rango se abrió de 3-8 a 6-18 para que
+ * quepa un nombre completo o una marca personal ("LUCEROYFIRULAIS"), no solo
+ * un apodo. Todo lo demás —campo, contador, sugerencias y el generador del
+ * panel— sale de estas dos constantes, así que mover el rango es cambiarlas.
+ *
+ * OJO con el mínimo: 6 deja fuera nombres cortos (ANA, LOLA, OSCAR). Es lo que
+ * se pidió; si el equipo se topa con eso, bajar CODIGO_MIN es una línea.
+ */
+export const CODIGO_MIN = 6;
+export const CODIGO_MAX = 18;
 
 /**
  * Palabras que no puede CONTENER un código, por protección de marca: sugieren
@@ -109,8 +118,8 @@ export function revisarCodigo(codigo: string): RevisionCodigo {
  * redes sociales cuando el usuario existe.
  *
  * Primero prueba sufijos cortos y después números, siempre respetando el tope
- * de caracteres: si el código ya mide 8, se recorta para que quepa el sufijo
- * en lugar de devolver algo inválido.
+ * de caracteres: si el código ya está en el máximo, se recorta para que quepa
+ * el sufijo en lugar de devolver algo inválido.
  */
 export function sugerenciasDeCodigo(codigo: string): string[] {
   const sufijos = ["MX", "01", "02", "23", "7", "PA", "99"];

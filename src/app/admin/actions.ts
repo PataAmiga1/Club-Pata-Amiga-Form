@@ -248,13 +248,21 @@ export async function resolveAmbassador(
 
   if (decision.approve) {
     // Código inicial único, que el embajador puede cambiar desde su portal.
-    // SIN el prefijo `PATAMIGA-` y con las reglas del 16-ago (3 a 8, A-Z y
-    // 0-9, sin palabras bloqueadas): si el nombre no da un código válido —es
-    // muy corto, o contiene una palabra reservada— se cae a "AMIGO".
+    // SIN el prefijo `PATAMIGA-` y con las reglas del 16-ago (de CODIGO_MIN a
+    // CODIGO_MAX, A-Z y 0-9, sin palabras bloqueadas).
+    //
+    // El mínimo de 6 dejó cortos a los nombres de pila (ANA, LOLA): antes de
+    // rendirse se prueba el nombre + AMIGO —"ANAAMIGO" se sigue leyendo como
+    // suyo— y solo si eso tampoco pasa se cae a un código genérico.
     let code = amb.referral_code;
     if (!code) {
       const delNombre = normalizarCodigo(amb.first_name ?? "");
-      const base = revisarCodigo(delNombre).ok ? delNombre : "AMIGO";
+      const conAmigo = normalizarCodigo(`${delNombre}AMIGO`);
+      const base = revisarCodigo(delNombre).ok
+        ? delNombre
+        : revisarCodigo(conAmigo).ok
+          ? conAmigo
+          : "AMIGOMX";
       code = base;
       for (let n = 2; ; n++) {
         const { data: taken } = await admin
@@ -692,11 +700,21 @@ export async function resolveCenter(
  * México el servidor ya cree que es el mes siguiente. Los dos lados decidían
  * distinto qué referidos entraban al corte, y el archivo del banco podía no
  * cuadrar con lo que el panel marcaba como pagado.
+ *
+ * A quien se dio de baja se le paga HASTA SU FECHA DE BAJA (Pablo, 16-ago),
+ * con el mismo criterio que el layout del banco: cuenta la membresía que entró
+ * por la pasarela antes de la baja, no la que se cobró después. Los dos lados
+ * tienen que filtrar igual o el archivo y el panel vuelven a discrepar.
  */
 export async function payAmbassadorCut(ambassadorId: string) {
   const { admin } = await requireAdmin();
 
   const monthStart = inicioDelMes();
+  const { data: amb } = await admin
+    .from("ambassadors")
+    .select("deactivated_at")
+    .eq("id", ambassadorId)
+    .maybeSingle();
   // Un día antes del arranque del mes cae siempre en el mes anterior, y
   // `inicioDelMes` lo lleva a su día 1. El corte se etiqueta con ESE mes,
   // que es el que se está liquidando.
@@ -704,12 +722,15 @@ export async function payAmbassadorCut(ambassadorId: string) {
     inicioDelMes(new Date(monthStart.getTime() - 24 * 60 * 60 * 1000)),
   );
 
-  const { data: pending } = await admin
+  let consulta = admin
     .from("referrals")
     .select("id, commission_amount")
     .eq("ambassador_id", ambassadorId)
     .eq("status", "pending")
     .lt("created_at", monthStart.toISOString());
+  if (amb?.deactivated_at)
+    consulta = consulta.lte("created_at", amb.deactivated_at);
+  const { data: pending } = await consulta;
   if (!pending?.length) throw new Error("Sin comisiones por pagar");
 
   const total = pending.reduce(

@@ -22,7 +22,7 @@ import { customizeCode, revisarDisponibilidadCodigo } from "./actions";
  *    imprimir y repartir, no algo que se cambia a la ligera.
  *
  * El código YA NO lleva el prefijo `PATAMIGA-` (equipo, 16-ago): es lo que la
- * persona escribe, de 3 a 8 caracteres.
+ * persona escribe, de CODIGO_MIN a CODIGO_MAX caracteres.
  */
 export function CodeCard({
   code,
@@ -148,6 +148,8 @@ export function CodeCard({
 
       {editing ? (
         <div className="relative flex flex-col gap-2.5">
+          {/* El campo crece con el espacio disponible: 18 caracteres en
+              monoespaciada ya no caben en el ancho fijo que tenía antes. */}
           <div className="flex flex-wrap items-center gap-2">
             <input
               value={borrador}
@@ -163,7 +165,7 @@ export function CodeCard({
               autoFocus
               placeholder="TUNOMBRE"
               aria-label="Tu código nuevo"
-              className="h-11 w-48 rounded-[10px] border-[1.5px] border-white/30 bg-white/10 px-3 font-mono text-[15px] font-bold tracking-[.08em] text-white outline-none placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-white/40 focus:border-lime"
+              className="h-11 w-full min-w-0 max-w-[268px] rounded-[10px] border-[1.5px] border-white/30 bg-white/10 px-3 font-mono text-[15px] font-bold tracking-[.08em] text-white outline-none placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-white/40 focus:border-lime"
             />
             <span className="text-[11.5px] text-white/60">
               {borrador.length}/{CODIGO_MAX}

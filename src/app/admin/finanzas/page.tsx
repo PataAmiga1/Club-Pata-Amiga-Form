@@ -46,9 +46,13 @@ export default async function AdminFinanzasPage() {
       .select("amount_approved, status")
       .in("status", ["approved", "partial", "paid"])
       .gte("resolved_at", monthStart.toISOString()),
+    // Se trae `created_at` y la fecha de baja del embajador porque el corte no
+    // solo mira el mes: a quien se dio de baja se le paga hasta SU fecha de
+    // baja (Pablo, 16-ago). Sin ese filtro este total no cuadraría con el
+    // archivo del banco ni con el panel de embajadores.
     admin
       .from("referrals")
-      .select("commission_amount")
+      .select("commission_amount, created_at, ambassadors(deactivated_at)")
       .eq("status", "pending")
       .lt("created_at", monthStart.toISOString()),
     // Miembros activos TOTALES: el MRR solo puede sumar a quienes tienen
@@ -111,10 +115,15 @@ export default async function AdminFinanzasPage() {
     (acc, r) => acc + Number(r.amount_approved ?? 0),
     0,
   );
-  const commissionsOut = (payableReferrals.data ?? []).reduce(
-    (acc, r) => acc + Number(r.commission_amount ?? 0),
-    0,
-  );
+  const commissionsOut = (payableReferrals.data ?? [])
+    .filter((r) => {
+      // PostgREST devuelve el embebido como objeto o como arreglo según la
+      // relación; se normaliza para no depender de eso.
+      const emb = Array.isArray(r.ambassadors) ? r.ambassadors[0] : r.ambassadors;
+      const baja = emb?.deactivated_at;
+      return !baja || new Date(r.created_at) <= new Date(baja);
+    })
+    .reduce((acc, r) => acc + Number(r.commission_amount ?? 0), 0);
 
   // Cobros desde Stripe (facturas pagadas recientes + total del mes)
   let payments: PaymentRow[] = [];

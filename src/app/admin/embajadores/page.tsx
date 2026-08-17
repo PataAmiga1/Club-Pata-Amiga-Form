@@ -97,6 +97,7 @@ type Row = {
   motivation: string | null;
   social_links: Record<string, string> | null;
   deactivation_reason: string | null;
+  deactivated_at: string | null;
   referrals: {
     commission_amount: number | null;
     status: string;
@@ -123,7 +124,7 @@ export default async function AdminEmbajadoresPage({
   const { data } = await admin
     .from("ambassadors")
     .select(
-      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, referrals(commission_amount, status, created_at)",
+      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, deactivated_at, referrals(commission_amount, status, created_at)",
     )
     .order("created_at", { ascending: masAntiguos });
 
@@ -177,8 +178,17 @@ export default async function AdminEmbajadoresPage({
   const monthStart = inicioDelMes();
 
   const stats = (a: Row) => {
+    // A quien se dio de baja se le paga hasta SU fecha de baja (Pablo, 16-ago):
+    // cuenta la membresía cobrada antes de que dejara de ser embajadora, no la
+    // que entró después. Mismo filtro que `payAmbassadorCut` y que el layout
+    // del banco — si los tres no coinciden, el panel promete un monto que el
+    // botón de pagar no liquida.
+    const corteBaja = a.deactivated_at ? new Date(a.deactivated_at) : null;
     const payable = a.referrals.filter(
-      (r) => r.status === "pending" && new Date(r.created_at) < monthStart,
+      (r) =>
+        r.status === "pending" &&
+        new Date(r.created_at) < monthStart &&
+        (!corteBaja || new Date(r.created_at) <= corteBaja),
     );
     return {
       count: a.referrals.length,

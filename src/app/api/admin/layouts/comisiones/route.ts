@@ -17,6 +17,16 @@ import { inicioDelMes } from "@/lib/zona-horaria";
  * quien tenga dinero pendiente de un mes ya cerrado, sin importar si sigue
  * activo. En el concepto se marca la baja para que quien revisa el archivo
  * sepa que es el último pago de esa persona.
+ *
+ * HASTA LA FECHA DE LA BAJA, NI UN DÍA MÁS (Pablo, 16-ago). "Ya ganada" es la
+ * comisión de una membresía que ENTRÓ POR LA PASARELA antes de que la persona
+ * se diera de baja: quien cancela el 15 cobra lo que se pagó hasta el 15. Los
+ * pagos que caen después no se le abonan, porque la operación no puede
+ * garantizar que esas membresías lleguen a cobrarse —la factura y el cargo
+ * pueden separarse diez días o más—. En la práctica el webhook ya no crea
+ * referidos de un embajador dado de baja (filtra por `approved`), así que este
+ * filtro es el cinturón sobre los tirantes: deja el corte a prueba de filas
+ * cargadas a mano o de una baja que se registra tarde.
  */
 export async function GET() {
   const ctx = await requireAdminRoute();
@@ -29,16 +39,21 @@ export async function GET() {
   const { data } = await ctx.admin
     .from("ambassadors")
     .select(
-      "first_name, last_name, email, bank_name, clabe, referral_code, status, referrals(commission_amount, status, created_at)",
+      "first_name, last_name, email, bank_name, clabe, referral_code, status, deactivated_at, referrals(commission_amount, status, created_at)",
     )
     .in("status", ["approved", "canceled"]);
 
   const rows = (data ?? [])
     .map((a) => {
+      // Tope por la baja: la comisión cuenta si el pago entró antes de que la
+      // persona dejara de ser embajadora.
+      const corteBaja = a.deactivated_at ? new Date(a.deactivated_at) : null;
       const total = (a.referrals ?? [])
         .filter(
           (r: { status: string; created_at: string }) =>
-            r.status === "pending" && new Date(r.created_at) < monthStart,
+            r.status === "pending" &&
+            new Date(r.created_at) < monthStart &&
+            (!corteBaja || new Date(r.created_at) <= corteBaja),
         )
         .reduce(
           (sum: number, r: { commission_amount: number | null }) =>

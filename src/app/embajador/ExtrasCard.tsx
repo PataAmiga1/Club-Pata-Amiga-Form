@@ -96,9 +96,14 @@ export function BajaEmbajadorCard() {
       </span>
       {!open ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* La promesa dice exactamente lo que el sistema paga (Pablo,
+              16-ago): cuenta la membresía cobrada HASTA el día de la baja. Un
+              pago que cae después no se abona — la operación no puede
+              garantizar que esa membresía llegue a cobrarse. */}
           <p className="text-[12.5px] leading-normal text-ink-secondary">
-            Tu código dejaría de generar comisiones nuevas. Las comisiones ya
-            ganadas se pagan con normalidad en el siguiente corte.
+            Tu código dejaría de generar comisiones nuevas. Se te pagan en el
+            siguiente corte las membresías que se hayan cobrado hasta el día de
+            tu baja; las que se cobren después ya no generan comisión.
           </p>
           <button
             type="button"
