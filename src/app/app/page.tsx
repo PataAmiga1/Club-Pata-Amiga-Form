@@ -107,7 +107,7 @@ export default async function AppHome() {
       tone: "bg-info-bg",
       // La espera ya NO comienza al registrar: arranca cuando el comité
       // aprueba el perfil (PM, 11-ago).
-      text: `Registraste a ${pet.name} — su perfil entró a revisión del comité`,
+      text: `Registraste a ${pet.name} — estamos confirmando sus datos`,
       at: new Date(pet.created_at),
     });
   }
@@ -164,7 +164,7 @@ export default async function AppHome() {
           </h1>
           <p className="text-[12.5px] text-ink-secondary md:text-sm">
             {active
-              ? `Tu manada está protegida.${renews ? ` Membresía activa hasta el ${formatDateEs(renews)}.` : ""}`
+              ? `Tu manada ya es parte del club.${renews ? ` Membresía activa hasta el ${formatDateEs(renews)}.` : ""}`
               : "Tu membresía aún no está activa."}
           </p>
         </div>
@@ -391,12 +391,17 @@ export default async function AppHome() {
             className="absolute -right-[50px] -top-10 size-[170px] bg-white/[.08]"
             style={{ borderRadius: "58% 42% 45% 55% / 48% 57% 43% 52%" }}
           />
+          {/* «PRÓXIMAMENTE» (pantalla 15 del tono 2.0): la red todavía se está
+              armando, igual que en la portada. */}
           <h2 className="relative font-display text-xl text-white">
-            Centros aliados cerca de ti
+            Centros aliados cerca de ti{" "}
+            <span className="align-middle text-[11px] font-extrabold tracking-[.06em] text-lime">
+              PRÓXIMAMENTE
+            </span>
           </h2>
           <p className="relative text-[13px] leading-relaxed text-white/80">
-            Veterinarias, tiendas y hoteles con beneficios para miembros en
-            todo México.
+            Clínicas, pet shops, hospedajes y más con beneficios para la manada
+            en todo México.
           </p>
           <Link
             href="/app/centros"

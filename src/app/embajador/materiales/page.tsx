@@ -19,7 +19,7 @@ export default async function EmbajadorMaterialesPage() {
           Materiales para compartir
         </h1>
         <p className="text-[12.5px] text-ink-secondary">
-          Descarga el pack del mes y compártelo con tu código en redes.
+          Descarga el kit del mes y compártelo con tu código en redes.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -43,7 +43,7 @@ export default async function AdminPagosCentrosPage() {
           ← Centros
         </Link>
         <h1 className="font-display text-[26px] text-ink-title">
-          Pagos a centros de bienestar
+          Pagos a centros aliados
         </h1>
       </div>
       <p className="text-sm text-ink-secondary">

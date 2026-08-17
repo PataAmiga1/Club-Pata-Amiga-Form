@@ -63,7 +63,7 @@ function StatusScreen({
       </h1>
       <p className="text-sm leading-relaxed text-ink-secondary">
         {status === "pending"
-          ? "El comité está revisando tu solicitud de embajador. Te avisaremos por correo en cuanto haya resolución."
+          ? "El comité está revisando tu solicitud de embajador. Te avisaremos por correo en cuanto tengamos una respuesta."
           : (reason ??
             "El comité no pudo aprobar tu solicitud en esta ocasión. Puedes escribirnos si crees que hay un error.")}
       </p>
@@ -140,7 +140,7 @@ export default async function EmbajadorLayout({
             <>
               <p className="text-center text-[13.5px] text-ink-secondary">
                 Mientras tanto puedes dejar listo tu perfil — así, en cuanto te
-                aprobemos, empiezas a compartir sin trámites.
+                aprobemos, empiezas a compartir de inmediato.
               </p>
               <div className="grid items-start gap-4 lg:grid-cols-2">
                 <PaymentDataCard

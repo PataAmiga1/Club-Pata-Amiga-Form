@@ -137,13 +137,13 @@ export function CenterForm({
           🎉
         </span>
         <h2 className="font-display text-[24px] text-ink-title">
-          ¡Solicitud recibida!
+          ¡Gracias por querer unirte a la manada!
         </h2>
         <p className="text-sm leading-relaxed text-ink-secondary">
-          Tu cuenta ya quedó creada. Inicia sesión con tu correo y contraseña
-          para entrar a tu panel y completar el perfil de{" "}
-          <strong>{name}</strong> mientras el comité revisa la solicitud. Al ser
-          aprobado, tu centro aparecerá en el directorio para toda la manada.
+          Tu cuenta está lista. Inicia sesión con tu correo y contraseña para
+          avanzar en el perfil de <strong>{name}</strong> mientras validamos la
+          información. En cuanto quede listo, tu centro formará parte de nuestra
+          red de centros aliados y estará visible para toda la manada.
         </p>
         <Link
           href="/iniciar-sesion?next=/centro"
@@ -164,7 +164,9 @@ export function CenterForm({
       }}
     >
       <section className="flex flex-col gap-4 rounded-[20px] bg-white p-6 shadow-[0_2px_12px_rgba(30,83,80,.06)]">
-        <h2 className="font-display text-lg text-ink-title">Tu centro</h2>
+        <h2 className="font-display text-lg text-ink-title">
+          Cuéntanos de tu centro
+        </h2>
         <TextField
           label="Nombre del centro"
           value={name}
@@ -289,7 +291,7 @@ export function CenterForm({
           value={memberBenefit}
           onChange={(e) => setMemberBenefit(e.target.value)}
           placeholder='Ej. "10% en consultas"'
-          hint="Es el gancho que verán los miembros en el directorio."
+          hint="Este beneficio aparecerá destacado en el directorio para la manada."
           required
         />
       </section>
@@ -389,7 +391,7 @@ export function CenterForm({
         onClick={() => setLocations((prev) => [...prev, emptyLocation()])}
         className="self-start text-sm font-semibold text-teal-deep hover:underline"
       >
-        + Agregar otra ubicación
+        + Agregar otra sucursal
       </button>
 
       {error && (
@@ -402,8 +404,8 @@ export function CenterForm({
         {busy ? "Enviando…" : "Enviar solicitud"}
       </Button>
       <p className="pb-8 text-center text-xs leading-relaxed text-ink-tertiary">
-        El comité revisa cada solicitud. Te contactaremos por correo con la
-        resolución.
+        Revisamos cada solicitud con detalle. Te contactaremos por correo
+        electrónico para confirmar la integración de tu centro a la manada.
       </p>
     </form>
   );

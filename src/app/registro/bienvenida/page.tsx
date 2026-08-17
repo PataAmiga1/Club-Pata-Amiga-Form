@@ -90,19 +90,19 @@ export default async function BienvenidaPage({
         </h1>
         <p className="text-base leading-relaxed text-white/[.92]">
           Tu membresía está activa y la orientación veterinaria 24/7 ya está
-          disponible.
+          lista.
           {pet &&
             (days ? (
               <>
                 {" "}
-                {pet.name} entra a revisión del comité y su tiempo de espera
-                de {days} días ya está en curso.
+                Estamos validando la información de {pet.name}; su tiempo de
+                espera de {days} días ya está en curso.
               </>
             ) : (
               <>
                 {" "}
-                {pet.name} entra a revisión del comité; en cuanto su perfil sea
-                aprobada empezará su tiempo de espera.
+                Estamos validando la información de {pet.name}; en cuanto quede
+                confirmada, iniciará su tiempo de espera.
               </>
             ))}
         </p>

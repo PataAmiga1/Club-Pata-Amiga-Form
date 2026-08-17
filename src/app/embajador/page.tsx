@@ -243,8 +243,8 @@ export default async function EmbajadorResumenPage() {
       <WelcomeOnce
         storageKey={`pa_welcome_embajador_${ambassador.id}`}
         emoji="🎉"
-        title={`¡Bienvenido al equipo, ${ambassador.first_name}!`}
-        message={`Tu código ${ambassador.referral_code ?? ""} ya está activo. Copia tu link, compártelo en tus redes y registra tus datos de pago para recibir tus comisiones el día ${AMBASSADOR_PAYOUT_DAY} de cada mes.`}
+        title={`¡Bienvenido a la manada, ${ambassador.first_name}!`}
+        message={`Tu código ${ambassador.referral_code ?? ""} ya está activo. Copia tu enlace, compártelo en tus redes y registra tus datos de pago para recibir tus comisiones el día ${AMBASSADOR_PAYOUT_DAY} de cada mes.`}
         cta="Empezar a compartir"
       />
     </div>

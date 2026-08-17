@@ -19,7 +19,7 @@ const fraiche = localFont({
 export const metadata: Metadata = {
   title: "Club Pata Amiga — Protección para tu manada",
   description:
-    "Membresía de salud para mascotas en México: reintegros de gastos veterinarios, orientación veterinaria 24/7, red de centros de bienestar y más. Disponible en todo México, 100% digital.",
+    "Membresía de salud para tu peludo en México: reintegros de gastos veterinarios, orientación veterinaria 24/7, red de centros aliados y más. Disponible en todo México, 100% digital.",
 };
 
 export default function RootLayout({

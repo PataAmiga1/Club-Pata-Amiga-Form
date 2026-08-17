@@ -73,9 +73,13 @@ export function DatosCard({
           </div>
         ))}
       </dl>
+      {/* miembros@ y no soporte@ SOLO aquí y en el correo de recuperación
+          (decisión 8, Pablo 16-ago). El resto de la plataforma sigue con
+          soporte@. */}
       <span className="text-[11.5px] leading-relaxed text-ink-tertiary">
-        Son los datos con los que el comité validó tu identidad. Si algo está
-        mal, escríbenos a soporte@pataamiga.mx y lo corregimos.
+        Son los datos con los que verificamos tu identidad. Si necesitas
+        actualizar alguno, escríbenos a miembros@pataamiga.mx y con gusto te
+        ayudamos.
       </span>
     </div>
   );

@@ -114,9 +114,11 @@ export function PetCard({ pet }: { pet: PetRow }) {
         ) : enRevision ? (
         <div className="flex flex-col gap-[5px]">
           <span className="text-[11.5px] text-ink-tertiary">
+            {/* Pantalla 14 del tono 2.0: se habla de «confirmar información»
+                en vez de «revisión del comité». */}
             {docsCompletos
-              ? "Su perfil está en revisión del comité — el tiempo de espera empieza al aprobarse · "
-              : "Su tiempo de espera empieza cuando el comité apruebe su perfil · "}
+              ? "Estamos validando su información — su tiempo de espera iniciará en cuanto quede confirmada · "
+              : "Su tiempo de espera inicia al confirmar su información · "}
             {/* Al perfil DE ESE peludo, no a la lista: desde el inicio
                 llevaba a la pestaña de peludos, y dentro de la pestaña
                 llevaba a la misma pantalla — o sea, no hacía nada
@@ -126,7 +128,7 @@ export function PetCard({ pet }: { pet: PetRow }) {
               href={`/app/peludos/${pet.id}?completar=1`}
               className="font-semibold text-teal-deep"
             >
-              {docsCompletos ? "Ver perfil" : "Completar documentos"}
+              {docsCompletos ? "Ver perfil completo" : "Completar perfil"}
             </Link>
           </span>
         </div>

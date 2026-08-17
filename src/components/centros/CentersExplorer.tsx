@@ -124,12 +124,14 @@ export function CentersExplorer({
         <div className="relative overflow-hidden bg-teal-dark px-5 py-9 sm:px-10">
           <div className="blob absolute -right-[70px] -top-[80px] size-[260px] bg-white/[.08]" />
           <div className="relative flex max-w-[560px] flex-col gap-3.5">
+            {/* «Centros aliados», no «Centros de bienestar»: el documento usó
+                tres variantes del nombre y Pablo eligió esta (decisión 2). */}
             <h1 className="font-display text-[30px] leading-tight text-white sm:text-[38px]">
-              Centros de bienestar aliados
+              Centros aliados
             </h1>
             <p className="text-[14.5px] leading-[1.55] text-white/85">
-              Veterinarias, tiendas, hoteles y más con beneficios para miembros
-              — en todo México. Y recuerda: siempre puedes seguir con tu
+              Clínicas, pet shops, hospedajes y más con beneficios para la
+              manada en todo México. Y recuerda: siempre puedes seguir con tu
               veterinario de confianza.
             </p>
             {searchBar}
@@ -254,8 +256,9 @@ export function CentersExplorer({
           </div>
         ) : (
           <div className="rounded-[18px] bg-white p-6 text-sm text-ink-secondary shadow-[0_2px_10px_rgba(30,83,80,.05)]">
-            No encontramos centros con esa búsqueda. Prueba con otra ciudad o
-            quita los filtros — estamos sumando aliados en todo México. 🐾
+            Aún no tenemos centros en esta zona. Intenta buscando con otra
+            ciudad, código postal o borra los filtros. ¡Seguimos sumando centros
+            aliados en todo México! 🐾
           </div>
         )}
 
@@ -266,7 +269,7 @@ export function CentersExplorer({
               ¿Tienes un negocio pet-friendly?
             </span>
             <span className="text-[12.5px] text-ink-tertiary">
-              Únete a la red de centros aliados de Pata Amiga.
+              Súmate a nuestra red de centros aliados.
             </span>
           </div>
           <Link

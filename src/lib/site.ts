@@ -102,10 +102,12 @@ export type SiteAssetSlot = (typeof SITE_ASSET_SLOTS)[number]["slot"];
  */
 export const MATERIAL_SLOTS = [
   {
+    // La LLAVE `material-pack-historias` no cambia: es la que apunta al
+    // archivo ya subido en site_assets. Solo cambian etiqueta y descripción.
     slot: "material-pack-historias",
-    label: "Pack historias IG",
+    label: "Kit historias IG",
     emoji: "🖼️",
-    hint: "ZIP o carpeta de imágenes del mes para historias.",
+    hint: "Recursos para historias de IG.",
   },
   {
     slot: "material-video-reintegro",
@@ -123,7 +125,7 @@ export const MATERIAL_SLOTS = [
     slot: "material-campana",
     label: "Campaña temporal",
     emoji: "⭐",
-    hint: "Asset de la campaña vigente — rota según temporada.",
+    hint: "Material de la campaña vigente — rota según la temporada.",
   },
 ] as const;
 

@@ -391,8 +391,8 @@ export function ProfileForm({
               Completa tu perfil
             </h1>
             <p className="mt-1.5 text-[14.5px] text-ink-secondary">
-              Necesitamos estos datos para validar tu identidad y habilitar tus
-              reintegros. La foto es opcional.
+              Necesitamos estos datos para confirmar tu información y habilitar
+              tus reintegros. La foto es opcional.
             </p>
           </div>
         </div>

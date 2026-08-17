@@ -71,8 +71,8 @@ export function IneCard({
 
       {completa && !abierto ? (
         <span className="text-[13px] text-success-text">
-          ✓ Frente y reverso recibidos — el comité ya puede validar tu
-          identidad.
+          ✓ Frente y reverso recibidos — el equipo de Pata Amiga puede validar
+          tu identidad.
         </span>
       ) : (
         <>

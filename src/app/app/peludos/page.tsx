@@ -43,8 +43,8 @@ export default async function PeludosPage({
     <div className="flex flex-col gap-4 px-5 py-6 md:gap-[22px] md:px-[34px] md:py-[30px]">
       {registrado && (
         <div className="rounded-[14px] bg-success-bg px-4 py-3 text-sm font-semibold text-success-text">
-          🐾 ¡Listo! Tu peludo quedó registrado. El comité revisará su perfil y
-          su tiempo de espera ya corre.
+          🐾 ¡Listo! Tu peludo ya está registrado. Validaremos sus datos para
+          iniciar su tiempo de espera.
         </div>
       )}
       <div className="flex items-center justify-between">
@@ -54,7 +54,7 @@ export default async function PeludosPage({
           </h1>
           <p className="text-[12.5px] text-ink-secondary md:text-sm">
             {active.length} de {MAX_ACTIVE_PETS} peludos activos. Toca «Ver
-            perfil» para fotos, datos completos y mensajes del comité.
+            perfil» para ver sus fotos, datos completos y avisos importantes.
           </p>
         </div>
         {active.length < MAX_ACTIVE_PETS && (
