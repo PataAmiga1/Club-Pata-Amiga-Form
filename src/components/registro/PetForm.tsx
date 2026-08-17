@@ -7,6 +7,7 @@ import { SelectField, TextField, ToggleGroup } from "@/components/ui/Field";
 import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { Button } from "@/components/ui/Button";
 import { SENIOR_PET_AGE_YEARS, MAX_ACTIVE_PETS } from "@/lib/constants";
+import { ETIQUETAS_ESPECIE, terminoPeludo } from "@/lib/vocabulario";
 import {
   DOG_BREED_NAMES,
   CAT_BREED_NAMES,
@@ -89,8 +90,12 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     setExtras((prev) =>
       prev.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)),
     );
-  /** "michi" para gatos, "peludo" para perros (PM: el copy cambia con la especie). */
-  const comoLeDicen = (e: Species) => (e === "cat" ? "michi" : "peludo");
+  /**
+   * "michi" para gatos, "lomito" para perros (equipo, 16-ago). Antes los perros
+   * caían en "peludo" —la palabra que cubre a los dos—, así que el michi tenía
+   * nombre propio y el lomito no. Ahora sale del glosario compartido.
+   */
+  const comoLeDicen = (e: Species) => terminoPeludo(e);
 
   useEffect(() => {
     const supabase = createClient();
@@ -296,18 +301,18 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       {mode === "registro" && (
         <>
           <ToggleGroup
-            label="¿Es perro o gato?"
+            label="¿Es lomito o michi?"
             value={species}
             onChange={(v) => setSpecies(v)}
             options={[
-              { value: "dog", label: "🐶 Perro" },
-              { value: "cat", label: "🐱 Gato" },
+              { value: "dog", label: `🐶 ${ETIQUETAS_ESPECIE[0].label}` },
+              { value: "cat", label: `🐱 ${ETIQUETAS_ESPECIE[1].label}` },
             ]}
           />
           <TextField
             label={`¿Cómo se llama tu ${comoLeDicen(species)}?`}
             required
-            placeholder={species === "cat" ? "Michi" : "Max"}
+            placeholder={species === "cat" ? "Luna" : "Max"}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -326,9 +331,11 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           </SelectField>
           {showsSeniorNote && (
             <div className="rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
-              Como tu {comoLeDicen(species)} tiene {SENIOR_PET_AGE_YEARS} años o
-              más, sí puedes protegerlo. Más adelante te pediremos información
-              sobre su estado de salud actual. 🐾
+              Nos encanta recibir a peludos seniors. Como tu{" "}
+              {comoLeDicen(species)} tiene {SENIOR_PET_AGE_YEARS} años o más, sí
+              puede unirse a Pata Amiga; más adelante te pediremos algunos datos
+              sobre su salud actual para darle el seguimiento adecuado y
+              personalizado. 🐾
             </div>
           )}
 
@@ -353,18 +360,18 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
                 </button>
               </div>
               <ToggleGroup
-                label="¿Es perro o gato?"
+                label="¿Es lomito o michi?"
                 value={p.species}
                 onChange={(v) => cambiarExtra(i, "species", v)}
                 options={[
-                  { value: "dog", label: "🐶 Perro" },
-                  { value: "cat", label: "🐱 Gato" },
+                  { value: "dog", label: `🐶 ${ETIQUETAS_ESPECIE[0].label}` },
+                  { value: "cat", label: `🐱 ${ETIQUETAS_ESPECIE[1].label}` },
                 ]}
               />
               <TextField
                 label={`¿Cómo se llama tu ${comoLeDicen(p.species)}?`}
                 required
-                placeholder={p.species === "cat" ? "Michi" : "Max"}
+                placeholder={p.species === "cat" ? "Luna" : "Max"}
                 value={p.name}
                 onChange={(e) => cambiarExtra(i, "name", e.target.value)}
               />
@@ -400,7 +407,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
             </button>
           )}
           <span className="text-[12.5px] leading-normal text-ink-tertiary">
-            Si tienes más de una mascota puedes registrarla ahora o más adelante
+            Si tienes más de un peludo, puedes registrarlo ahora o más adelante
             desde tu cuenta (hasta {MAX_ACTIVE_PETS}). Los demás datos —raza,
             sexo, colores y su foto— te los pedimos después del pago.
           </span>

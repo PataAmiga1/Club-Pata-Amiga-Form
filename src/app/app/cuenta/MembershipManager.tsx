@@ -18,9 +18,9 @@ const CANCEL_REASONS = [
 /** Lo que se pierde al cancelar — popup de retención (equipo, 5-ago). */
 const BENEFITS_LOST = [
   "💬 Orientación veterinaria 24/7 para tu manada",
-  "🐾 Reintegros: hasta $3,000 MXN en gastos veterinarios, $2,000 por fallecimiento y $300 en vacunas",
+  "🐾 Reintegros: hasta $3,000 MXN en gastos veterinarios, $2,000 para momentos de despedida y $300 en vacunas",
   "📍 Beneficios y promociones en la red de centros aliados",
-  "👨‍👩‍👧 Protección de hasta 3 mascotas con una sola membresía",
+  "👨‍👩‍👧 Protección de hasta 3 peludos con una sola membresía",
   "⏳ El tiempo de espera ya avanzado — si vuelves después, empieza de nuevo",
 ];
 

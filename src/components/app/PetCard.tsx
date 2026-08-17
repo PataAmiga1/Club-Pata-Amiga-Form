@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { waitingProgress } from "@/lib/dates";
+import { etiquetaEspecie } from "@/lib/vocabulario";
 
 export type PetRow = {
   id: string;
@@ -100,7 +101,7 @@ export function PetCard({ pet }: { pet: PetRow }) {
           </span>
         </div>
         <span className="text-[13px] text-ink-secondary">
-          {pet.species === "dog" ? "Perro" : "Gato"}
+          {etiquetaEspecie(pet.species)}
           {pet.breed ? ` · ${pet.breed}` : ""} · {ageLabel(pet)}
         </span>
         {inactive ? (

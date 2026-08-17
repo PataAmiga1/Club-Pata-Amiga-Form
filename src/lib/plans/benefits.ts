@@ -54,10 +54,10 @@ export const CATALOGO_BENEFICIOS = {
   // solo que sin el beneficio del embajador (PM). Los snapshots viejos que aún
   // traen estas llaves las ignoran (migración 20260811000005).
   espera_mascota_estandar_dias: {
-    label: "Tiempo de espera por mascota — estándar",
+    label: "Tiempo de espera por peludo — estándar",
     tipo: "entero",
     unidad: "días",
-    consumidoPor: ["alta de mascota", "reintegros"],
+    consumidoPor: ["alta de peludo", "reintegros"],
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
@@ -67,7 +67,7 @@ export const CATALOGO_BENEFICIOS = {
     label: "Tiempo de espera — adoptado de raza",
     tipo: "entero",
     unidad: "días",
-    consumidoPor: ["alta de mascota"],
+    consumidoPor: ["alta de peludo"],
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
@@ -77,7 +77,7 @@ export const CATALOGO_BENEFICIOS = {
     label: "Tiempo de espera — adoptado mestizo",
     tipo: "entero",
     unidad: "días",
-    consumidoPor: ["alta de mascota"],
+    consumidoPor: ["alta de peludo"],
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
@@ -87,7 +87,7 @@ export const CATALOGO_BENEFICIOS = {
     label: "Tiempo de espera — con código de embajador",
     tipo: "entero",
     unidad: "días",
-    consumidoPor: ["alta de mascota"],
+    consumidoPor: ["alta de peludo"],
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
@@ -105,7 +105,9 @@ export const CATALOGO_BENEFICIOS = {
     porOmision: REIMBURSEMENT_CAPS_MXN.vet_expenses,
   },
   tope_fallecimiento_mxn: {
-    label: "Tope anual — fallecimiento",
+    // La LLAVE se queda: vive en la BD. Solo cambia la etiqueta visible, al
+    // tono 2.0 («momentos de despedida», equipo 16-ago).
+    label: "Tope anual — momentos de despedida",
     tipo: "dinero",
     unidad: "MXN por año",
     consumidoPor: ["saldos de reintegro"],
@@ -146,9 +148,9 @@ export const CATALOGO_BENEFICIOS = {
 
   // --- Mascotas -------------------------------------------------------------
   mascotas_activas_max: {
-    label: "Mascotas activas incluidas",
+    label: "Peludos activos incluidos",
     tipo: "entero",
-    consumidoPor: ["alta de mascota"],
+    consumidoPor: ["alta de peludo"],
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "mayor",

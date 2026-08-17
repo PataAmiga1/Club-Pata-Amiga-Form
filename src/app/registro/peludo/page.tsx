@@ -17,7 +17,7 @@ export default function PeludoPage() {
               Preséntanos a tu peludo
             </h1>
             <p className="mt-1.5 text-[15px] leading-normal text-ink-secondary">
-              Registra a tu primera mascota. Podrás agregar hasta 3 desde tu
+              Registra a tu primer peludo. Podrás agregar hasta 3 desde tu
               cuenta.
             </p>
           </div>

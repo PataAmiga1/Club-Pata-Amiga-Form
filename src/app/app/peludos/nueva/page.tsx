@@ -28,8 +28,8 @@ export default async function NuevoPeludoPage() {
           Registra a un nuevo peludo
         </h1>
         <p className="mt-1.5 text-[14.5px] leading-normal text-ink-secondary">
-          Tu membresía cubre hasta {MAX_ACTIVE_PETS} mascotas. El comité
-          revisará su perfil y su tiempo de espera empieza hoy.
+          Tu membresía te permite registrar hasta {MAX_ACTIVE_PETS} peludos.
+          Confirmaremos su información para iniciar su tiempo de espera.
         </p>
       </div>
       <PetForm mode="member" />

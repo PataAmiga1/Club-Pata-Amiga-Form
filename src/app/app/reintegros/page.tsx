@@ -150,7 +150,7 @@ export default async function ReintegrosPage({
               <span className="w-16 font-bold text-teal-deep">{r.folio}</span>
               <div className="flex flex-1 flex-col">
                 <span className="text-sm font-bold text-ink-title">
-                  {pet?.name ?? "Mascota"} ·{" "}
+                  {pet?.name ?? "Peludo"} ·{" "}
                   {REIMBURSEMENT_CATEGORY_LABELS[
                     r.category as keyof typeof REIMBURSEMENT_CATEGORY_LABELS
                   ] ?? r.category}
