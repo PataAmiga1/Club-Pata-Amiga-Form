@@ -1,5 +1,6 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "./send";
+import { destinatarioPermitido } from "@/lib/resend";
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -40,8 +41,15 @@ export async function enviarRecordatoriosDatosFaltantes(admin: Admin) {
   const conPasaporte = new Set((pasaportes ?? []).map((d) => d.user_id));
 
   let enviados = 0;
+  // La reja de pruebas responde sin error: sin descontarlos, el contador de
+  // la pantalla presumía recordatorios que nunca salieron.
+  let bloqueados = 0;
   for (const p of incompletos) {
     if (!p.email) continue;
+    if (!destinatarioPermitido(p.email)) {
+      bloqueados++;
+      continue;
+    }
     const faltantes = datosFaltantesDelPerfil(p, {
       tienePasaporte: conPasaporte.has(p.id),
     });
@@ -56,5 +64,5 @@ export async function enviarRecordatoriosDatosFaltantes(admin: Admin) {
     if (ok) enviados++;
   }
 
-  return { candidatos: incompletos.length, enviados };
+  return { candidatos: incompletos.length, enviados, bloqueados };
 }

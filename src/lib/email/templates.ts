@@ -4,7 +4,7 @@
  * /admin/comunicados (tabla email_templates). Las variables se escriben
  * {{asi}} y se sustituyen al enviar.
  *
- * Terminología VINCULANTE (CLAUDE.md): reintegro, período de espera,
+ * Terminología VINCULANTE (CLAUDE.md): reintegro, tiempo de espera,
  * orientación veterinaria 24/7 — nunca seguro, póliza, cobertura, carencia.
  */
 
@@ -20,7 +20,7 @@ export type EmailTemplateDef = {
   html: string;
 };
 
-const FOOTER = `<p style="margin:0;color:#6B7C79;font-size:13px">Club Pata Amiga · Protección para tu manada</p>`;
+const FOOTER = `<p style="margin:0;color:#6B7C79;font-size:13px">Pata Amiga · El mejor cuidado para tu manada</p>`;
 
 /**
  * Logo para correos (los clientes de correo no soportan SVG).
@@ -80,11 +80,11 @@ const CAMPAIGN_GIFT_HTML = `<!-- Correo "Obtén tu regalo" · Club Pata Amiga --
       <tr><td style="background-color:#FFFFFF;padding:6px 32px 8px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FAF7F1;border-radius:16px;">
           <tr><td style="padding:18px 22px;">
-            <p style="margin:0 0 10px;font-size:14px;font-weight:bold;color:#1E5350;">Usa tu cupón al unirte a la manada — membresía de salud para tu perro o gato:</p>
+            <p style="margin:0 0 10px;font-size:14px;font-weight:bold;color:#1E5350;">Usa tu cupón al unirte a la manada — membresía de salud para tu peludo (michi o lomito):</p>
             <p style="margin:0;font-size:13.5px;line-height:2;color:#3D524F;">
               🐾 Disponible en todo México<br>
               🐾 Mantienes a tu veterinario<br>
-              🐾 Incluye hasta 3 mascotas<br>
+              🐾 Incluye hasta 3 peludos<br>
               🐾 Orientación veterinaria 24/7<br>
               🐾 100% digital
             </p>
@@ -104,7 +104,7 @@ const CAMPAIGN_GIFT_HTML = `<!-- Correo "Obtén tu regalo" · Club Pata Amiga --
 
       <!-- Pie -->
       <tr><td style="background-color:#1E5350;border-radius:0 0 20px 20px;padding:24px 32px;text-align:center;">
-        <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#FFFFFF;">Club Pata Amiga · Protección para tu manada</p>
+        <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#FFFFFF;">Pata Amiga · El mejor cuidado para tu manada</p>
         <p style="margin:0 0 10px;font-size:12px;line-height:1.7;color:#BFD9D6;">
           ¿Dudas? Escríbenos a <a href="mailto:soporte@pataamiga.mx" style="color:#A6CE39;text-decoration:none;">soporte@pataamiga.mx</a><br>
           <a href="https://www.instagram.com/pataamigamx" style="color:#BFD9D6;text-decoration:underline;">Instagram</a> &nbsp;·&nbsp;
@@ -130,12 +130,12 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     variables: {
       firstName: "Nombre del miembro (puede venir vacío)",
       petNotice:
-        "Frase sobre la primera mascota y su período de espera (vacía si no aplica)",
+        "Frase sobre el primer peludo y su tiempo de espera (vacía si no aplica)",
     },
     sample: {
       firstName: "Cipatli",
       petNotice:
-        "<strong>Max</strong> entra a revisión del comité y su período de espera de 120 días corre desde hoy.",
+        "<strong>Max</strong> entra a revisión del comité y su tiempo de espera de 120 días corre desde hoy.",
     },
     subject: "¡Bienvenido a la manada! 🐾",
     html: WRAP(`<h1 style="color:#1E5350">¡Bienvenido a la manada, {{firstName}}!</h1>
@@ -168,7 +168,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     variables: {
       folio: "Folio de la solicitud (ej. R-0001)",
       amount: "Monto aprobado con formato (ej. $1,250)",
-      petName: "Nombre de la mascota",
+      petName: "Nombre del peludo",
     },
     sample: { folio: "R-0001", amount: "$1,250", petName: "Max" },
     subject: "¡Tu reintegro {{folio}} fue aprobado! 🎉",
@@ -182,7 +182,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     description: "Cuando el comité rechaza un reintegro (incluye motivo).",
     variables: {
       folio: "Folio de la solicitud",
-      petName: "Nombre de la mascota",
+      petName: "Nombre del peludo",
       reason: "Motivo del rechazo",
     },
     sample: { folio: "R-0001", petName: "Max", reason: "Factura ilegible" },
@@ -194,39 +194,39 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   },
   {
     key: "pet_approved",
-    name: "Mascota aprobada",
-    description: "Cuando el comité aprueba la ficha de una mascota.",
-    variables: { petName: "Nombre de la mascota" },
+    name: "Peludo aprobado",
+    description: "Cuando el comité aprueba el perfil de un peludo.",
+    variables: { petName: "Nombre del peludo" },
     sample: { petName: "Max" },
     subject: "¡{{petName}} fue aprobado por el comité! 🐾",
     html: WRAP(`<h2 style="color:#1E5350">¡{{petName}} fue aprobado por el comité! 🐾</h2>
-<p>Su ficha quedó aprobada y su período de espera sigue corriendo con normalidad.</p>`),
+<p>Su perfil quedó aprobado y su tiempo de espera sigue corriendo con normalidad.</p>`),
   },
   {
     key: "pet_rejected",
-    name: "Mascota con observaciones",
-    description: "Cuando la ficha de una mascota necesita correcciones.",
+    name: "Peludo con observaciones",
+    description: "Cuando el perfil de un peludo necesita correcciones.",
     variables: {
-      petName: "Nombre de la mascota",
+      petName: "Nombre del peludo",
       notes: "Observaciones del comité",
     },
     sample: { petName: "Max", notes: "Falta el certificado veterinario." },
-    subject: "La ficha de {{petName}} necesita atención",
-    html: WRAP(`<h2 style="color:#1E5350">La ficha de {{petName}} necesita atención</h2>
+    subject: "El perfil de {{petName}} necesita atención",
+    html: WRAP(`<h2 style="color:#1E5350">El perfil de {{petName}} necesita atención</h2>
 <p><strong>Observaciones del comité:</strong> {{notes}}</p>
 <p>Entra a tu cuenta para actualizar la información o los documentos.</p>`),
   },
   {
     key: "pet_info_request",
-    name: "El comité pide información (mascota)",
+    name: "El comité pide información (peludo)",
     description:
-      "Cuando el comité solicita fotos/documentos o escribe al miembro sobre una mascota.",
+      "Cuando el comité solicita fotos/documentos o escribe al miembro sobre un peludo.",
     variables: {
       firstName: "Nombre del miembro",
-      petName: "Nombre de la mascota",
+      petName: "Nombre del peludo",
       itemsList: "Lista de lo solicitado (puede venir vacía)",
       message: "Mensaje del comité",
-      fichaUrl: "URL de la ficha de la mascota",
+      fichaUrl: "URL del perfil del peludo",
     },
     sample: {
       firstName: "Cipatli",
@@ -237,10 +237,10 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     },
     subject: "El comité necesita información sobre {{petName}} 🐾",
     html: WRAP(`<h2 style="color:#1E5350">Necesitamos tu ayuda con {{petName}}</h2>
-<p>Hola {{firstName}}, el comité te escribió sobre la ficha de <strong>{{petName}}</strong>:</p>
+<p>Hola {{firstName}}, el comité te escribió sobre el perfil de <strong>{{petName}}</strong>:</p>
 <ul>{{itemsList}}</ul>
 <p style="background:#FAF7F1;border-radius:12px;padding:12px">{{message}}</p>
-<p style="text-align:center;margin:16px 0"><a href="{{fichaUrl}}" style="background:#1CBCAD;color:#fff;padding:12px 26px;border-radius:999px;font-weight:700;text-decoration:none">Abrir la ficha de {{petName}}</a></p>`),
+<p style="text-align:center;margin:16px 0"><a href="{{fichaUrl}}" style="background:#1CBCAD;color:#fff;padding:12px 26px;border-radius:999px;font-weight:700;text-decoration:none">Abrir el perfil de {{petName}}</a></p>`),
   },
   {
     key: "ambassador_received",
@@ -375,11 +375,11 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   {
     key: "appeal_received",
     name: "Apelación recibida",
-    description: "Acuse al presentar una apelación (reintegro o mascota).",
+    description: "Acuse al presentar una apelación (reintegro o peludo).",
     variables: {
       firstName: "Nombre del miembro",
       folio: "Folio de la apelación (ej. A-0001)",
-      subject: "Qué se apela (ej. 'el reintegro R-0001' o 'la ficha de Max')",
+      subject: "Qué se apela (ej. 'el reintegro R-0001' o 'el perfil de Max')",
     },
     sample: { firstName: "Cipatli", folio: "A-0001", subject: "el reintegro R-0001" },
     subject: "Recibimos tu apelación {{folio}}",
@@ -394,7 +394,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     variables: {
       firstName: "Nombre del miembro",
       folio: "Folio de la apelación",
-      outcome: "Qué pasa ahora (ej. 'tu solicitud volvió a revisión' / 'la ficha de Max quedó aprobada')",
+      outcome: "Qué pasa ahora (ej. 'tu solicitud volvió a revisión' / 'el perfil de Max quedó aprobado')",
     },
     sample: {
       firstName: "Cipatli",
@@ -521,12 +521,12 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   },
   {
     key: "birthday_pet",
-    name: "Cumpleaños de la mascota",
+    name: "Cumpleaños del peludo",
     description:
-      "Automático: el día del cumpleaños de una mascota registrada (usa mes y año de nacimiento).",
+      "Automático: el día del cumpleaños de un peludo registrado (usa mes y año de nacimiento).",
     variables: {
       firstName: "Nombre del tutor",
-      petName: "Nombre de la mascota",
+      petName: "Nombre del peludo",
       petEmoji: "🐶 o 🐱 según la especie",
       ageLine: "Frase sobre la edad que cumple (vacía si no se sabe el año)",
     },
@@ -551,7 +551,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
 export const EMAIL_CATEGORIES = [
   { id: "membresia", label: "Membresía", icon: "🎫" },
   { id: "reintegros", label: "Reintegros", icon: "💚" },
-  { id: "mascotas", label: "Mascotas", icon: "🐾" },
+  { id: "mascotas", label: "Peludos", icon: "🐾" },
   { id: "apelaciones", label: "Apelaciones", icon: "⚖️" },
   { id: "embajadores", label: "Embajadores", icon: "🤝" },
   { id: "centros", label: "Centros aliados", icon: "📍" },

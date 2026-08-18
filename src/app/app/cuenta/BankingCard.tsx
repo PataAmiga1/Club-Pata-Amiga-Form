@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BANK_OPTIONS, bankFromClabe } from "@/lib/banks";
+import { BANCO_OTRO, BANK_OPTIONS, bankFromClabe } from "@/lib/banks";
 import { SelectField, TextField } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { saveMemberBanking } from "./actions";
@@ -9,6 +9,10 @@ import { saveMemberBanking } from "./actions";
 /**
  * Datos bancarios del miembro (SPEI para reintegros). El banco se detecta
  * automáticamente desde la CLABE y puede corregirse con el selector.
+ *
+ * "Otro" abre un campo para ESCRIBIR el banco (equipo, 13-ago; lo pidieron
+ * para embajadores y aplica igual aquí): antes se guardaba la palabra "Otro"
+ * y el layout de dispersión salía sin saber a qué institución iba el dinero.
  */
 export function BankingCard({
   initialBank,
@@ -17,24 +21,44 @@ export function BankingCard({
   initialBank: string | null;
   initialClabe: string | null;
 }) {
-  const [bank, setBank] = useState(initialBank ?? "");
+  const guardadoEsDeCatalogo =
+    !initialBank || BANK_OPTIONS.includes(initialBank as never);
+  const [bank, setBank] = useState(
+    guardadoEsDeCatalogo ? (initialBank ?? "") : BANCO_OTRO,
+  );
+  const [bankOtro, setBankOtro] = useState(
+    guardadoEsDeCatalogo ? "" : (initialBank ?? ""),
+  );
   const [clabe, setClabe] = useState(initialClabe ?? "");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const eligioOtro = bank === BANCO_OTRO;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     setNotice(null);
-    const result = await saveMemberBanking(bank, clabe);
+    const result = await saveMemberBanking(
+      eligioOtro ? bankOtro.trim() : bank,
+      clabe,
+    );
     setBusy(false);
     if (result.error) {
       setError(result.error);
       return;
     }
-    if (result.bankName) setBank(result.bankName);
+    if (result.bankName) {
+      if (BANK_OPTIONS.includes(result.bankName as never)) {
+        setBank(result.bankName);
+        setBankOtro("");
+      } else {
+        setBank(BANCO_OTRO);
+        setBankOtro(result.bankName);
+      }
+    }
     setNotice("Datos bancarios guardados ✓");
   }
 
@@ -60,7 +84,10 @@ export function BankingCard({
             const digits = e.target.value.replace(/\D/g, "").slice(0, 18);
             setClabe(digits);
             const detected = bankFromClabe(digits);
-            if (detected) setBank(detected);
+            if (detected) {
+              setBank(detected);
+              setBankOtro("");
+            }
           }}
         />
         <SelectField
@@ -76,6 +103,14 @@ export function BankingCard({
           ))}
         </SelectField>
       </div>
+      {eligioOtro && (
+        <TextField
+          label="¿Cuál es tu banco?"
+          placeholder="Escribe el nombre de tu banco"
+          value={bankOtro}
+          onChange={(e) => setBankOtro(e.target.value)}
+        />
+      )}
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">
           {error}

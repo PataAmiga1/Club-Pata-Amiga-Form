@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/Field";
@@ -17,6 +18,7 @@ import {
   type ReimbursementDocType,
 } from "@/lib/reimbursement-docs";
 import { formatMxn } from "@/lib/format";
+import { hoyEnMexico } from "@/lib/zona-horaria";
 import { notifyReimbursementSubmitted } from "./actions";
 
 export type EligiblePet = {
@@ -79,6 +81,16 @@ export function RequestForm({
   const balance = balances[category];
   const docSlots = DOCS_BY_CATEGORY[category] ?? [];
 
+
+  /**
+   * ¿Hay al menos un peludo que HOY pueda pedir un reintegro?
+   *
+   * Con todos en tiempo de espera el formulario se desplegaba completo y se
+   * dejaba llenar entero para nada: al final no había a quién asignárselo
+   * (equipo, 15-ago). Ahora ni siquiera se pinta.
+   */
+  const hayPeludoDisponible = pets.some((p) => p.eligible);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -92,6 +104,12 @@ export function RequestForm({
         `El monto solicitado (${formatMxn(amountNum)}) excede tu disponible de este año para este apoyo (${formatMxn(balance.available)} MXN).`,
       );
     if (!serviceDate) return setError("Indica la fecha.");
+    if (!clinicName.trim())
+      return setError("Indica en qué veterinaria o clínica lo atendieron.");
+    if (!vetName.trim())
+      return setError("Escribe el nombre del médico veterinario que lo atendió.");
+    if (!vetLicense.trim())
+      return setError("Escribe la cédula profesional del veterinario.");
     if (!files.evidence_photo)
       return setError(`Sube: ${docSlots[0]?.label ?? "la evidencia"}.`);
     if (!files.receipt)
@@ -188,6 +206,46 @@ export function RequestForm({
         })}
       </div>
 
+      {/* Sin ningún peludo disponible NO se pinta el formulario (equipo,
+          15-ago). Antes se desplegaba completo con un aviso arriba, y se podía
+          llenar entero —montos, fechas, facturas, CLABE— para toparse al final
+          con que no había a quién asignar la solicitud. */}
+      {!hayPeludoDisponible ? (
+        <div className="flex flex-col gap-3 rounded-[20px] bg-white p-6 shadow-[var(--shadow-card)] md:p-[30px]">
+          <span className="font-display text-[19px] text-ink-title">
+            Todavía no puedes solicitar un reintegro
+          </span>
+          <p className="text-[13.5px] leading-relaxed text-ink-secondary">
+            {pets.length === 0
+              ? "Aún no tienes peludos registrados. Preséntanos al primero y, en cuanto el comité apruebe su perfil, empieza a correr su tiempo de espera."
+              : "Ninguno de tus peludos está disponible por ahora: el comité tiene que aprobar su perfil y después corre su tiempo de espera. Te avisamos en cuanto el primero quede listo."}
+          </p>
+          {pets.length > 0 && (
+            <ul className="flex flex-col gap-1.5">
+              {pets.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-2.5 rounded-[12px] bg-cream px-3.5 py-2.5 text-[13px] text-ink-body"
+                >
+                  <span aria-hidden>{p.species === "dog" ? "🐕" : "🐈"}</span>
+                  <span className="min-w-0 flex-1 truncate font-semibold text-ink-title">
+                    {p.name}
+                  </span>
+                  <span className="flex-none text-[12.5px] text-ink-secondary">
+                    {p.pendingApproval ? "en revisión del comité" : p.waitLabel}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link
+            href={pets.length === 0 ? "/app/peludos/nueva" : "/app/peludos"}
+            className="mt-1 grid h-11 place-items-center self-start rounded-full bg-teal px-6 text-[13.5px] font-bold text-white transition-colors hover:bg-teal-deep"
+          >
+            {pets.length === 0 ? "Registrar a mi peludo" : "Ver mis peludos"}
+          </Link>
+        </div>
+      ) : (
       <form
         onSubmit={handleSubmit}
         className="flex flex-col gap-[18px] rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]"
@@ -207,7 +265,12 @@ export function RequestForm({
                   type="button"
                   disabled={disabled}
                   onClick={() => setPetId(p.id)}
-                  className={`flex h-[52px] flex-1 items-center gap-2.5 rounded-[12px] px-3.5 text-sm ${
+                  /* `min-w-0`: sin él, el ancho mínimo de cada botón es el de
+                     su texto completo (min-width:auto de flex), así que con
+                     tres peludos la fila se salía de la tarjeta blanca en vez
+                     de recortar el nombre — el recuadro rojo del equipo,
+                     13-ago. El `truncate` de adentro nunca llegaba a actuar. */
+                  className={`flex h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded-[12px] px-3.5 text-sm ${
                     selected
                       ? "bg-teal font-bold text-white"
                       : disabled
@@ -256,36 +319,42 @@ export function RequestForm({
           <TextField
             label={DATE_LABEL_BY_CATEGORY[category]}
             type="date"
-            max={new Date().toISOString().slice(0, 10)}
+            /* `hoyEnMexico()`, no `new Date().toISOString()`: en Vercel el
+               proceso corre en UTC y de las 18:00 en adelante el tope se
+               adelantaba un día, bloqueando una factura de HOY. */
+            max={hoyEnMexico()}
             value={serviceDate}
             onChange={(e) => setServiceDate(e.target.value)}
           />
-          {category === "vet_expenses" && (
-            <TextField
-              label="¿En qué veterinaria o clínica lo atendieron?"
-              placeholder="Nombre del consultorio"
-              value={clinicName}
-              onChange={(e) => setClinicName(e.target.value)}
-            />
-          )}
+          <TextField
+            label="¿En qué veterinaria o clínica lo atendieron?"
+            placeholder="Nombre del consultorio"
+            value={clinicName}
+            onChange={(e) => setClinicName(e.target.value)}
+          />
         </div>
 
-        {category === "vet_expenses" && (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <TextField
-              label="Médico veterinario que lo atendió (opcional)"
-              placeholder="Nombre del veterinario"
-              value={vetName}
-              onChange={(e) => setVetName(e.target.value)}
-            />
-            <TextField
-              label="Cédula profesional (opcional)"
-              placeholder="Cédula del veterinario"
-              value={vetLicense}
-              onChange={(e) => setVetLicense(e.target.value)}
-            />
-          </div>
-        )}
+        {/* DÓNDE Y QUIÉN ATENDIÓ — en las tres categorías, y obligatorio.
+            Empezó siendo opcional y solo en gastos veterinarios. El 15-ago se
+            volvió obligatorio y se sumó a vacunas; el 16-ago, también a
+            fallecimiento. Ahí también aplica: ese reintegro exige un
+            "certificado de defunción o informe médico", y ese documento lo
+            firma un veterinario — sin su nombre y su cédula no hay forma de
+            verificar quién lo emitió. */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <TextField
+            label="Médico veterinario que lo atendió"
+            placeholder="Nombre del veterinario"
+            value={vetName}
+            onChange={(e) => setVetName(e.target.value)}
+          />
+          <TextField
+            label="Cédula profesional"
+            placeholder="Cédula del veterinario"
+            value={vetLicense}
+            onChange={(e) => setVetLicense(e.target.value)}
+          />
+        </div>
 
         {/* Documentos por motivo — cada archivo se guarda catalogado */}
         <div className="flex flex-col gap-1.5">
@@ -376,6 +445,7 @@ export function RequestForm({
           {loading ? "Enviando…" : "Enviar solicitud"}
         </Button>
       </form>
+      )}
     </>
   );
 }

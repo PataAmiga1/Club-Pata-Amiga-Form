@@ -21,6 +21,8 @@ export type CenterRegistrationInput = {
   email: string;
   phone: string;
   website?: string;
+  /** Redes del centro, cada una en su campo (equipo, 15-ago). */
+  socialLinks?: Record<string, string>;
   services: string[];
   memberBenefit: string;
   locations: CenterLocationInput[];
@@ -91,6 +93,20 @@ export async function registerCenter(input: CenterRegistrationInput) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // …pero solo si el correo del formulario ES el de esa sesión.
+  //
+  // Antes, con sesión abierta se ligaba la solicitud a la cuenta de la sesión
+  // SIN MIRAR el correo escrito: el correo y la contraseña del formulario se
+  // ignoraban en silencio y no nacía cuenta para ese correo. Así fue como un
+  // centro capturado desde la sesión del comité quedó colgado de la cuenta del
+  // comité, y "recuperar contraseña" con el correo del formulario no mandaba
+  // nada — esa cuenta nunca existió (reporte de la PM, 12-ago).
+  if (user && (user.email ?? "").toLowerCase() !== email) {
+    return {
+      error: `Tienes la sesión abierta con ${user.email}. Para registrar el centro con ${email}, cierra sesión y vuelve a enviar la solicitud; si el centro es de esta cuenta, usa ${user.email} en el formulario.`,
+    };
+  }
 
   if (user) {
     const { data: mine } = await admin
@@ -167,6 +183,14 @@ export async function registerCenter(input: CenterRegistrationInput) {
       email,
       phone,
       website: input.website?.trim() || null,
+      // Se normalizan igual que las del embajador: sin vacíos y con https://
+      // adelante, para que la tarjeta del directorio pueda enlazarlas.
+      social_links: Object.fromEntries(
+        Object.entries(input.socialLinks ?? {})
+          .map(([k, v]) => [k, (v ?? "").trim()])
+          .filter(([, v]) => v.length > 0)
+          .map(([k, v]) => [k, v.startsWith("http") ? v : `https://${v}`]),
+      ),
       services,
       member_benefit: memberBenefit,
       status: "pending",

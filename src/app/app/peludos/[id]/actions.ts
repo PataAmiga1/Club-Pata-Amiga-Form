@@ -23,6 +23,8 @@ async function ownPet(petId: string) {
 }
 
 export type PetFichaInput = {
+  /** Se captura aquí desde el 12-ago: el alta se redujo a tipo, nombre y edad. */
+  breed?: string;
   sex?: string;
   coatColor?: string;
   noseColor?: string;
@@ -34,7 +36,7 @@ export type PetFichaInput = {
   vetCertificateUrl?: string;
 };
 
-/** Guarda la ficha completa (datos + foto principal + galería máx. 5). */
+/** Guarda el perfil completo (datos + foto principal + galería máx. 5). */
 export async function updatePetFicha(petId: string, input: PetFichaInput) {
   const ctx = await ownPet(petId);
   if (!ctx) return { error: "No encontramos a tu peludo." };
@@ -43,6 +45,7 @@ export async function updatePetFicha(petId: string, input: PetFichaInput) {
   const { error } = await ctx.admin
     .from("pets")
     .update({
+      breed: input.breed?.trim() || null,
       sex: input.sex || null,
       coat_color: input.coatColor?.trim() || null,
       nose_color: input.noseColor?.trim() || null,
@@ -56,7 +59,7 @@ export async function updatePetFicha(petId: string, input: PetFichaInput) {
         : {}),
     })
     .eq("id", petId);
-  if (error) return { error: "No pudimos guardar la ficha. Intenta de nuevo." };
+  if (error) return { error: "No pudimos guardar el perfil. Intenta de nuevo." };
 
   revalidatePath(`/app/peludos/${petId}`);
   revalidatePath("/app/peludos");
@@ -104,7 +107,7 @@ const DEACTIVATION_REASONS: Record<string, string> = {
 /**
  * Dar de baja: la mascota deja de contar en el límite de activas, pero su
  * tarjeta queda (gris) como recuerdo. El miembro puede registrar otra en su
- * lugar — la nueva entra como reemplazo (período de espera de 180 días).
+ * lugar — la nueva entra como reemplazo (tiempo de espera de 180 días).
  */
 export async function deactivatePet(
   petId: string,
@@ -130,10 +133,10 @@ export async function deactivatePet(
 
   await notifyTeam(
     "notify_pets",
-    `Baja de mascota: ${ctx.pet.name} 🕊️`,
+    `Baja de peludo: ${ctx.pet.name} 🕊️`,
     `<h2 style="color:#1E5350">Un miembro dio de baja a ${ctx.pet.name}</h2>
      <p>Motivo: ${reason}</p>
-     <p>El miembro conserva su lugar y puede registrar otra mascota (entrará como reemplazo, 180 días de período de espera).</p>`,
+     <p>El miembro conserva su lugar y puede registrar otro peludo (entrará como reemplazo, 180 días de tiempo de espera).</p>`,
   );
 
   revalidatePath("/app/peludos");

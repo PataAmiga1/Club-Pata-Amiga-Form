@@ -91,7 +91,7 @@ export type ResolveResult = {
 /**
  * La única identidad que traía el registro es un teléfono que ya pertenece a
  * OTRO contacto, y el nombre no coincide. Crear el contacto igual produciría una
- * ficha sin forma de alcanzar a la persona —y que nunca volvería a empatar, así
+ * perfil sin forma de alcanzar a la persona —y que nunca volvería a empatar, así
  * que cada reimportación crearía otra— así que mejor no se crea y lo resuelve
  * alguien. Lo detectó la importación de prueba de la fase 1e.
  */
@@ -209,7 +209,7 @@ export async function resolveContact(
   // 2. Sin coincidencias → contacto nuevo
   if (contactIds.length === 0) {
     // El teléfono ajeno no se puede adjuntar (y el `unique` lo impediría). Si era
-    // la ÚNICA identidad, no se crea una ficha inalcanzable: se avisa para que lo
+    // la ÚNICA identidad, no se crea un perfil inalcanzable: se avisa para que lo
     // resuelva una persona.
     const tomados = new Set(
       matched.filter((m) => m.kind === "phone").map((m) => m.value),

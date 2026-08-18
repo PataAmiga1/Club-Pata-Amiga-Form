@@ -1,5 +1,5 @@
 /**
- * Reglas de período de espera por mascota — confirmadas por la PM el
+ * Reglas de tiempo de espera por mascota — confirmadas por la PM el
  * 11-ago-2026 (audio + respuestas escritas). Aplican igual a perros y gatos:
  *
  * 1. Código de embajador en la MEMBRESÍA → 90 días. Es un beneficio por
@@ -14,7 +14,7 @@
  * solo que SIN el beneficio del embajador. Regla anterior (15-jul, sitio
  * vivo): 180 fijos; la PM la corrigió el 11-ago.
  *
- * El CONTRATANTE no tiene período de espera: al pagar es miembro, sin
+ * El CONTRATANTE no tiene tiempo de espera: al pagar es miembro, sin
  * aprobación ni espera (PM, 11-ago).
  */
 import { diaEnMexicoMasDias } from "@/lib/zona-horaria";

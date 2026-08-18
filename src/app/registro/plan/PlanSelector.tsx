@@ -135,12 +135,16 @@ export function PlanSelector({
             <span className="text-[15px] text-ink-tertiary">MXN / mes</span>
           </div>
           <div className="flex flex-col gap-2.5 text-sm leading-snug text-ink-body">
+            {/* Cuarta viñeta: «Red de centros de bienestar» → «100% digital»
+                (pantalla 06 del tono 2.0). El documento escribió «período de
+                espera» en esta tarjeta y «tiempo de espera» en la de junto; se
+                aplica «tiempo», que es la regla vinculante del 13-ago. */}
             <div className="flex gap-2.5">{CHECK}Sin plazos forzosos</div>
             <div className="flex gap-2.5">{CHECK}Orientación veterinaria 24/7</div>
             <div className="flex gap-2.5">
-              {CHECK}Reintegros al cumplir período de espera
+              {CHECK}Reintegros al cumplir tiempo de espera
             </div>
-            <div className="flex gap-2.5">{CHECK}Red de centros de bienestar</div>
+            <div className="flex gap-2.5">{CHECK}100% digital</div>
           </div>
           <span
             onClick={(e) => {
@@ -188,9 +192,11 @@ export function PlanSelector({
             <div className="flex gap-2.5">{CHECK}Tranquilidad los 365 días</div>
             <div className="flex gap-2.5">{CHECK}Orientación veterinaria 24/7</div>
             <div className="flex gap-2.5">
-              {CHECK}Reintegros al cumplir período de espera
+              {CHECK}Reintegros al cumplir tiempo de espera
             </div>
-            <div className="flex gap-2.5">{CHECK}Reintegros en 72 hrs</div>
+            <div className="flex gap-2.5">
+              {CHECK}Respuesta a reintegros en máximo 72 hrs
+            </div>
           </div>
           <span
             onClick={(e) => {
@@ -263,9 +269,13 @@ export function PlanSelector({
         </button>
       </div>
 
+      {/* Solo tarjeta (Pablo, 16-ago). OJO: los métodos NO se declaran en el
+          código —no hay `payment_method_types`—, así que el checkout ofrece lo
+          que esté prendido en el panel de Stripe. Si OXXO y SPEI siguen
+          activos allá, esta línea va a mentir. */}
       <div className="flex items-center justify-center gap-2 text-[13px] text-ink-tertiary">
         <span className="inline-block size-4 rounded-[4px] bg-teal-dark" />
-        Pago seguro procesado por Stripe · Tarjeta, OXXO y SPEI
+        Procesamiento de pago protegido por Stripe · Tarjeta de crédito y débito
       </div>
     </>
   );

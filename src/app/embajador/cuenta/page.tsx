@@ -1,14 +1,17 @@
 import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
 import { LogoutButton } from "@/components/app/LogoutButton";
 import { PaymentDataCard } from "../PaymentDataCard";
+import { DatosCard } from "../DatosCard";
+import { IneCard } from "../IneCard";
 import { ExtrasCard, BajaEmbajadorCard } from "../ExtrasCard";
 import { getAmbassadorContext } from "../shared";
 
 export const metadata = { title: "Mi cuenta de embajador · Club Pata Amiga" };
 
 /**
- * Ajustes del embajador: datos de pago (con titular), RFC y redes sociales,
- * contraseña y baja voluntaria (equipo, 5-ago).
+ * Ajustes del embajador: datos de pago (titular y RFC), redes sociales,
+ * contraseña y baja voluntaria (equipo, 5-ago; RFC movido a la tarjeta
+ * bancaria el 13-ago).
  */
 export default async function EmbajadorCuentaPage() {
   const { ambassador } = await getAmbassadorContext();
@@ -17,15 +20,18 @@ export default async function EmbajadorCuentaPage() {
     <div className="mx-auto flex w-full max-w-[980px] flex-col gap-4 px-5 py-5 sm:px-8">
       <h1 className="font-display text-[24px] text-ink-title">Mi cuenta</h1>
       <div className="grid items-start gap-4 lg:grid-cols-2">
+        <DatosCard datos={ambassador} />
         <PaymentDataCard
           initialBank={ambassador.bank_name}
           initialClabe={ambassador.clabe}
           initialHolder={ambassador.bank_holder}
-        />
-        <ExtrasCard
           initialRfc={ambassador.rfc}
-          initialLinks={ambassador.social_links}
         />
+        <IneCard
+          tieneFrente={Boolean(ambassador.ine_front_url)}
+          tieneReverso={Boolean(ambassador.ine_back_url)}
+        />
+        <ExtrasCard initialLinks={ambassador.social_links} />
         <ChangePasswordCard />
         <BajaEmbajadorCard />
       </div>

@@ -527,7 +527,7 @@ export function InboxClient({ initial }: { initial: Conversation[] }) {
               <p className="border-t border-border-divider bg-cream px-4 py-3 text-xs text-ink-tertiary">
                 👁️ Vista de supervisión: el miembro conversa con el asistente IA
                 dentro de su portal. Para contactarlo directamente, usa
-                Comunicados o su ficha en Miembros.
+                Comunicados o su perfil en Miembros.
               </p>
             ) : (
             <form

@@ -46,15 +46,24 @@ export default async function AdminFinanzasPage() {
       .select("amount_approved, status")
       .in("status", ["approved", "partial", "paid"])
       .gte("resolved_at", monthStart.toISOString()),
+    // Se trae `created_at` y la fecha de baja del embajador porque el corte no
+    // solo mira el mes: a quien se dio de baja se le paga hasta SU fecha de
+    // baja (Pablo, 16-ago). Sin ese filtro este total no cuadraría con el
+    // archivo del banco ni con el panel de embajadores.
     admin
       .from("referrals")
-      .select("commission_amount")
+      .select("commission_amount, created_at, ambassadors(deactivated_at)")
       .eq("status", "pending")
       .lt("created_at", monthStart.toISOString()),
-    // Miembros activos TOTALES: el MRR solo puede ver a los que cobran por
-    // Stripe, y los migrados de Memberstack no tienen suscripción aquí. Sin
-    // este contraste el tablero daba a entender que el MRR era todo el negocio
-    // (auditoría 11-ago: 63 activos, 3 con cobro en la plataforma).
+    // Miembros activos TOTALES: el MRR solo puede sumar a quienes tienen
+    // suscripción registrada aquí. Sin este contraste, el tablero daría a
+    // entender que el MRR es todo el negocio.
+    //
+    // ⚠ OJO al leer la diferencia: en el ambiente de PRUEBAS sale enorme
+    // porque esa base es copia de producción pero sus suscripciones apuntan
+    // al Stripe de prueba — las reales no están. Se confundió dos veces con
+    // "hay miembros a los que no se les cobra" (11 y 12-ago) y NO lo es.
+    // Para juzgar esta cifra: producción, nunca pruebas.
     admin
       .from("profiles")
       .select("id", { count: "exact", head: true })
@@ -106,10 +115,15 @@ export default async function AdminFinanzasPage() {
     (acc, r) => acc + Number(r.amount_approved ?? 0),
     0,
   );
-  const commissionsOut = (payableReferrals.data ?? []).reduce(
-    (acc, r) => acc + Number(r.commission_amount ?? 0),
-    0,
-  );
+  const commissionsOut = (payableReferrals.data ?? [])
+    .filter((r) => {
+      // PostgREST devuelve el embebido como objeto o como arreglo según la
+      // relación; se normaliza para no depender de eso.
+      const emb = Array.isArray(r.ambassadors) ? r.ambassadors[0] : r.ambassadors;
+      const baja = emb?.deactivated_at;
+      return !baja || new Date(r.created_at) <= new Date(baja);
+    })
+    .reduce((acc, r) => acc + Number(r.commission_amount ?? 0), 0);
 
   // Cobros desde Stripe (facturas pagadas recientes + total del mes)
   let payments: PaymentRow[] = [];
@@ -271,6 +285,14 @@ export default async function AdminFinanzasPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-[26px] text-ink-title">Finanzas</h1>
         <div className="flex flex-wrap gap-2">
+          {isSuper && (
+            <Link
+              href="/admin/costos"
+              className="grid h-9 place-items-center rounded-full bg-teal px-4 text-xs font-bold text-white transition-colors hover:bg-teal-deep"
+            >
+              📉 Costos de la plataforma →
+            </Link>
+          )}
           {/* Atajo al filtro de solicitantes de factura (Fase 4) */}
           <Link
             href="/admin/miembros?factura=si"

@@ -96,7 +96,10 @@ export default async function EmbajadorResumenPage() {
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <CodeCard
           code={ambassador.referral_code ?? ""}
-          canCustomize={ambassador.code_change_count === 0}
+          /* Siempre se puede cambiar (equipo, 16-ago). Los lineamientos decían
+             "no se pueden hacer cambios", pero el equipo prefirió dejarlo
+             abierto; `code_change_count` sigue contando para poder auditar. */
+          canCustomize
         />
         {/* Finanzas del mes: KPIs y cortes mensuales juntos */}
         <div className="flex flex-col gap-3">
@@ -240,8 +243,8 @@ export default async function EmbajadorResumenPage() {
       <WelcomeOnce
         storageKey={`pa_welcome_embajador_${ambassador.id}`}
         emoji="🎉"
-        title={`¡Bienvenido al equipo, ${ambassador.first_name}!`}
-        message={`Tu código ${ambassador.referral_code ?? ""} ya está activo. Copia tu link, compártelo en tus redes y registra tus datos de pago para recibir tus comisiones el día ${AMBASSADOR_PAYOUT_DAY} de cada mes.`}
+        title={`¡Bienvenido a la manada, ${ambassador.first_name}!`}
+        message={`Tu código ${ambassador.referral_code ?? ""} ya está activo. Copia tu enlace, compártelo en tus redes y registra tus datos de pago para recibir tus comisiones el día ${AMBASSADOR_PAYOUT_DAY} de cada mes.`}
         cta="Empezar a compartir"
       />
     </div>

@@ -9,7 +9,7 @@ import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { Stepper } from "@/components/registro/Stepper";
 import { TextField } from "@/components/ui/Field";
-import { PhoneField } from "@/components/ui/PhoneField";
+import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 import { GoogleIcon } from "@/components/ui/GoogleIcon";
 
@@ -42,8 +42,10 @@ export default function RegistroPage() {
       setError("La contraseña debe tener mínimo 8 caracteres.");
       return;
     }
-    if (phone.length !== 10) {
-      setError("El teléfono debe tener 10 dígitos.");
+    if (!telefonoCompleto(phone)) {
+      setError(
+        "Revisa tu teléfono — con lada de México son 10 dígitos, sin el código de país.",
+      );
       return;
     }
     setLoading(true);
@@ -52,7 +54,10 @@ export default function RegistroPage() {
       email: cleanEmail,
       password,
       options: {
-        data: { phone: `+52${phone}` },
+        // La fecha de nacimiento ya NO se pide aquí (Pablo, 16-ago): el alta
+        // se acorta y la edad se comprueba después del pago, al completar el
+        // perfil, leyéndola de la CURP. Ver `ProfileForm`.
+        data: { phone },
         // La liga del correo de confirmación abre en pestaña nueva: aterriza
         // en una página de marca que invita a cerrarla (el registro sigue solo
         // en la pestaña original). Requiere la URL en la lista de redirecciones
@@ -186,7 +191,7 @@ export default function RegistroPage() {
                   required
                   value={phone}
                   onChange={setPhone}
-                  hint="10 dígitos, sin lada internacional."
+                  hint="Elige tu país si no es México."
                 />
                 {error && (
                   <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">

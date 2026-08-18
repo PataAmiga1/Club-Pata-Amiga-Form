@@ -8,12 +8,22 @@ import { notifyTeam } from "@/lib/alerts";
 import { APPEAL_MAX_PER_SUBJECT, CENTER_APPEAL_MAX } from "@/lib/constants";
 import { beneficiosDeUsuario } from "@/lib/plans/resolve";
 
+/** Adjunto ya subido a `appeal-documents` por el navegador. */
+export type AppealDocument = { path: string; name: string; type: string };
+
 export type AppealInput = {
   reimbursementId?: string;
   petId?: string;
   centerId?: string;
   message: string;
+  /**
+   * Fotos o PDF que acompañan la apelación (equipo, 15-ago). Suben desde el
+   * navegador, que es donde hay sesión; aquí solo llegan las rutas.
+   */
+  documents?: AppealDocument[];
 };
+
+const MAX_DOCUMENTOS = 5;
 
 /**
  * Presenta una apelación sobre un reintegro rechazado, una mascota denegada
@@ -33,6 +43,14 @@ export async function submitAppeal(input: AppealInput) {
     return { error: "Cuéntanos tu caso con al menos 10 caracteres." };
   if (!input.reimbursementId && !input.petId && !input.centerId)
     return { error: "Falta el sujeto de la apelación." };
+
+  // Los adjuntos ya están en Storage, pero las rutas llegan del navegador: se
+  // acepta únicamente lo que está dentro de la carpeta de esta persona. Sin
+  // esto, alguien podría anotar en su apelación la ruta del documento de otro
+  // y el panel se lo mostraría firmado al comité.
+  const documents = (input.documents ?? []).slice(0, MAX_DOCUMENTOS).filter(
+    (d) => typeof d?.path === "string" && d.path.startsWith(`${user.id}/`),
+  );
 
   const admin = createAdminClient();
   let subjectLabel = "";
@@ -55,10 +73,10 @@ export async function submitAppeal(input: AppealInput) {
       .eq("id", input.petId)
       .single();
     if (!p || p.user_id !== user.id)
-      return { error: "No encontramos esa mascota." };
+      return { error: "No encontramos ese peludo." };
     if (p.approval_status !== "rejected")
-      return { error: "Solo se apelan fichas rechazadas." };
-    subjectLabel = `la ficha de ${p.name}`;
+      return { error: "Solo se apelan perfiles rechazados." };
+    subjectLabel = `el perfil de ${p.name}`;
   } else if (input.centerId) {
     const { data: c } = await admin
       .from("wellness_centers")
@@ -110,6 +128,7 @@ export async function submitAppeal(input: AppealInput) {
       pet_id: input.petId ?? null,
       center_id: input.centerId ?? null,
       reason: message,
+      documents,
     })
     .select("folio")
     .single();
@@ -134,6 +153,7 @@ export async function submitAppeal(input: AppealInput) {
     `<h2 style="color:#1E5350">Nueva apelación ${appeal.folio}</h2>
      <p>${profile?.first_name ?? "Un miembro"} apeló ${subjectLabel}.</p>
      <p><strong>Mensaje:</strong> ${message}</p>
+     ${documents.length > 0 ? `<p><strong>Adjuntó ${documents.length} archivo${documents.length === 1 ? "" : "s"}</strong> — se ven en el panel.</p>` : ""}
      <p>Revisa la cola en el panel → Apelaciones.</p>`,
   );
 

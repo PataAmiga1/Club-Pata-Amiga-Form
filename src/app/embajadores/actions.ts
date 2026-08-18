@@ -5,6 +5,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
 import { validateCurp } from "@/lib/curp";
+import {
+  EDAD_MINIMA,
+  esMayorDeEdad,
+  fechaDeNacimientoDeCurp,
+} from "@/lib/edad";
+import { esDocumentoValido, guardarFotoIne } from "@/lib/documentos-ine";
 
 export type AmbassadorApplicationInput = {
   firstName: string;
@@ -30,6 +36,13 @@ export type AmbassadorApplicationInput = {
   birthDate?: string;
   /** Por qué quiere ser embajador (equipo, 5-ago) */
   motivation?: string;
+  /**
+   * INE por los DOS lados, como data URL de imagen ya comprimida en el
+   * navegador (equipo, 13-ago). Obligatorias: el comité valida identidad con
+   * ellas y las comisiones se pagan a nombre de esa persona.
+   */
+  ineFront?: string;
+  ineBack?: string;
   /**
    * Contraseña de la cuenta que se crea AL APLICAR (equipo, 11-ago).
    * Antes no se pedía: la solicitud se guardaba sin cuenta, así que el
@@ -58,6 +71,31 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
   const curpCheck = validateCurp(curp ?? "");
   if (!curpCheck.isValid)
     return { error: curpCheck.error ?? "Revisa tu CURP (18 caracteres, formato oficial)." };
+
+  // 18+ DE VERDAD (equipo, 13-ago). Hasta hoy la única barrera era la casilla
+  // "confirmo que soy mayor de edad", que cualquiera palomea. Ahora se calcula
+  // la edad con la fecha capturada y, además, con la que trae la propia CURP:
+  // si la CURP dice que es menor, no hay fecha que valga.
+  const birthDate = input.birthDate?.trim();
+  if (!birthDate)
+    return { error: "Necesitamos tu fecha de nacimiento." };
+  if (!esMayorDeEdad(birthDate))
+    return {
+      error: `El programa de embajadores es para mayores de ${EDAD_MINIMA} años.`,
+    };
+  const fechaCurp = fechaDeNacimientoDeCurp(curp ?? "");
+  if (fechaCurp && !esMayorDeEdad(fechaCurp))
+    return {
+      error: `Tu CURP indica que aún no cumples ${EDAD_MINIMA} años. El programa de embajadores es para mayores de edad.`,
+    };
+
+  // INE por los dos lados, obligatoria (equipo, 13-ago). Se valida aquí y no
+  // solo en el formulario: sin ella el comité no puede aprobar a nadie.
+  if (!esDocumentoValido(input.ineFront) || !esDocumentoValido(input.ineBack))
+    return {
+      error:
+        "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
+    };
 
   // Al menos una red social. Se limpia antes de validar para que un campo con
   // espacios no cuente como red llenada.
@@ -95,6 +133,16 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Solo si el correo del formulario ES el de la sesión. Con otro correo, la
+  // solicitud se colgaba de la cuenta abierta y el correo/contraseña escritos
+  // se ignoraban: no nacía cuenta para ese correo y su "recuperar contraseña"
+  // no mandaba nada (mismo caso que se detectó en centros, 12-ago).
+  if (user && (user.email ?? "").toLowerCase() !== email) {
+    return {
+      error: `Tienes la sesión abierta con ${user.email}. Para enviar la solicitud con ${email}, cierra sesión y vuelve a intentarlo; si la solicitud es de esta cuenta, usa ${user.email} en el formulario.`,
+    };
+  }
 
   if (user) {
     const { data: mine } = await admin
@@ -161,7 +209,13 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     ambassadorUserId = created.user.id;
   }
 
-  const birthDate = input.birthDate?.trim();
+  // La INE se sube AHORA, con la cuenta ya creada: el bucket es privado y su
+  // ruta arranca con el id del usuario, que hasta este punto no existía.
+  const [ineFrontPath, ineBackPath] = await Promise.all([
+    guardarFotoIne(ambassadorUserId, "ine_front", input.ineFront ?? ""),
+    guardarFotoIne(ambassadorUserId, "ine_back", input.ineBack ?? ""),
+  ]);
+
   const { error } = await admin.from("ambassadors").insert({
     user_id: ambassadorUserId,
     first_name: firstName,
@@ -178,6 +232,8 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     birth_date:
       birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
     motivation: input.motivation?.trim() || null,
+    ine_front_url: ineFrontPath,
+    ine_back_url: ineBackPath,
     status: "pending",
   });
   if (error) {

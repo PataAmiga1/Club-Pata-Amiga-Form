@@ -68,7 +68,7 @@ const REGLAS: { patron: RegExp; etiqueta: string; enLugarDe: string }[] = [
   {
     patron: /\bcarencia(?:s)?\b/g,
     etiqueta: "carencia",
-    enLugarDe: "período de espera",
+    enLugarDe: "tiempo de espera",
   },
   {
     patron: /\bfondo\s+solidario\b/g,

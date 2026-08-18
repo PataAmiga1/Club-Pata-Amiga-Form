@@ -75,12 +75,12 @@ export const SITE_ASSET_SLOTS = [
   {
     slot: "landing-hero",
     label: "Hero de la landing",
-    hint: "Perro y gato mirando arriba (recorte sobre teal). Ideal ~900×760.",
+    hint: "Lomito y michi mirando arriba (recorte sobre teal). Ideal ~900×760.",
   },
   {
     slot: "landing-planes",
     label: "Tarjeta de planes",
-    hint: "Tutora abrazando a su perro (estilo brandbook). Ideal ~800×560.",
+    hint: "Tutora abrazando a su lomito (estilo brandbook). Ideal ~800×560.",
   },
   {
     slot: "landing-como-funciona",
@@ -102,10 +102,12 @@ export type SiteAssetSlot = (typeof SITE_ASSET_SLOTS)[number]["slot"];
  */
 export const MATERIAL_SLOTS = [
   {
+    // La LLAVE `material-pack-historias` no cambia: es la que apunta al
+    // archivo ya subido en site_assets. Solo cambian etiqueta y descripción.
     slot: "material-pack-historias",
-    label: "Pack historias IG",
+    label: "Kit historias IG",
     emoji: "🖼️",
-    hint: "ZIP o carpeta de imágenes del mes para historias.",
+    hint: "Recursos para historias de IG.",
   },
   {
     slot: "material-video-reintegro",
@@ -123,7 +125,7 @@ export const MATERIAL_SLOTS = [
     slot: "material-campana",
     label: "Campaña temporal",
     emoji: "⭐",
-    hint: "Asset de la campaña vigente — rota según temporada.",
+    hint: "Material de la campaña vigente — rota según la temporada.",
   },
 ] as const;
 
@@ -151,7 +153,7 @@ export const NOTIFY_EVENTS = [
   {
     key: "notify_centers",
     label: "Nueva solicitud de centro aliado",
-    hint: "Aviso al llegar un registro de centro de bienestar.",
+    hint: "Aviso al llegar un registro de centro aliado.",
   },
   {
     key: "notify_memberships",
@@ -160,13 +162,13 @@ export const NOTIFY_EVENTS = [
   },
   {
     key: "notify_pets",
-    label: "Respuestas sobre mascotas",
+    label: "Respuestas sobre peludos",
     hint: "Aviso cuando un miembro responde una solicitud de información del comité.",
   },
   {
     key: "notify_appeals",
     label: "Nueva apelación",
-    hint: "Aviso cuando un miembro apela un reintegro o una ficha de mascota.",
+    hint: "Aviso cuando un miembro apela un reintegro o un perfil de peludo.",
   },
   {
     key: "notify_emergencies",

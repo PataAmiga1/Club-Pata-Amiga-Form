@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { waitingProgress } from "@/lib/dates";
+import { etiquetaEspecie } from "@/lib/vocabulario";
 
 export type PetRow = {
   id: string;
@@ -46,7 +47,7 @@ export function PetCard({ pet }: { pet: PetRow }) {
     pet.waiting_period_bypassed,
     pet.waiting_period_start_date,
   );
-  // La espera arranca cuando el comité aprueba (PM, 11-ago): una ficha en
+  // La espera arranca cuando el comité aprueba (PM, 11-ago): un perfil en
   // revisión no muestra un conteo corriendo.
   const enRevision = pet.approval_status === "pending" && !pet.waiting_period_bypassed;
   // Si el miembro ya subió todo (foto + certificado si es senior y el comité
@@ -100,7 +101,7 @@ export function PetCard({ pet }: { pet: PetRow }) {
           </span>
         </div>
         <span className="text-[13px] text-ink-secondary">
-          {pet.species === "dog" ? "Perro" : "Gato"}
+          {etiquetaEspecie(pet.species)}
           {pet.breed ? ` · ${pet.breed}` : ""} · {ageLabel(pet)}
         </span>
         {inactive ? (
@@ -113,11 +114,21 @@ export function PetCard({ pet }: { pet: PetRow }) {
         ) : enRevision ? (
         <div className="flex flex-col gap-[5px]">
           <span className="text-[11.5px] text-ink-tertiary">
+            {/* Pantalla 14 del tono 2.0: se habla de «confirmar información»
+                en vez de «revisión del comité». */}
             {docsCompletos
-              ? "Su ficha está en revisión del comité — el período de espera empieza al aprobarse · "
-              : "Su período de espera empieza cuando el comité apruebe su ficha · "}
-            <Link href="/app/peludos" className="font-semibold text-teal-deep">
-              {docsCompletos ? "Ver ficha" : "Completar documentos"}
+              ? "Estamos validando su información — su tiempo de espera iniciará en cuanto quede confirmada · "
+              : "Su tiempo de espera inicia al confirmar su información · "}
+            {/* Al perfil DE ESE peludo, no a la lista: desde el inicio
+                llevaba a la pestaña de peludos, y dentro de la pestaña
+                llevaba a la misma pantalla — o sea, no hacía nada
+                (PM, 12-ago). El ?completar=1 encadena con el siguiente
+                peludo al que le falten datos. */}
+            <Link
+              href={`/app/peludos/${pet.id}?completar=1`}
+              className="font-semibold text-teal-deep"
+            >
+              {docsCompletos ? "Ver perfil completo" : "Completar perfil"}
             </Link>
           </span>
         </div>
@@ -126,8 +137,8 @@ export function PetCard({ pet }: { pet: PetRow }) {
           <div className="flex justify-between text-[11.5px] text-ink-tertiary">
             <span>
               {wait.done
-                ? "Período de espera completado"
-                : "Período de espera en curso"}
+                ? "Tiempo de espera completado"
+                : "Tiempo de espera en curso"}
             </span>
             <span
               className={
@@ -146,7 +157,7 @@ export function PetCard({ pet }: { pet: PetRow }) {
             />
           </div>
           {/* La rama "pending" vive arriba (enRevision): aquí solo llegan
-              fichas aprobadas o con bypass. */}
+              perfiles aprobados o con bypass. */}
           {wait.done && pet.approval_status === "approved" ? (
             <Link
               href="/app/reintegros/nueva"

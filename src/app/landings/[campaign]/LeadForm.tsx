@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PhoneField } from "@/components/ui/PhoneField";
 import { registerLead } from "./actions";
 
 /** Formulario de registro de la landing: nombre, apellidos, correo, teléfono. */
@@ -96,15 +97,8 @@ export function LeadForm({
         required
         className={inputCls}
       />
-      <input
-        type="tel"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        placeholder="Teléfono (10 dígitos)"
-        autoComplete="tel"
-        required
-        className={inputCls}
-      />
+      {/* Lada seleccionable como en el resto del sitio (equipo, 13-ago) */}
+      <PhoneField value={phone} onChange={setPhone} required />
       <label className="flex items-start gap-2.5 text-left text-[12px] leading-snug text-ink-secondary">
         <input
           type="checkbox"

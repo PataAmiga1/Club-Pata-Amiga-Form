@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/app/LogoutButton";
 import { AmbassadorNav } from "./AmbassadorNav";
 import { PaymentDataCard } from "./PaymentDataCard";
 import { ExtrasCard } from "./ExtrasCard";
+import { IneCard } from "./IneCard";
 import { getAmbassadorContext } from "./shared";
 
 /** Lo que se desbloquea al ser aprobado — se muestra en gris mientras tanto. */
@@ -62,7 +63,7 @@ function StatusScreen({
       </h1>
       <p className="text-sm leading-relaxed text-ink-secondary">
         {status === "pending"
-          ? "El comité está revisando tu solicitud de embajador. Te avisaremos por correo en cuanto haya resolución."
+          ? "El comité está revisando tu solicitud de embajador. Te avisaremos por correo en cuanto tengamos una respuesta."
           : (reason ??
             "El comité no pudo aprobar tu solicitud en esta ocasión. Puedes escribirnos si crees que hay un error.")}
       </p>
@@ -139,18 +140,20 @@ export default async function EmbajadorLayout({
             <>
               <p className="text-center text-[13.5px] text-ink-secondary">
                 Mientras tanto puedes dejar listo tu perfil — así, en cuanto te
-                aprobemos, empiezas a compartir sin trámites.
+                aprobemos, empiezas a compartir de inmediato.
               </p>
               <div className="grid items-start gap-4 lg:grid-cols-2">
                 <PaymentDataCard
                   initialBank={ambassador.bank_name}
                   initialClabe={ambassador.clabe}
                   initialHolder={ambassador.bank_holder}
-                />
-                <ExtrasCard
                   initialRfc={ambassador.rfc}
-                  initialLinks={ambassador.social_links}
                 />
+                <IneCard
+                  tieneFrente={Boolean(ambassador.ine_front_url)}
+                  tieneReverso={Boolean(ambassador.ine_back_url)}
+                />
+                <ExtrasCard initialLinks={ambassador.social_links} />
                 <ChangePasswordCard />
                 <LockedPreview />
               </div>
@@ -179,7 +182,7 @@ export default async function EmbajadorLayout({
               <span className="text-[12.5px] opacity-90">
                 {wasMember
                   ? "Tu membresía no está activa. Reactívala para volver a cuidar a tus peludos."
-                  : "Como embajador aún no tienes membresía. Únete y registra hasta 3 mascotas."}
+                  : "Como embajador aún no tienes membresía. Únete y registra hasta 3 peludos."}
               </span>
             </div>
             <Link

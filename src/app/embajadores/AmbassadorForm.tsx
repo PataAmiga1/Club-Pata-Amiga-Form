@@ -2,38 +2,74 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/Button";
 import { TextField, SelectField } from "@/components/ui/Field";
-import { PhoneField } from "@/components/ui/PhoneField";
+import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
+import { FotoDocumento } from "@/components/ui/FotoDocumento";
 import { createClient } from "@/lib/supabase/client";
+import {
+  EDAD_MINIMA,
+  esMayorDeEdad,
+  fechaMaximaParaSerMayor,
+} from "@/lib/edad";
+import type { DatosConocidos } from "@/lib/datos-conocidos";
 import { registerAmbassador } from "./actions";
 
-export function AmbassadorForm() {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [curp, setCurp] = useState("");
-  const [state, setState] = useState("");
-  const [city, setCity] = useState("");
+// Los textos legales pesan miles de líneas: el popup se carga SOLO cuando
+// alguien lo abre, no viaja con la página del formulario.
+const LegalPopup = dynamic(
+  () => import("@/components/legal/LegalPopup").then((m) => m.LegalPopup),
+  { ssr: false },
+);
+
+/**
+ * `conocidos` llega del servidor cuando hay sesión: lo que la persona ya
+ * capturó como miembro o en un registro anterior (equipo, 15-ago). Antes cada
+ * rol volvía a preguntar lo mismo desde cero.
+ */
+export function AmbassadorForm({
+  conocidos,
+}: {
+  conocidos: DatosConocidos | null;
+}) {
+  const [firstName, setFirstName] = useState(conocidos?.firstName ?? "");
+  const [lastName, setLastName] = useState(conocidos?.lastName ?? "");
+  const [email, setEmail] = useState(conocidos?.email ?? "");
+  const [phone, setPhone] = useState(conocidos?.phone ?? "");
+  const [curp, setCurp] = useState(conocidos?.curp ?? "");
+  const [state, setState] = useState(conocidos?.state ?? "");
+  const [city, setCity] = useState(conocidos?.city ?? "");
   const [isAdult, setIsAdult] = useState(false);
   // Fecha de nacimiento y motivación (equipo, 5-ago)
-  const [birthDate, setBirthDate] = useState("");
+  const [birthDate, setBirthDate] = useState(conocidos?.birthDate ?? "");
   const [motivation, setMotivation] = useState("");
   // Contraseña: la cuenta se crea al aplicar (equipo, 11-ago)
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   // Apellido materno, CP y redes sociales (equipo, 11-ago)
-  const [secondLastName, setSecondLastName] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [colony, setColony] = useState("");
-  const [colonies, setColonies] = useState<string[]>([]);
+  const [secondLastName, setSecondLastName] = useState(
+    conocidos?.secondLastName ?? "",
+  );
+  const [postalCode, setPostalCode] = useState(conocidos?.postalCode ?? "");
+  const [colony, setColony] = useState(conocidos?.colony ?? "");
+  const [colonies, setColonies] = useState<string[]>(
+    conocidos?.colony ? [conocidos.colony] : [],
+  );
   const [social, setSocial] = useState<Record<string, string>>({
     facebook: "",
     instagram: "",
     tiktok: "",
     youtube: "",
   });
+  // INE por los DOS LADOS (confirmado 13-ago). El comité la necesita para
+  // aprobar y para pagar comisiones a nombre de alguien; el registro nunca la
+  // había pedido, así que los embajadores dados de alta con el sitio nuevo
+  // salían en el panel marcados como "falta INE" para siempre.
+  const [ineFront, setIneFront] = useState("");
+  const [ineBack, setIneBack] = useState("");
+  // Popup de legales (equipo, 16-ago): null = cerrado
+  const [legalSlug, setLegalSlug] = useState<string | null>(null);
 
   /** CP → colonia y alcaldía/municipio. Editable: el catálogo puede fallar. */
   const onCpChange = (cp: string) => {
@@ -55,8 +91,29 @@ export function AmbassadorForm() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
+  const menorDeEdad =
+    /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && !esMayorDeEdad(birthDate);
+
   const submit = async () => {
     setError(null);
+    if (!telefonoCompleto(phone)) {
+      setError(
+        "Revisa tu teléfono — con lada de México son 10 dígitos, sin el código de país.",
+      );
+      return;
+    }
+    if (!esMayorDeEdad(birthDate)) {
+      setError(
+        `El programa de embajadores es para mayores de ${EDAD_MINIMA} años. Revisa tu fecha de nacimiento.`,
+      );
+      return;
+    }
+    if (!ineFront || !ineBack) {
+      setError(
+        "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
+      );
+      return;
+    }
     setBusy(true);
     try {
       const result = await registerAmbassador({
@@ -75,6 +132,8 @@ export function AmbassadorForm() {
         postalCode,
         colony,
         socialLinks: social,
+        ineFront,
+        ineBack,
       });
       if (result.error) {
         setError(result.error);
@@ -137,6 +196,12 @@ export function AmbassadorForm() {
         submit();
       }}
     >
+      {conocidos && (
+        <div className="rounded-[12px] bg-info-bg px-4 py-3 text-[12.5px] leading-relaxed text-info-text">
+          Llenamos lo que ya sabemos de ti con los datos de tu cuenta. Revísalos
+          y corrige lo que haya cambiado.
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField
           label="Nombre(s)"
@@ -172,29 +237,34 @@ export function AmbassadorForm() {
           required
           value={phone}
           onChange={setPhone}
-          hint="10 dígitos, sin lada internacional."
+          hint="Elige tu país si no es México."
         />
       </div>
-      <TextField
-        label="Contraseña"
-        type={showPassword ? "text" : "password"}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        autoComplete="new-password"
-        minLength={8}
-        placeholder="Mínimo 8 caracteres"
-        hint="Con ella entras a tu portal de embajador, aunque tu solicitud siga en revisión."
-        required
-        rightSlot={
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="text-[13px] font-semibold text-teal-deep"
-          >
-            {showPassword ? "Ocultar" : "Mostrar"}
-          </button>
-        }
-      />
+      {/* Sin contraseña cuando YA hay sesión: la cuenta existe y pedirla otra
+          vez solo confunde. La acción del servidor ya la trata como opcional
+          en ese caso (equipo, 15-ago). */}
+      {!conocidos && (
+        <TextField
+          label="Contraseña"
+          type={showPassword ? "text" : "password"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="new-password"
+          minLength={8}
+          placeholder="Mínimo 8 caracteres"
+          hint="Con ella entras a tu portal de embajador, aunque tu solicitud siga en revisión."
+          required
+          rightSlot={
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="text-[13px] font-semibold text-teal-deep"
+            >
+              {showPassword ? "Ocultar" : "Mostrar"}
+            </button>
+          }
+        />
+      )}
       <TextField
         label="CURP"
         value={curp}
@@ -204,6 +274,33 @@ export function AmbassadorForm() {
         hint="La usamos para validar que eres mayor de edad."
         required
       />
+      {/* INE por los dos lados: el comité valida identidad con ella y las
+          comisiones se pagan a nombre de esa persona (equipo, 13-ago). */}
+      <div className="flex flex-col gap-3 rounded-[14px] bg-cream/60 p-4">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[13px] font-semibold text-ink-title">
+            Tu identificación oficial (INE)
+          </span>
+          <span className="text-xs text-ink-tertiary">
+            Los dos lados, en foto o PDF. Solo la ve el comité, para validar tu
+            identidad y pagarte tus comisiones a tu nombre.
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <FotoDocumento
+            label="INE — frente"
+            hint="El lado de tu foto."
+            value={ineFront}
+            onChange={setIneFront}
+          />
+          <FotoDocumento
+            label="INE — reverso"
+            hint="El lado del código de barras."
+            value={ineBack}
+            onChange={setIneBack}
+          />
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField
           label="Código postal"
@@ -245,12 +342,27 @@ export function AmbassadorForm() {
           onChange={(e) => setState(e.target.value)}
         />
       </div>
+      {/* Obligatoria y validada desde el 13-ago: la casilla de "soy mayor de
+          edad" era la única barrera y no comprobaba nada. */}
       <TextField
         label="Fecha de nacimiento"
         type="date"
+        required
         value={birthDate}
+        max={fechaMaximaParaSerMayor()}
         onChange={(e) => setBirthDate(e.target.value)}
+        hint={
+          menorDeEdad
+            ? undefined
+            : `El programa es para mayores de ${EDAD_MINIMA} años.`
+        }
       />
+      {menorDeEdad && (
+        <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">
+          Con esa fecha aún no cumples {EDAD_MINIMA} años, así que todavía no
+          puedes ser embajador. ¡Te esperamos cuando los cumplas! 🐾
+        </div>
+      )}
       <TextField
         label="¿Por qué quieres ser embajador?"
         value={motivation}
@@ -302,13 +414,42 @@ export function AmbassadorForm() {
         solicitud.
       </label>
 
+      {/* Legales antes del botón (equipo, 16-ago). Se leen en el mismo popup
+          que en el registro de miembro: no navegan fuera, así que nadie pierde
+          lo que ya llenó del formulario. */}
+      <p className="text-[12.5px] leading-normal text-ink-tertiary">
+        Al enviar tu solicitud aceptas los{" "}
+        <button
+          type="button"
+          onClick={() => setLegalSlug("terminos-y-condiciones")}
+          className="font-semibold text-teal-deep underline"
+        >
+          Términos y condiciones
+        </button>{" "}
+        y el{" "}
+        <button
+          type="button"
+          onClick={() => setLegalSlug("aviso-de-privacidad")}
+          className="font-semibold text-teal-deep underline"
+        >
+          Aviso de privacidad
+        </button>
+        .
+      </p>
+      {legalSlug && (
+        <LegalPopup
+          initialSlug={legalSlug}
+          onClose={() => setLegalSlug(null)}
+        />
+      )}
+
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm font-semibold text-error-text">
           {error}
         </div>
       )}
 
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" disabled={busy || menorDeEdad}>
         {busy ? "Enviando…" : "Quiero ser embajador"}
       </Button>
     </form>

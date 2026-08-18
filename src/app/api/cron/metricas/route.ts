@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { calcularAgregadosDelDia } from "@/lib/tableros/metricas";
 import { diaEnMexico } from "@/lib/tableros/rango";
 import { reportError } from "@/lib/alerts";
+import { recordarCapturaDeCostos } from "@/lib/costos-recordatorio";
 
 /**
  * Agregado nocturno del tablero de ventas. Corre una vez al día.
@@ -39,5 +40,15 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, dias, fallidos });
+  // Recordatorio de captura de costos: va aquí y no en una tarea propia
+  // porque el plan de Vercel limita cuántas caben, y adentro decide si hoy
+  // toca y si de verdad falta algo.
+  let recordatorio: unknown = null;
+  try {
+    recordatorio = await recordarCapturaDeCostos(admin);
+  } catch (e) {
+    await reportError("recordatorio-costos", e);
+  }
+
+  return NextResponse.json({ ok: true, dias, fallidos, recordatorio });
 }

@@ -58,7 +58,7 @@ export default async function AdminReintegrosPage({
             href="/admin/centros/pagos"
             className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
           >
-            🏥 Pagos a centros de bienestar →
+            🏥 Pagos a centros aliados →
           </Link>
           <a
             href="/api/admin/layouts/reintegros"

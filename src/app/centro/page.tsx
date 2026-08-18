@@ -294,7 +294,7 @@ export default async function CentroDashboardPage() {
               <span className="text-[12.5px] opacity-90">
                 {wasMember
                   ? "Tu membresía no está activa. Reactívala para volver a cuidar a tus peludos."
-                  : "Tu cuenta de centro aliado aún no tiene membresía. Únete y registra hasta 3 mascotas."}
+                  : "Tu cuenta de centro aliado aún no tiene membresía. Únete y registra hasta 3 peludos."}
               </span>
             </div>
             <Link
@@ -385,8 +385,8 @@ export default async function CentroDashboardPage() {
         storageKey={`pa_welcome_centro_${center.id}`}
         emoji="🎉"
         title={`¡${center.name} ya es parte de la red!`}
-        message="Tu centro ya aparece en el directorio de centros aliados. Completa tu ficha, publica promociones y los miembros las verán al instante."
-        cta="Completar mi ficha"
+        message="Tu centro ya aparece en el directorio de centros aliados. Completa tu perfil, publica promociones y los miembros las verán al instante."
+        cta="Completar mi perfil"
       />
     </div>
   );

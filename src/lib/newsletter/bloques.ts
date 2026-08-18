@@ -239,7 +239,7 @@ export const LAYOUT_POR_OMISION = `<table role="presentation" width="100%" cellp
       </td></tr>
       {{bloques}}
       <tr><td style="background-color:#1E5350;border-radius:0 0 20px 20px;padding:20px 32px;text-align:center;">
-        <p style="margin:0;font-size:12.5px;color:#BFD9D6;">Protección para tu manada · Hecho con ♡ en México</p>
+        <p style="margin:0;font-size:12.5px;color:#BFD9D6;">El mejor cuidado para tu manada · Hecho con ♡ en México</p>
       </td></tr>
       {{baja}}
     </table>

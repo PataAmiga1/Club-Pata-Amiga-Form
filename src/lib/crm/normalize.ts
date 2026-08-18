@@ -56,7 +56,7 @@ export function normalizeName(value: string | null | undefined): string | null {
 /**
  * Parte un nombre completo en nombre y apellido. Los canales de Meta entregan
  * "Avner Resendiz" en un solo campo; el CRM los guarda separados porque así los
- * ve el equipo en la ficha.
+ * ve el equipo en el perfil.
  */
 export function splitFullName(full: string | null | undefined): {
   firstName: string | null;

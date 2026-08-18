@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
+import { PhoneField } from "@/components/ui/PhoneField";
 import {
   updateCenterServices,
   addCenterLocation,
@@ -100,6 +101,18 @@ export function ServiciosCard({
     />
   );
 
+  // El teléfono lleva selector de lada como el resto del sitio (equipo,
+  // 13-ago): hay centros con número de otro país y antes no cabían.
+  const telefonoSucursal = (
+    <PhoneField
+      compact
+      className="col-span-2"
+      value={form.phone ?? ""}
+      onChange={(t) => setForm({ ...form, phone: t })}
+      hint="Teléfono de la sucursal"
+    />
+  );
+
   return (
     <div className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)]">
       <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
@@ -156,9 +169,9 @@ export function ServiciosCard({
             {input("address", "Calle y número", true)}
             {input("colony", "Colonia")}
             {input("postalCode", "Código postal")}
-            {input("city", "Ciudad")}
+            {input("city", "Alcaldía o municipio")}
             {input("state", "Estado")}
-            {input("phone", "Teléfono de la sucursal", true)}
+            {telefonoSucursal}
             <div className="col-span-2 flex gap-2">
               <button
                 type="button"
@@ -217,9 +230,9 @@ export function ServiciosCard({
           {input("address", "Calle y número", true)}
           {input("colony", "Colonia")}
           {input("postalCode", "Código postal")}
-          {input("city", "Ciudad")}
+          {input("city", "Alcaldía o municipio")}
           {input("state", "Estado")}
-          {input("phone", "Teléfono de la sucursal", true)}
+          {telefonoSucursal}
           <div className="col-span-2 flex gap-2">
             <button
               type="button"

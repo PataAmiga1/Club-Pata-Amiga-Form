@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { LEGAL_DOCS } from "@/lib/site";
 import { LEGAL_TEXTS } from "@/data/legal-texts";
+import { limpiarMarcasLegales } from "@/lib/legal-format";
 
 /**
  * Popup de documentos legales (equipo, 10-ago): en el flujo de registro los
@@ -15,7 +16,18 @@ import { LEGAL_TEXTS } from "@/data/legal-texts";
  *   (~miles de líneas) y no deben viajar con la página de registro.
  * - "No se pueden descargar": no hay botón de descarga ni liga externa; el
  *   texto se lee aquí mismo.
+ * - TODO EN UN SOLO SCROLL (equipo, 13-ago): antes cada documento vivía en su
+ *   pestaña y había que descubrirlas. Ahora van uno tras otro en la misma
+ *   lectura, y quien abre desde "Términos y condiciones" aterriza en ese
+ *   documento.
+ * - SIN ÍNDICE ARRIBA (equipo, 15-ago): el primer intento conservó una fila de
+ *   ligas para saltar entre documentos. Se pidió quitarla y dejar solo el
+ *   texto: se seguía leyendo como una barra de pestañas, que era justo lo que
+ *   se quería eliminar. El salto al documento con el que se abre se conserva
+ *   —es lo que hace que "Aviso de privacidad" lleve al aviso—, solo desaparece
+ *   la fila.
  */
+
 export function LegalPopup({
   initialSlug,
   onClose,
@@ -24,7 +36,6 @@ export function LegalPopup({
   onClose: () => void;
 }) {
   const docs = LEGAL_DOCS.filter((d) => LEGAL_TEXTS[d.slug]);
-  const [slug, setSlug] = useState(initialSlug);
   const contentRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -43,13 +54,23 @@ export function LegalPopup({
     };
   }, [onClose]);
 
-  // Al cambiar de documento, la lectura empieza desde arriba
+  /**
+   * La lectura empieza en el documento con el que se abrió (Términos, Aviso…),
+   * no siempre arriba del todo.
+   *
+   * Se mide con `getBoundingClientRect`, no con `offsetTop`: el contenedor que
+   * scrollea es `position: static`, así que `offsetTop` se cuenta desde otro
+   * ancestro y el salto caía en el lugar equivocado.
+   */
   useEffect(() => {
-    contentRef.current?.scrollTo({ top: 0 });
-  }, [slug]);
+    const caja = contentRef.current;
+    const destino = caja?.querySelector(`[data-doc="${CSS.escape(initialSlug)}"]`);
+    if (!caja || !(destino instanceof HTMLElement)) return;
+    caja.scrollTop +=
+      destino.getBoundingClientRect().top - caja.getBoundingClientRect().top;
+  }, [initialSlug]);
 
-  const active = docs.find((d) => d.slug === slug) ?? docs[0];
-  if (!active) return null;
+  if (docs.length === 0) return null;
 
   return (
     <div
@@ -60,7 +81,7 @@ export function LegalPopup({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={active.title}
+        aria-label="Documentos legales"
         className="flex h-[88dvh] w-full max-w-[860px] flex-col overflow-hidden rounded-[20px] bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -79,34 +100,21 @@ export function LegalPopup({
           </button>
         </div>
 
-        {/* Todos los documentos, cambiables sin salir del popup */}
-        <div className="flex gap-2 overflow-x-auto border-b border-border-divider px-5 py-3">
-          {docs.map((d) => (
-            <button
-              key={d.slug}
-              type="button"
-              onClick={() => setSlug(d.slug)}
-              className={`flex-none rounded-full px-4 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                d.slug === active.slug
-                  ? "bg-teal text-white"
-                  : "bg-cream text-ink-secondary hover:bg-border-divider"
-              }`}
-            >
-              {d.title}
-            </button>
-          ))}
-        </div>
-
         <div
           ref={contentRef}
           className="flex-1 overflow-y-auto px-5 py-4 sm:px-8 sm:py-6"
         >
-          <h2 className="mb-3 font-display text-[22px] text-ink-title">
-            {active.title}
-          </h2>
-          <div className="whitespace-pre-line text-[13.5px] leading-relaxed text-ink-body">
-            {LEGAL_TEXTS[active.slug]}
-          </div>
+          {docs.map((d, i) => (
+            <section key={d.slug} data-doc={d.slug} className={i > 0 ? "mt-10" : ""}>
+              {i > 0 && <hr className="mb-8 border-border-divider" />}
+              <h2 className="mb-3 font-display text-[22px] text-ink-title">
+                {d.title}
+              </h2>
+              <div className="whitespace-pre-line text-[13.5px] leading-relaxed text-ink-body">
+                {limpiarMarcasLegales(LEGAL_TEXTS[d.slug])}
+              </div>
+            </section>
+          ))}
         </div>
       </div>
     </div>

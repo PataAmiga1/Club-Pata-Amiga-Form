@@ -177,7 +177,7 @@ export async function reemplazarSnapshot(
     if (error) return null;
 
     // El rastro. Va por el mismo sumidero que todo lo demás para que aparezca
-    // en la ficha del contacto sin pantallas nuevas.
+    // en el perfil del contacto sin pantallas nuevas.
     const cambios = diferencias(antes, despues);
     const { crmEventoDeUsuario } = await import("@/lib/crm/sync");
     await crmEventoDeUsuario(admin, {
@@ -209,7 +209,7 @@ export async function reemplazarSnapshot(
   }
 }
 
-/** Períodos de espera con la forma que espera petWaitingPeriodDays. */
+/** Tiempos de espera con la forma que espera petWaitingPeriodDays. */
 export function esperasDe(beneficios: Beneficios) {
   return {
     espera_mascota_estandar_dias: Number(beneficios.espera_mascota_estandar_dias),

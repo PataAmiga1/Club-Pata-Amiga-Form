@@ -13,7 +13,7 @@
  * ellos con consecuencias que alguien iba a reclamar:
  *
  *  - el tope diario de gasto de IA se reiniciaba a las 6 de la tarde;
- *  - la fecha fin del período de espera de una mascota salía con un día extra
+ *  - la fecha fin del tiempo de espera de una mascota salía con un día extra
  *    para quien se registrara después de las 6 de la tarde;
  *  - una promoción que vencía hoy dejaba de mostrarse 6 horas antes.
  *

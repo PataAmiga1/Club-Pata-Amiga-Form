@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { datosConocidos } from "@/lib/datos-conocidos";
 import { ProfileForm } from "./ProfileForm";
 
 export default async function PerfilPage() {
@@ -26,11 +27,30 @@ export default async function PerfilPage() {
       .eq("document_type", "passport"),
   ]);
 
+  // Quien ya fue embajador o centro no vuelve a capturar lo mismo (equipo,
+  // 15-ago): lo que falte en su perfil de miembro se rellena con lo que dio en
+  // ese otro rol. SOLO rellena huecos — nunca pisa lo que ya escribió aquí.
+  const conocidos = await datosConocidos();
+  const inicial = {
+    ...(profile ?? {}),
+    first_name: profile?.first_name || conocidos?.firstName || null,
+    last_name: profile?.last_name || conocidos?.lastName || null,
+    mother_last_name:
+      profile?.mother_last_name || conocidos?.secondLastName || null,
+    phone: profile?.phone || conocidos?.phone || null,
+    curp: profile?.curp || conocidos?.curp || null,
+    birth_date: profile?.birth_date || conocidos?.birthDate || null,
+    postal_code: profile?.postal_code || conocidos?.postalCode || null,
+    colony: profile?.colony || conocidos?.colony || null,
+    city: profile?.city || conocidos?.city || null,
+    state: profile?.state || conocidos?.state || null,
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[620px] flex-col gap-[22px] px-5 py-6 md:py-10">
       <ProfileForm
         userId={user.id}
-        initial={profile ?? {}}
+        initial={inicial}
         passport={docs?.[0]?.file_name ?? null}
         avatarUrl={profile?.avatar_url ?? null}
       />

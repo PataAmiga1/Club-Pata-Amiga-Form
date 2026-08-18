@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useRef, useState } from "react";
 import { TextField } from "@/components/ui/Field";
+import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
 import { updateCenterInfo, uploadCenterLogo } from "./actions";
 
@@ -110,13 +111,7 @@ export function CenterInfoCard({
         onChange={(e) => setBenefit(e.target.value)}
       />
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-        <TextField
-          label="Teléfono"
-          type="tel"
-          placeholder="55 1234 5678"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
+        <PhoneField label="Teléfono" value={phone} onChange={setPhone} />
         <TextField
           label="Sitio web (opcional)"
           placeholder="https://tucentro.mx"

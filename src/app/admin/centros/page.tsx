@@ -107,7 +107,7 @@ export default async function AdminCentrosPage({
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-[26px] text-ink-title">
-          Centros de bienestar
+          Centros aliados
         </h1>
         <a
           href="/admin/centros/pagos"

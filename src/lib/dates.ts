@@ -37,11 +37,11 @@ export type WaitingProgress = {
  * El período es variable por mascota (ver src/lib/waiting-period.ts).
  *
  * El inicio sale de `waiting_period_start_date` — el día en que el comité
- * APROBÓ la ficha (regla de la PM, 11-ago). `createdAt` queda solo como
+ * APROBÓ el perfil (regla de la PM, 11-ago). `createdAt` queda solo como
  * respaldo para mascotas aprobadas antes de esa regla (sin backfill).
  *
  * Por qué existe el inicio guardado: antes se adivinaba con `created_at`, y
- * si la fecha fin se fijaba días después de crear la ficha (p. ej. al pagar),
+ * si la fecha fin se fijaba días después de crear el perfil (p. ej. al pagar),
  * esa brecha aparecía como días "transcurridos" fantasma — el bug de los
  * "13 días" en una mascota recién registrada.
  */

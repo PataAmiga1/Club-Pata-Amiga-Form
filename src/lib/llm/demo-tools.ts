@@ -17,7 +17,7 @@ type Admin = ReturnType<typeof createAdminClient>;
  *
  * Todo lo de aquí es de SOLO LECTURA y sobre datos PÚBLICOS: planes, períodos
  * de espera, reglas de reintegro, promociones vigentes y un resumen de centros
- * sin datos de contacto. Nada del usuario: ni sus mascotas, ni sus
+ * sin datos de contacto. Nada del usuario: ni sus peludos, ni sus
  * reintegros, ni su saldo, ni su perfil.
  */
 
@@ -31,7 +31,7 @@ export const DEMO_TOOLS: AgentTool[] = [
   {
     name: "periodos_de_espera",
     description:
-      "Los períodos de espera vigentes por tipo de alta (estándar, adoptado, con código de embajador, reemplazo) y el del contratante.",
+      "Los tiempos de espera vigentes por tipo de alta (estándar, adoptado, con código de embajador, reemplazo) y el del contratante.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -48,7 +48,7 @@ export const DEMO_TOOLS: AgentTool[] = [
   {
     name: "centros_aliados_resumen",
     description:
-      "Cuántos centros de bienestar aliados hay y en qué ciudades. NO devuelve nombres ni datos de contacto.",
+      "Cuántos centros aliados hay y en qué ciudades. NO devuelve nombres ni datos de contacto.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -60,7 +60,7 @@ export const DEMO_TOOLS: AgentTool[] = [
       properties: {
         tema: {
           type: "string",
-          description: "Sobre qué quiere el ejemplo (reintegros, mascotas, espera…).",
+          description: "Sobre qué quiere el ejemplo (reintegros, peludos, espera…).",
         },
       },
     },
@@ -107,7 +107,7 @@ export async function executeDemoTool(
           const b = beneficiosDe(v.benefits as Record<string, unknown>);
           return [
             `${plan?.name ?? "Membresía"} — ${v.interval === "year" ? "anual" : "mensual"}: ${pesos(v.price_cents / 100)}`,
-            `  hasta ${b.mascotas_activas_max} mascotas`,
+            `  hasta ${b.mascotas_activas_max} peludos`,
             `  reintegro de gastos veterinarios hasta ${pesos(Number(b.tope_gastos_veterinarios_mxn))} al año`,
             `  orientación veterinaria 24/7: ${b.orientacion_vet_24_7 ? "incluida" : "no incluida"}`,
           ].join("\n");
@@ -118,13 +118,13 @@ export async function executeDemoTool(
     case "periodos_de_espera": {
       const b = beneficiosDe(null); // los valores vigentes del catálogo
       return [
-        `Contratante: sin período de espera — la membresía queda activa al pagar.`,
-        `La espera es por mascota y empieza cuando el comité aprueba su ficha:`,
-        `Mascota estándar: ${b.espera_mascota_estandar_dias} días.`,
-        `Mascota adoptada de raza: ${b.espera_mascota_adoptada_raza_dias} días.`,
-        `Mascota adoptada mestiza: ${b.espera_mascota_adoptada_mestizo_dias} días.`,
+        `Contratante: sin tiempo de espera — la membresía queda activa al pagar.`,
+        `La espera es por peludo y empieza cuando el comité aprueba su perfil:`,
+        `Peludo estándar: ${b.espera_mascota_estandar_dias} días.`,
+        `Peludo adoptado de raza: ${b.espera_mascota_adoptada_raza_dias} días.`,
+        `Peludo adoptado mestizo: ${b.espera_mascota_adoptada_mestizo_dias} días.`,
         `Con código de embajador: ${b.espera_mascota_con_embajador_dias} días (beneficio de la membresía).`,
-        `Mascota de reemplazo tras una baja: condiciones normales, sin el beneficio del embajador.`,
+        `Peludo de reemplazo tras una baja: condiciones normales, sin el beneficio del embajador.`,
       ].join("\n");
     }
 
@@ -139,7 +139,7 @@ export async function executeDemoTool(
         `Compromiso de transferencia: ${b.horas_compromiso_reintegro} horas desde la aprobación.`,
         `Apelaciones por caso: ${b.apelaciones_max}.`,
         "Para solicitar se sube la factura o el recibo del veterinario y los datos bancarios del titular.",
-        "El reintegro aplica cuando ya pasó el período de espera de esa mascota.",
+        "El reintegro aplica cuando ya pasó el tiempo de espera de ese peludo.",
       ].join("\n");
     }
 

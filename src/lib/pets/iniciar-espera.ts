@@ -6,8 +6,8 @@ import { hoyEnMexico, diaEnMexicoMasDias } from "@/lib/zona-horaria";
 type Admin = ReturnType<typeof createAdminClient>;
 
 /**
- * Fija el período de espera de una mascota EN EL MOMENTO DE SU APROBACIÓN
- * (regla de la PM, 11-ago): el reloj no corre mientras la ficha está en
+ * Fija el tiempo de espera de una mascota EN EL MOMENTO DE SU APROBACIÓN
+ * (regla de la PM, 11-ago): el reloj no corre mientras el perfil está en
  * revisión, así que el inicio es el día en que el comité aprueba.
  *
  * Se usa desde los DOS caminos que aprueban mascotas: `resolvePet` y la

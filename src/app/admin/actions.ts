@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMxn } from "@/lib/format";
-import { hoyEnMexico, ZONA_MX } from "@/lib/zona-horaria";
+import {
+  hoyEnMexico,
+  ZONA_MX,
+  inicioDelMes,
+  diaEnMexico,
+} from "@/lib/zona-horaria";
 import {
   MATERIAL_SLOTS,
   ASSISTANT_PROMPT_KEY,
@@ -14,7 +19,12 @@ import {
   SITE_SETTINGS,
 } from "@/lib/site";
 import { CAMPAIGN_COUPON_KEYS, CAMPAIGN_PDF_SLOTS } from "@/lib/landings";
-import { getResend, EMAIL_FROM } from "@/lib/resend";
+import {
+  CODIGO_MAX,
+  normalizarCodigo,
+  revisarCodigo,
+} from "@/lib/codigo-embajador";
+import { getResend, EMAIL_FROM, destinatarioPermitido } from "@/lib/resend";
 import { perfilCompleto } from "@/lib/perfil-faltantes";
 import { notifyTeam, reportError } from "@/lib/alerts";
 import { sendTemplatedEmail } from "@/lib/email/send";
@@ -142,7 +152,7 @@ export async function resolvePet(
     .select("id, name, user_id")
     .eq("id", petId)
     .single();
-  if (!pet) throw new Error("Mascota no encontrada");
+  if (!pet) throw new Error("Peludo no encontrado");
 
   await admin
     .from("pets")
@@ -202,11 +212,11 @@ export async function resolvePet(
       ? {
           type: "pet_approved",
           title: `¡${pet.name} fue aprobado por el comité! 🐾`,
-          message: `La ficha de ${pet.name} quedó aprobada. Su período de espera sigue corriendo con normalidad.`,
+          message: `El perfil de ${pet.name} quedó aprobado. Su tiempo de espera sigue corriendo con normalidad.`,
         }
       : {
           type: "pet_rejected",
-          title: `La ficha de ${pet.name} necesita atención`,
+          title: `El perfil de ${pet.name} necesita atención`,
           message: `Observaciones del comité: ${notes}`,
         },
     decision.approve
@@ -221,14 +231,8 @@ export async function resolvePet(
 /** Base pública para links en correos (embajadores/centros). */
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
-function slugCode(firstName: string) {
-  return firstName
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 15);
-}
+/* `slugCode` se retiró el 16-ago: la normalización del código de embajador
+   vive ahora en `@/lib/codigo-embajador`, junto con sus reglas. */
 
 export async function resolveAmbassador(
   id: string,
@@ -243,10 +247,22 @@ export async function resolveAmbassador(
   if (!amb) throw new Error("Solicitud no encontrada");
 
   if (decision.approve) {
-    // Assign an initial unique code (customizable once by the ambassador)
+    // Código inicial único, que el embajador puede cambiar desde su portal.
+    // SIN el prefijo `PATAMIGA-` y con las reglas del 16-ago (de CODIGO_MIN a
+    // CODIGO_MAX, A-Z y 0-9, sin palabras bloqueadas).
+    //
+    // El mínimo de 6 dejó cortos a los nombres de pila (ANA, LOLA): antes de
+    // rendirse se prueba el nombre + AMIGO —"ANAAMIGO" se sigue leyendo como
+    // suyo— y solo si eso tampoco pasa se cae a un código genérico.
     let code = amb.referral_code;
     if (!code) {
-      const base = `PATAMIGA-${slugCode(amb.first_name) || "AMIGO"}`;
+      const delNombre = normalizarCodigo(amb.first_name ?? "");
+      const conAmigo = normalizarCodigo(`${delNombre}AMIGO`);
+      const base = revisarCodigo(delNombre).ok
+        ? delNombre
+        : revisarCodigo(conAmigo).ok
+          ? conAmigo
+          : "AMIGOMX";
       code = base;
       for (let n = 2; ; n++) {
         const { data: taken } = await admin
@@ -255,7 +271,8 @@ export async function resolveAmbassador(
           .eq("referral_code", code)
           .maybeSingle();
         if (!taken) break;
-        code = `${base}${n}`;
+        // El sufijo no puede empujar el código más allá del tope.
+        code = `${base.slice(0, CODIGO_MAX - String(n).length)}${n}`;
       }
     }
     await admin
@@ -367,7 +384,14 @@ export async function sendExtraordinaryEmail(input: {
 
   const resend = getResend();
   let enviados = 0;
+  // La reja de pruebas responde sin error, así que un bloqueado se contaba
+  // como enviado ("2 de 2" cuando solo salió 1). Se descuenta aquí.
+  let bloqueados = 0;
   for (const to of recipients) {
+    if (!destinatarioPermitido(to)) {
+      bloqueados++;
+      continue;
+    }
     try {
       const { error } = await resend.emails.send({
         from: EMAIL_FROM,
@@ -386,10 +410,15 @@ export async function sendExtraordinaryEmail(input: {
     "Envío extraordinario realizado ✉️",
     `<h2 style="color:#1E5350">Envío extraordinario</h2>
      <p><strong>Asunto:</strong> ${subject}</p>
-     <p><strong>Audiencia:</strong> ${input.audience} · <strong>Enviados:</strong> ${enviados} de ${recipients.length}</p>`,
+     <p><strong>Audiencia:</strong> ${input.audience} · <strong>Enviados:</strong> ${enviados} de ${recipients.length}${bloqueados > 0 ? ` · <strong>Bloqueados por la reja de pruebas:</strong> ${bloqueados}` : ""}</p>`,
   );
 
-  return { ok: true as const, enviados, total: recipients.length };
+  return {
+    ok: true as const,
+    enviados,
+    total: recipients.length,
+    bloqueados,
+  };
 }
 
 /**
@@ -558,7 +587,7 @@ export async function updatePetByAdmin(
   };
 
   const name = t(fields.name);
-  if (!name) return { error: "La mascota necesita nombre." };
+  if (!name) return { error: "El peludo necesita nombre." };
 
   const { data: pet, error } = await admin
     .from("pets")
@@ -664,21 +693,44 @@ export async function resolveCenter(
 /**
  * Corte mensual de comisiones: agrupa los referidos pendientes generados antes
  * del mes en curso en un payout y los marca como pagados (pago el día 5).
+ *
+ * El mes sale de `inicioDelMes()`, no de `new Date()` (14-ago). El layout que
+ * se sube al banco ya usaba la hora de México y esto no: en Vercel el proceso
+ * corre en UTC, así que del último día del mes a partir de las 18:00 hora de
+ * México el servidor ya cree que es el mes siguiente. Los dos lados decidían
+ * distinto qué referidos entraban al corte, y el archivo del banco podía no
+ * cuadrar con lo que el panel marcaba como pagado.
+ *
+ * A quien se dio de baja se le paga HASTA SU FECHA DE BAJA (Pablo, 16-ago),
+ * con el mismo criterio que el layout del banco: cuenta la membresía que entró
+ * por la pasarela antes de la baja, no la que se cobró después. Los dos lados
+ * tienen que filtrar igual o el archivo y el panel vuelven a discrepar.
  */
 export async function payAmbassadorCut(ambassadorId: string) {
   const { admin } = await requireAdmin();
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const periodMonth = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}-01`;
+  const monthStart = inicioDelMes();
+  const { data: amb } = await admin
+    .from("ambassadors")
+    .select("deactivated_at")
+    .eq("id", ambassadorId)
+    .maybeSingle();
+  // Un día antes del arranque del mes cae siempre en el mes anterior, y
+  // `inicioDelMes` lo lleva a su día 1. El corte se etiqueta con ESE mes,
+  // que es el que se está liquidando.
+  const periodMonth = diaEnMexico(
+    inicioDelMes(new Date(monthStart.getTime() - 24 * 60 * 60 * 1000)),
+  );
 
-  const { data: pending } = await admin
+  let consulta = admin
     .from("referrals")
     .select("id, commission_amount")
     .eq("ambassador_id", ambassadorId)
     .eq("status", "pending")
     .lt("created_at", monthStart.toISOString());
+  if (amb?.deactivated_at)
+    consulta = consulta.lte("created_at", amb.deactivated_at);
+  const { data: pending } = await consulta;
   if (!pending?.length) throw new Error("Sin comisiones por pagar");
 
   const total = pending.reduce(
@@ -819,7 +871,7 @@ export async function resolveAppeal(
       // Aprobada por apelación = aprobada: su espera arranca hoy, igual que
       // en resolvePet (los dos caminos comparten la misma regla).
       await iniciarEsperaDeMascota(admin, appeal.pet_id);
-      outcome = `la ficha de ${pet?.name ?? "tu mascota"} quedó aprobada`;
+      outcome = `el perfil de ${pet?.name ?? "tu peludo"} quedó aprobado`;
     } else if (appeal.center_id) {
       await admin
         .from("wellness_centers")
@@ -838,7 +890,7 @@ export async function resolveAppeal(
   const subjectLabel = appeal.reimbursement_id
     ? `tu reintegro ${reimbursement?.folio ?? ""}`
     : appeal.pet_id
-      ? `la ficha de ${pet?.name ?? "tu mascota"}`
+      ? `el perfil de ${pet?.name ?? "tu peludo"}`
       : `la solicitud del centro ${center?.name ?? ""}`;
 
   if (closing) {
@@ -885,7 +937,7 @@ export async function resolveAppeal(
 /**
  * "Solicitar información" del expediente (sistema anterior): el comité pide
  * fotos/documentos o escribe al miembro sobre una mascota. Queda en el hilo
- * (pet_messages), enciende la bandera en la ficha y avisa por campana+correo.
+ * (pet_messages), enciende la bandera en el perfil y avisa por campana+correo.
  */
 export async function requestPetInfo(
   petId: string,
@@ -898,7 +950,7 @@ export async function requestPetInfo(
     .select("id, name, user_id")
     .eq("id", petId)
     .single();
-  if (!pet) throw new Error("Mascota no encontrada");
+  if (!pet) throw new Error("Peludo no encontrado");
   const text = message?.trim();
   if (!text && items.length === 0)
     return { error: "Elige qué solicitar o escribe un mensaje." };
@@ -925,7 +977,7 @@ export async function requestPetInfo(
     {
       type: "pet_info_request",
       title: `El comité necesita información sobre ${pet.name}`,
-      message: text || "Revisa la ficha para ver lo solicitado.",
+      message: text || "Revisa el perfil para ver lo solicitado.",
     },
     {
       template: "pet_info_request",
@@ -950,7 +1002,7 @@ export async function sendPetMessage(petId: string, message: string) {
     .select("id, name, user_id")
     .eq("id", petId)
     .single();
-  if (!pet) throw new Error("Mascota no encontrada");
+  if (!pet) throw new Error("Peludo no encontrado");
   const text = message?.trim();
   if (!text) return { error: "Escribe el mensaje." };
 
@@ -1187,7 +1239,7 @@ export async function resetEmailTemplate(key: string) {
   return { ok: true as const };
 }
 
-/** Super admin only: "Forzar fin de período de espera". */
+/** Super admin only: "Forzar fin de tiempo de espera". */
 export async function bypassWaitingPeriod(petId: string) {
   const { admin } = await requireAdmin(true);
   await admin

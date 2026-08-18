@@ -4,8 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField } from "@/components/ui/Field";
+import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { Button } from "@/components/ui/Button";
+import { nombresDePaises } from "@/data/countries";
+import {
+  EDAD_MINIMA,
+  esMayorDeEdad,
+  fechaDeNacimientoDeCurp,
+  fechaMaximaParaSerMayor,
+} from "@/lib/edad";
+import { avisarMenorDeEdad } from "./actions";
 
 import { validateCurp, curpCoincide } from "@/lib/curp";
 
@@ -81,10 +90,13 @@ function DocUpload({
           : "flex flex-col items-center gap-1 rounded-[14px] border-2 border-dashed border-[#C9E9E4] bg-[#F2FAF9] p-[18px] transition-colors hover:border-teal"
       }
     >
+      {/* `application/pdf` explícito además de la extensión: en algunos
+          Android el filtro por ".pdf" a secas deja los PDF en gris y no se
+          pueden elegir (equipo, 15-ago). */}
       <input
         ref={ref}
         type="file"
-        accept="image/*,.pdf"
+        accept="image/*,application/pdf,.pdf"
         className="hidden"
         onChange={handleFile}
       />
@@ -97,8 +109,15 @@ function DocUpload({
         {label}
       </span>
       <span className="max-w-full truncate text-[11px] text-ink-tertiary">
-        {busy ? "Subiendo…" : error ? "Error, intenta de nuevo" : (fileName ?? "Subir foto")}
+        {busy
+          ? "Subiendo…"
+          : error
+            ? "Error, intenta de nuevo"
+            : (fileName ?? "Subir archivo")}
       </span>
+      {!uploaded && (
+        <span className="text-[11px] text-ink-tertiary">JPG, PNG o PDF</span>
+      )}
     </button>
   );
 }
@@ -124,7 +143,11 @@ export function ProfileForm({
   const [motherLastName, setMotherLastName] = useState(
     initial.mother_last_name ?? "",
   );
-  const [birthDate, setBirthDate] = useState(initial.birth_date ?? "");
+  // Lo que la persona teclea. Para mexicanos con CURP válida NO se usa: la
+  // fecha efectiva sale de la CURP (ver `birthDate`, más abajo).
+  const [birthDateManual, setBirthDateManual] = useState(
+    initial.birth_date ?? "",
+  );
   const [nationality, setNationality] = useState(initial.nationality ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
   const [curp, setCurp] = useState(initial.curp ?? "");
@@ -147,6 +170,8 @@ export function ProfileForm({
   const [avatar, setAvatar] = useState(avatarUrl);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  // Un solo aviso al equipo por menor de edad, aunque insista en guardar.
+  const avisoMenorEnviado = useRef(false);
 
   async function handleAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -188,7 +213,32 @@ export function ProfileForm({
     );
   })();
 
+  // Nacionalidad con sugerencias, no texto libre a secas (equipo, 13 y 15-ago):
+  // llegaban valores a medio escribir ("Chil") y con eso no hay forma de saber
+  // si la persona es extranjera y le toca pasaporte. Lo que ya estaba guardado
+  // se respeta aunque no coincida con el catálogo — el campo acepta texto
+  // libre, así que a nadie se le borra lo suyo por no estar en la lista.
+  const listaPaises = nombresDePaises();
+
   const curpValid = validateCurp(curp).isValid;
+
+  // Mayoría de edad (equipo, 13-ago). Desde el 16-ago el alta ya NO pregunta la
+  // fecha —se acortó el registro—, así que ESTE es el punto donde se comprueba
+  // que el titular tenga 18, ya con la membresía pagada.
+  //
+  // Para mexicanos la fecha no se teclea: la trae la CURP, que es un dato
+  // oficial y no se puede maquillar para pasar el filtro. Solo los extranjeros
+  // (pasaporte, sin CURP) la capturan a mano.
+  // La fecha se DERIVA, no se sincroniza con un efecto: mientras haya CURP
+  // válida ella manda, y lo tecleado a mano solo se usa cuando no la hay. Con
+  // un `useEffect` que copiara la fecha al estado habría un render intermedio
+  // pintando todavía la fecha anterior — y el lint lo marca con razón.
+  const fechaDeCurp =
+    !esExtranjero && curpValid ? fechaDeNacimientoDeCurp(curp) : null;
+  const birthDate = fechaDeCurp ?? birthDateManual;
+
+  const fechaValida = /^\d{4}-\d{2}-\d{2}$/.test(birthDate);
+  const menorDeEdad = fechaValida && !esMayorDeEdad(birthDate);
   // Cruce CURP ↔ datos: SOLO MARCA, no bloquea (decisión de Pablo, 5-ago)
   const cruceCurp = curpValid
     ? curpCoincide(curp, {
@@ -229,11 +279,28 @@ export function ProfileForm({
   const completion =
     25 * Number(firstName.trim().length > 0 && lastName.trim().length > 0) +
     25 * Number(identidadOk) +
-    15 * Number(/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) +
+    // Una fecha que deja a la persona por debajo de los 18 no cuenta: el
+    // titular de la membresía tiene que ser mayor de edad.
+    15 * Number(fechaValida && !menorDeEdad) +
     10 * Number(nationality.trim().length > 0) +
     25 * Number(Boolean(cp.length === 5 && colony && street));
 
   async function save(finalize: boolean) {
+    if (menorDeEdad) {
+      setMessage(
+        `El titular de la membresía debe tener ${EDAD_MINIMA} años o más. Revisa tu fecha de nacimiento.`,
+      );
+      // La membresía ya está pagada a estas alturas: el equipo tiene que
+      // enterarse para reembolsar y cancelar. Se avisa una sola vez por sesión
+      // —no en cada intento de guardar— y nunca frena la pantalla.
+      if (!avisoMenorEnviado.current) {
+        avisoMenorEnviado.current = true;
+        avisarMenorDeEdad(birthDate).catch(() => {
+          avisoMenorEnviado.current = false;
+        });
+      }
+      return;
+    }
     setSaving(true);
     setMessage(null);
     const supabase = createClient();
@@ -243,7 +310,7 @@ export function ProfileForm({
         first_name: firstName.trim() || null,
         last_name: lastName.trim() || null,
         mother_last_name: motherLastName.trim() || null,
-        birth_date: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
+        birth_date: fechaValida ? birthDate : null,
         nationality: nationality.trim() || null,
         phone: phone || null,
         // Extranjeros no tienen CURP: si cambió su nacionalidad después de
@@ -270,7 +337,20 @@ export function ProfileForm({
       return;
     }
     if (finalize && completion === 100) {
-      router.push("/app");
+      // El registro dejó a los peludos con lo mínimo (tipo, nombre y edad),
+      // así que en cuanto el contratante queda completo se sigue con ELLOS,
+      // uno por uno, en vez de devolver a la persona al inicio a que adivine
+      // qué falta (PM, 12-ago).
+      const { data: pendientes } = await supabase
+        .from("pets")
+        .select("id, breed, sex, photo_url")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true });
+      const siguiente = (pendientes ?? []).find(
+        (p) => !p.breed || !p.sex || !p.photo_url,
+      );
+      router.push(siguiente ? `/app/peludos/${siguiente.id}?completar=1` : "/app");
     } else if (finalize) {
       setMessage(
         "Guardado. Aún faltan datos o documentos para completar el perfil.",
@@ -316,8 +396,8 @@ export function ProfileForm({
               Completa tu perfil
             </h1>
             <p className="mt-1.5 text-[14.5px] text-ink-secondary">
-              Necesitamos estos datos para validar tu identidad y habilitar tus
-              reintegros. La foto es opcional.
+              Necesitamos estos datos para confirmar tu información y habilitar
+              tus reintegros. La foto es opcional.
             </p>
           </div>
         </div>
@@ -361,29 +441,89 @@ export function ProfileForm({
           />
         </div>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+          {/* La fecha la dicta la CURP cuando hay una válida (Pablo, 16-ago):
+              se muestra solo lectura para que la persona vea de dónde sale y no
+              pueda escribir otra distinta a la de su documento oficial. Si aún
+              no hay CURP —o es extranjera— se captura a mano como siempre. */}
           <TextField
             label="Fecha de nacimiento"
             type="date"
             value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
+            max={fechaMaximaParaSerMayor()}
+            onChange={(e) => setBirthDateManual(e.target.value)}
+            readOnly={Boolean(fechaDeCurp)}
             autoComplete="bday"
+            hint={
+              fechaDeCurp
+                ? "La tomamos de tu CURP."
+                : menorDeEdad
+                  ? undefined
+                  : `El titular de la membresía debe tener ${EDAD_MINIMA} años o más.`
+            }
           />
-          <TextField
+          {/* Autocompletado, no lista cerrada (equipo, 15-ago): con 216 países
+              bajar a "Chile" era un scroll larguísimo. Se escribe y la lista
+              se angosta sola; el orden pone México y Latinoamérica arriba. */}
+          <AutocompleteField
             label="Nacionalidad"
-            placeholder="Mexicana"
+            options={listaPaises}
             value={nationality}
-            onChange={(e) => setNationality(e.target.value)}
+            onChange={setNationality}
+            placeholder="Escribe tu país"
+            hint="Empieza a escribir y elige de la lista."
           />
         </div>
+        {menorDeEdad && (
+          <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">
+            {fechaDeCurp ? (
+              <>
+                Tu CURP dice que aún no cumples {EDAD_MINIMA} años, y el titular
+                de la membresía tiene que ser mayor de edad. Si la CURP está mal
+                escrita, corrígela arriba. Si es correcta, al guardar avisamos al
+                equipo para devolverte el pago y cancelar la membresía — y un
+                adulto de tu casa sí puede quedar como titular con sus datos.
+              </>
+            ) : (
+              <>
+                Con esa fecha de nacimiento aún no cumples {EDAD_MINIMA} años. El
+                titular de la membresía debe ser mayor de edad — si hay una fecha
+                equivocada, corrígela; si no, un adulto de tu casa puede quedar
+                como titular.
+              </>
+            )}
+          </div>
+        )}
+        {/* Pasaporte JUNTO a la nacionalidad (equipo, 13-ago): antes vivía en
+            una tarjeta al final de la página y quien elegía otro país no veía
+            que le tocaba subirlo. Los extranjeros no pueden tener CURP. */}
+        {esExtranjero && (
+          <div className="flex flex-col gap-3 rounded-[14px] bg-[#F2FAF9] p-4">
+            <p className="text-[12.5px] leading-relaxed text-ink-secondary">
+              Como tu nacionalidad no es mexicana, tu identificación es el{" "}
+              <strong className="text-ink-title">pasaporte</strong> (en lugar de
+              la CURP). Lo usamos para validar tu identidad al habilitar tus
+              reintegros.
+            </p>
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+              <DocUpload
+                side="passport"
+                label="Pasaporte — página de datos"
+                fileName={passportFile}
+                onUploaded={setPassportFile}
+                userId={userId}
+              />
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-          {/* Mismo componente que el registro: prefijo +52 fijo y solo 10
-              dígitos en la BD. Antes era un campo libre, así que el mismo
-              teléfono podía guardarse de cinco formas distintas. */}
+          {/* Lada seleccionable desde el 13-ago: antes era +52 fijo y un
+              miembro extranjero no tenía dónde capturar su número. Se guarda
+              en E.164 ("+52…") para que siempre signifique lo mismo. */}
           <PhoneField
             label="Teléfono"
             value={phone}
             onChange={setPhone}
-            hint="10 dígitos, sin lada internacional."
+            hint="Elige tu país si no es México."
           />
           {/* Extranjeros no tienen CURP: en su lugar suben pasaporte (abajo) */}
           {!esExtranjero && (
@@ -437,40 +577,39 @@ export function ProfileForm({
             onChange={(e) => setCp(e.target.value.replace(/\D/g, ""))}
             autoComplete="postal-code"
           />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[13px] font-semibold text-ink-title">
-              Colonia{" "}
-              <span className="font-medium text-ink-tertiary">
-                (auto-completada)
-              </span>
-            </label>
-            {colonies.length > 0 ? (
-              <select
-                className="h-12 w-full appearance-none rounded-[12px] border-[1.5px] border-border-input bg-white px-4 text-[15px] text-ink-title outline-none focus:border-2 focus:border-teal"
-                value={colony}
-                onChange={(e) => setColony(e.target.value)}
-              >
-                {colonies.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                className="h-12 w-full rounded-[12px] border-[1.5px] border-border-input bg-white px-4 text-[15px] text-ink-title placeholder:text-ink-placeholder outline-none focus:border-2 focus:border-teal"
-                placeholder="Escribe tu colonia"
-                value={colony}
-                onChange={(e) => setColony(e.target.value)}
-              />
-            )}
-          </div>
+          {/* El código postal propone la colonia, pero SIEMPRE se puede
+              escribir otra: el catálogo se equivoca o le falta la de alguien
+              (PM, 12-ago). Antes era una lista cerrada. */}
+          <AutocompleteField
+            label="Colonia"
+            options={colonies}
+            value={colony}
+            onChange={setColony}
+            placeholder="Escribe o elige tu colonia"
+            hint={
+              colonies.length > 0
+                ? "La sugerimos según tu código postal; si no es correcta, puedes cambiarla."
+                : undefined
+            }
+          />
         </div>
-        {stateMx && (
-          <span className="-mt-1 text-[12.5px] text-ink-tertiary">
-            {city}, {stateMx}
-          </span>
-        )}
+        {/* Alcaldía y estado: se llenan solos con el CP y ahora SE PUEDEN
+            CORREGIR. Antes eran texto fijo, así que un dato equivocado del
+            catálogo no había forma de arreglarlo (PM, 12-ago). */}
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+          <TextField
+            label="Alcaldía o municipio"
+            placeholder="Gustavo A. Madero"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+          <TextField
+            label="Estado"
+            placeholder="Ciudad de México"
+            value={stateMx}
+            onChange={(e) => setStateMx(e.target.value)}
+          />
+        </div>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1fr_120px_120px]">
           <TextField
             label="Calle"
@@ -494,29 +633,9 @@ export function ProfileForm({
       </section>
 
       {/* El INE se dejó de pedir a los miembros (equipo, 11-ago). Los
-          embajadores lo conservan — su formulario es aparte. Los extranjeros
-          suben PASAPORTE: no pueden tener CURP. */}
-      {esExtranjero && (
-        <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
-          <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
-            TU PASAPORTE
-          </span>
-          <p className="-mt-1.5 text-[13px] leading-relaxed text-ink-secondary">
-            Como tu nacionalidad no es mexicana, tu identificación es tu
-            pasaporte (en lugar de la CURP). Lo usamos para validar tu
-            identidad al habilitar tus reintegros.
-          </p>
-          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-            <DocUpload
-              side="passport"
-              label="Pasaporte — página de datos"
-              fileName={passportFile}
-              onUploaded={setPassportFile}
-              userId={userId}
-            />
-          </div>
-        </section>
-      )}
+          embajadores lo conservan — su formulario es aparte. El pasaporte de
+          los extranjeros se pide arriba, junto a la nacionalidad que lo
+          dispara (equipo, 13-ago). */}
 
       {message && (
         <div className="rounded-[12px] bg-info-bg px-4 py-3 text-sm text-info-text">

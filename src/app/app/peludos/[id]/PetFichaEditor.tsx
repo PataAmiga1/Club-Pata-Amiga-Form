@@ -2,17 +2,21 @@
 
 /* eslint-disable @next/next/no-img-element */
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextField, SelectField } from "@/components/ui/Field";
+import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { Button } from "@/components/ui/Button";
 import { PET_GALLERY_MAX, SENIOR_PET_AGE_YEARS } from "@/lib/constants";
+import { DOG_BREED_NAMES, CAT_BREED_NAMES } from "@/data/pet-catalogs";
 import { updatePetFicha, replyPetThread, deactivatePet } from "./actions";
 
 export type PetFicha = {
   id: string;
   userId: string;
   name: string;
+  species: "dog" | "cat";
+  breed: string | null;
   isSenior: boolean;
   infoRequested: boolean;
   sex: string | null;
@@ -41,7 +45,7 @@ const REQUEST_LABELS: Record<string, string> = {
   documento: "📄 Documento adicional",
 };
 
-/** Ficha completa: foto principal + galería (máx. 5) + datos + hilo con el comité. */
+/** Perfil completo: foto principal + galería (máx. 5) + datos + hilo con el comité. */
 export function PetFichaEditor({
   pet,
   thread,
@@ -50,6 +54,8 @@ export function PetFichaEditor({
   thread: ThreadMessage[];
 }) {
   const router = useRouter();
+  // ?completar=1 → venimos del flujo guiado que arranca en "completa tu perfil"
+  const enCadena = useSearchParams().get("completar") === "1";
   const mainRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const certRef = useRef<HTMLInputElement>(null);
@@ -57,6 +63,7 @@ export function PetFichaEditor({
   const [photoUrl, setPhotoUrl] = useState(pet.photoUrl);
   const [gallery, setGallery] = useState<string[]>(pet.galleryPhotos);
   const [certUrl, setCertUrl] = useState(pet.vetCertificateUrl);
+  const [breed, setBreed] = useState(pet.breed ?? "");
   const [sex, setSex] = useState(pet.sex ?? "");
   const [coat, setCoat] = useState(pet.coatColor ?? "");
   const [nose, setNose] = useState(pet.noseColor ?? "");
@@ -86,12 +93,37 @@ export function PetFichaEditor({
     return supabase.storage.from("pet-photos").getPublicUrl(path).data.publicUrl;
   }
 
-  const save = async (patch: Parameters<typeof updatePetFicha>[1] = {}) => {
+  /** Siguiente peludo del mismo dueño al que todavía le falten datos. */
+  const siguientePeludoPendiente = async (userId: string, actual: string) => {
+    const { data } = await createClient()
+      .from("pets")
+      .select("id, breed, sex, photo_url")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .neq("id", actual)
+      .order("created_at", { ascending: true });
+    return (data ?? []).find((p) => !p.breed || !p.sex || !p.photo_url)?.id ?? null;
+  };
+
+  /**
+   * Guarda el perfil del peludo.
+   *
+   * `avanzar` separa las dos cosas que antes iban juntas: subir una foto
+   * también guardaba, y guardar dentro del flujo guiado saltaba al siguiente
+   * peludo. Resultado: se cargaba la foto de la mascota 1 y la pantalla se iba
+   * sola a la mascota 2 sin haber capturado un solo dato (equipo, 13-ago).
+   * Ahora solo el botón "Guardar" avanza; las fotos guardan y se quedan.
+   */
+  const save = async (
+    patch: Parameters<typeof updatePetFicha>[1] = {},
+    avanzar = false,
+  ) => {
     setBusy("save");
     setError(null);
     setNotice(null);
     try {
       const result = await updatePetFicha(pet.id, {
+        breed,
         sex,
         coatColor: coat,
         noseColor: nose,
@@ -104,7 +136,16 @@ export function PetFichaEditor({
         ...patch,
       });
       if (result.error) setError(result.error);
-      else setNotice("Ficha guardada ✓");
+      else {
+        setNotice("Perfil guardado ✓");
+        // Venimos de "completa tu perfil": se encadena con el siguiente
+        // peludo que aún deba datos, y al terminar todos se va al inicio.
+        // Así la persona no tiene que ir buscando qué le falta (PM, 12-ago).
+        if (enCadena && avanzar) {
+          const siguiente = await siguientePeludoPendiente(pet.userId, pet.id);
+          router.push(siguiente ? `/app/peludos/${siguiente}?completar=1` : "/app");
+        }
+      }
     } finally {
       setBusy(null);
     }
@@ -116,7 +157,7 @@ export function PetFichaEditor({
       {pet.infoRequested && (
         <div className="rounded-[14px] bg-info-bg px-4 py-3 text-[13.5px] font-semibold leading-relaxed text-info-text">
           💬 El comité te pidió información sobre {pet.name} — revisa el
-          mensaje abajo, actualiza lo necesario en la ficha y respóndeles.
+          mensaje abajo, actualiza lo necesario en el perfil y respóndeles.
         </div>
       )}
 
@@ -221,6 +262,21 @@ export function PetFichaEditor({
           DATOS DE {pet.name.toUpperCase()}
         </span>
         <div className="grid gap-3.5 sm:grid-cols-2">
+          {/* La raza se pide AQUÍ desde el 12-ago: el alta quedó en tres datos
+              (tipo, nombre y edad) y todo lo demás se completa ya pagado. Sin
+              este campo no habría dónde capturarla nunca. */}
+          <AutocompleteField
+            label="Raza"
+            options={
+              pet.species === "dog"
+                ? ["Mestizo", ...DOG_BREED_NAMES]
+                : ["Doméstico", ...CAT_BREED_NAMES]
+            }
+            value={breed}
+            onChange={setBreed}
+            placeholder={pet.species === "dog" ? "Mestizo, Labrador…" : "Doméstico, Siamés…"}
+            hint="Escribe y elige una sugerencia. Si no aparece, escríbela tal cual."
+          />
           <SelectField label="Sexo" value={sex} onChange={(e) => setSex(e.target.value)}>
             <option value="">Elige</option>
             <option value="male">Macho</option>
@@ -302,8 +358,16 @@ export function PetFichaEditor({
           <span className="text-sm font-semibold text-error-text">{error}</span>
         )}
         <div className="flex items-center gap-3">
-          <Button type="button" onClick={() => save()} disabled={busy === "save"}>
-            {busy === "save" ? "Guardando…" : "Guardar ficha"}
+          <Button
+            type="button"
+            onClick={() => save({}, true)}
+            disabled={busy === "save"}
+          >
+            {busy === "save"
+              ? "Guardando…"
+              : enCadena
+                ? "Guardar y continuar"
+                : "Guardar perfil"}
           </Button>
           {notice && (
             <span className="text-sm font-semibold text-success-text">{notice}</span>
@@ -409,7 +473,7 @@ export function PetFichaEditor({
               <p className="text-[13px] leading-relaxed text-ink-secondary">
                 Su tarjeta se quedará contigo como recuerdo y su lugar se
                 libera para otro peludo (el nuevo entra como reemplazo, con
-                período de espera de 180 días).
+                tiempo de espera de 180 días).
               </p>
               <SelectField
                 label="¿Por qué lo das de baja?"

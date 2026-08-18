@@ -7,7 +7,7 @@ import { getStripe } from "@/lib/stripe";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
 import { ZONA_MX } from "@/lib/zona-horaria";
-import { bankFromClabe, isValidClabe } from "@/lib/banks";
+import { BANCO_OTRO, bankFromClabe, isValidClabe } from "@/lib/banks";
 import { versionVigente } from "@/lib/plans/versiones";
 import { reemplazarSnapshot } from "@/lib/plans/resolve";
 
@@ -304,7 +304,14 @@ export async function saveMemberBanking(bankNameRaw: string, clabeRaw: string) {
   const clabe = clabeRaw?.replace(/\D/g, "") ?? "";
   if (!isValidClabe(clabe))
     return { error: "Revisa tu CLABE — deben ser 18 dígitos válidos." };
-  const bankName = bankNameRaw?.trim() || bankFromClabe(clabe) || "Otro";
+  // "Otro" a secas no es un banco (equipo, 13-ago): si llega la palabra sin el
+  // nombre real se prefiere el que delata la CLABE.
+  const escrito = bankNameRaw?.trim() ?? "";
+  const bankName =
+    (escrito.toLowerCase() === BANCO_OTRO.toLowerCase() ? "" : escrito) ||
+    bankFromClabe(clabe) ||
+    "";
+  if (!bankName) return { error: "Escribe el nombre de tu banco." };
 
   const admin = createAdminClient();
   const { error } = await admin

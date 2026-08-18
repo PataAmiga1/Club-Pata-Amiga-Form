@@ -7,6 +7,7 @@ import { SelectField, TextField, ToggleGroup } from "@/components/ui/Field";
 import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { Button } from "@/components/ui/Button";
 import { SENIOR_PET_AGE_YEARS, MAX_ACTIVE_PETS } from "@/lib/constants";
+import { ETIQUETAS_ESPECIE, terminoPeludo } from "@/lib/vocabulario";
 import {
   DOG_BREED_NAMES,
   CAT_BREED_NAMES,
@@ -41,7 +42,7 @@ const AGE_OPTIONS: {
  * Formulario de alta de mascota, compartido entre:
  * - mode="registro": paso 2 del registro (pre-pago) → sigue a elegir plan.
  * - mode="member":   miembro activo agrega otro peludo → vuelve a Mis peludos
- *   (sin stepper ni plan; su período de espera corre desde hoy).
+ *   (sin stepper ni plan; su tiempo de espera corre desde hoy).
  *
  * Reglas del sitio vivo: raza y colores con autocompletado (se puede escribir
  * un valor libre si no aparece), edad por rangos, aviso senior a los
@@ -69,6 +70,32 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
   const certRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Peludos ADICIONALES del registro (PM, 12-ago). En el alta solo se piden
+   * tres cosas por mascota —tipo, nombre y edad— y desde ahí se pueden
+   * registrar hasta MAX_ACTIVE_PETS de una vez, con esa misma información.
+   * Lo demás (raza, sexo, colores, foto) se completa después del pago, para
+   * no poner fricción antes de que la persona decida.
+   */
+  const [extras, setExtras] = useState<
+    { name: string; species: Species; ageKey: string }[]
+  >([]);
+  const puedeAgregarOtro = mode === "registro" && extras.length + 1 < MAX_ACTIVE_PETS;
+  const cambiarExtra = (
+    i: number,
+    campo: "name" | "species" | "ageKey",
+    valor: string,
+  ) =>
+    setExtras((prev) =>
+      prev.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)),
+    );
+  /**
+   * "michi" para gatos, "lomito" para perros (equipo, 16-ago). Antes los perros
+   * caían en "peludo" —la palabra que cubre a los dos—, así que el michi tenía
+   * nombre propio y el lomito no. Ahora sale del glosario compartido.
+   */
+  const comoLeDicen = (e: Species) => terminoPeludo(e);
 
   useEffect(() => {
     const supabase = createClient();
@@ -105,16 +132,29 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     if (loading) return;
     setError(null);
     if (!ageOption) {
-      setError("Cuéntanos la edad de tu peludo.");
+      setError(`Cuéntanos la edad de tu ${comoLeDicen(species)}.`);
       return;
     }
-    if (!breed.trim()) {
+    // La raza solo se pide al miembro que ya pagó: en el alta estorba (PM, 12-ago)
+    if (mode === "member" && !breed.trim()) {
       setError(
         species === "dog"
           ? "Cuéntanos su raza (o elige Mestizo)."
           : "Cuéntanos su raza (o elige Doméstico).",
       );
       return;
+    }
+    if (mode === "registro") {
+      for (const [i, p] of extras.entries()) {
+        if (!p.name.trim()) {
+          setError(`Falta el nombre de tu ${comoLeDicen(p.species)} #${i + 2}.`);
+          return;
+        }
+        if (!AGE_OPTIONS.some((o) => o.value === p.ageKey)) {
+          setError(`Falta la edad de ${p.name.trim()}.`);
+          return;
+        }
+      }
     }
     setLoading(true);
     const supabase = createClient();
@@ -131,7 +171,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       }
     }
 
-    // Certificado del senior (mismo bucket que usa la ficha)
+    // Certificado del senior (mismo bucket que usa el perfil)
     let certUrl: string | null = null;
     if (cert && showsSeniorNote) {
       const path = `${userId}/cert-${Date.now()}-${cert.name}`;
@@ -164,8 +204,8 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     };
 
     if (mode === "member") {
-      // Miembro activo: solo se valida el cupo; el período de espera (incluido
-      // el caso de reemplazo) lo determina el comité al aprobar la ficha.
+      // Miembro activo: solo se valida el cupo; el tiempo de espera (incluido
+      // el caso de reemplazo) lo determina el comité al aprobar el perfil.
       const { count: activeCount } = await supabase
         .from("pets")
         .select("id", { count: "exact", head: true })
@@ -176,9 +216,9 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
         setLoading(false);
         return;
       }
-      // La espera arranca cuando el COMITÉ APRUEBA la ficha (PM, 11-ago), no
+      // La espera arranca cuando el COMITÉ APRUEBA el perfil (PM, 11-ago), no
       // al registrar: la fecha la fija resolvePet vía iniciarEsperaDeMascota.
-      // Mientras la ficha está en revisión no corre ningún conteo.
+      // Mientras el perfil está en revisión no corre ningún conteo.
       const { error: saveError } = await supabase.from("pets").insert(petData);
       if (saveError) {
         setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
@@ -189,16 +229,15 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       return;
     }
 
-    // Registro pre-pago: volver a este paso actualiza la mascota capturada.
-    // Su período de espera se fija al pagar (webhook), donde ya se conoce
+    // Registro pre-pago: volver a este paso actualiza lo ya capturado.
+    // Su tiempo de espera se fija al pagar (webhook), donde ya se conoce
     // si hubo código de embajador (90 días).
     const { data: existing, error: lookupError } = await supabase
       .from("pets")
       .select("id")
       .eq("user_id", userId)
       .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .limit(1);
+      .order("created_at", { ascending: true });
     // Si la búsqueda falla NO se puede caer al insert: crearía una mascota
     // duplicada cuando la captura ya existía (sospechoso del reporte de
     // "mascota duplicada tras el pago" que nadie pudo reproducir).
@@ -208,16 +247,40 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       return;
     }
 
-    const query = existing?.length
-      ? supabase.from("pets").update(petData).eq("id", existing[0].id)
-      : supabase.from("pets").insert(petData);
+    // El primero lleva todo lo capturado; los adicionales solo sus tres datos.
+    const todos = [
+      petData,
+      ...extras.map((p) => {
+        const edad = AGE_OPTIONS.find((o) => o.value === p.ageKey)!;
+        return {
+          user_id: userId,
+          name: p.name.trim(),
+          species: p.species,
+          age_years: edad.years,
+          age_months: edad.months,
+          is_senior: edad.years >= SENIOR_PET_AGE_YEARS,
+        };
+      }),
+    ];
 
-    const { error: saveError } = await query;
-    if (saveError) {
-      setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
-      setLoading(false);
-      return;
+    // Se emparejan con lo que ya existía (por si regresó a este paso): el
+    // i-ésimo actualiza al i-ésimo, y lo que sobre se elimina — son capturas
+    // pre-pago de esta misma persona, sin tiempo de espera todavía.
+    for (const [i, datos] of todos.entries()) {
+      const previo = existing?.[i];
+      const { error: saveError } = previo
+        ? await supabase.from("pets").update(datos).eq("id", previo.id)
+        : await supabase.from("pets").insert(datos);
+      if (saveError) {
+        setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
+        setLoading(false);
+        return;
+      }
     }
+    const sobrantes = (existing ?? []).slice(todos.length).map((p) => p.id);
+    if (sobrantes.length > 0)
+      await supabase.from("pets").delete().in("id", sobrantes);
+
     router.push("/registro/plan");
   }
 
@@ -231,6 +294,128 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       onSubmit={handleSubmit}
       className="flex flex-col gap-[18px] rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] sm:p-7"
     >
+      {/* ===== ALTA (pre-pago): SOLO tipo, nombre y edad =====
+          Decisión de la PM (12-ago): pedir raza, sexo, colores y foto antes de
+          pagar mete fricción justo donde la persona todavía está decidiendo.
+          Todo eso se completa después del pago, en el perfil del peludo. */}
+      {mode === "registro" && (
+        <>
+          <ToggleGroup
+            label="¿Es lomito o michi?"
+            value={species}
+            onChange={(v) => setSpecies(v)}
+            options={[
+              { value: "dog", label: `🐶 ${ETIQUETAS_ESPECIE[0].label}` },
+              { value: "cat", label: `🐱 ${ETIQUETAS_ESPECIE[1].label}` },
+            ]}
+          />
+          <TextField
+            label={`¿Cómo se llama tu ${comoLeDicen(species)}?`}
+            required
+            placeholder={species === "cat" ? "Luna" : "Max"}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <SelectField
+            label="¿Qué edad tiene?"
+            required
+            value={ageKey}
+            onChange={(e) => setAgeKey(e.target.value)}
+          >
+            <option value="">Elige su edad</option>
+            {AGE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </SelectField>
+          {showsSeniorNote && (
+            <div className="rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
+              Nos encanta recibir a peludos seniors. Como tu{" "}
+              {comoLeDicen(species)} tiene {SENIOR_PET_AGE_YEARS} años o más, sí
+              puede unirse a Pata Amiga; más adelante te pediremos algunos datos
+              sobre su salud actual para darle el seguimiento adecuado y
+              personalizado. 🐾
+            </div>
+          )}
+
+          {/* Peludos adicionales: la misma información, nada más */}
+          {extras.map((p, i) => (
+            <div
+              key={i}
+              className="flex flex-col gap-[18px] rounded-[16px] border-[1.5px] border-border-input p-4"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-extrabold text-teal-deep">
+                  PELUDO {i + 2}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExtras((prev) => prev.filter((_, j) => j !== i))
+                  }
+                  className="text-[12.5px] font-bold text-error-text hover:underline"
+                >
+                  Quitar
+                </button>
+              </div>
+              <ToggleGroup
+                label="¿Es lomito o michi?"
+                value={p.species}
+                onChange={(v) => cambiarExtra(i, "species", v)}
+                options={[
+                  { value: "dog", label: `🐶 ${ETIQUETAS_ESPECIE[0].label}` },
+                  { value: "cat", label: `🐱 ${ETIQUETAS_ESPECIE[1].label}` },
+                ]}
+              />
+              <TextField
+                label={`¿Cómo se llama tu ${comoLeDicen(p.species)}?`}
+                required
+                placeholder={p.species === "cat" ? "Luna" : "Max"}
+                value={p.name}
+                onChange={(e) => cambiarExtra(i, "name", e.target.value)}
+              />
+              <SelectField
+                label="¿Qué edad tiene?"
+                required
+                value={p.ageKey}
+                onChange={(e) => cambiarExtra(i, "ageKey", e.target.value)}
+              >
+                <option value="">Elige su edad</option>
+                {AGE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
+          ))}
+
+          {puedeAgregarOtro && (
+            <button
+              type="button"
+              onClick={() =>
+                setExtras((prev) => [
+                  ...prev,
+                  { name: "", species: "dog", ageKey: "" },
+                ])
+              }
+              className="flex items-center justify-center gap-2 rounded-[12px] border-[1.5px] border-dashed border-teal px-4 py-3 text-[13.5px] font-bold text-teal-deep transition-colors hover:bg-info-bg"
+            >
+              <span className="text-[18px] leading-none">+</span> Agregar otro
+              peludo
+            </button>
+          )}
+          <span className="text-[12.5px] leading-normal text-ink-tertiary">
+            Si tienes más de un peludo, puedes registrarlo ahora o más adelante
+            desde tu cuenta (hasta {MAX_ACTIVE_PETS}). Los demás datos —raza,
+            sexo, colores y su foto— te los pedimos después del pago.
+          </span>
+        </>
+      )}
+
+      {mode === "member" && (
+      <>
       <div className="flex items-center gap-4">
         <button
           type="button"
@@ -263,7 +448,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           </span>
           <span className="text-[12.5px] text-ink-tertiary">
             {mode === "member"
-              ? "Podrás agregar más fotos en su ficha"
+              ? "Podrás agregar más fotos en su perfil"
               : "Opcional ahora, la pedimos al completar el perfil"}
           </span>
         </div>
@@ -391,7 +576,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           />
           <span className="text-xs text-ink-tertiary">
             Al compartir su historia nos autorizas a incluirla en la página y
-            redes de Pata Amiga. 💚 Los adoptados tienen un período de espera
+            redes de Pata Amiga. 💚 Los adoptados tienen un tiempo de espera
             más corto.
           </span>
         </div>
@@ -401,7 +586,7 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           <span>
             Como tu peludo tiene {SENIOR_PET_AGE_YEARS} años o más, te pedimos
             un certificado veterinario para conocer su estado de salud. Puedes
-            subirlo aquí mismo o después desde su ficha. 🐾
+            subirlo aquí mismo o después desde su perfil. 🐾
           </span>
           <input
             ref={certRef}
@@ -425,6 +610,8 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
             )}
           </div>
         </div>
+      )}
+      </>
       )}
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">

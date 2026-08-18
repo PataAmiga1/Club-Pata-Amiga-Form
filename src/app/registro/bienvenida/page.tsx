@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
+import { PurchaseEvent } from "@/components/analytics/PurchaseEvent";
 
 export default async function BienvenidaPage({
   searchParams,
@@ -16,11 +17,21 @@ export default async function BienvenidaPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/registro");
 
-  // Verify the Stripe checkout actually completed
+  // Verify the Stripe checkout actually completed.
+  // De paso se guarda el MONTO REAL cobrado: es el valor que se manda a GA4 y
+  // al píxel de Meta. Un monto fijo en el código hace mentir a todo reporte de
+  // campañas en cuanto cambia un precio o entra un cupón.
+  let compra: { montoCentavos: number; moneda: string; transaccion: string } | null =
+    null;
   if (session_id) {
     try {
       const session = await getStripe().checkout.sessions.retrieve(session_id);
       if (session.payment_status !== "paid") redirect("/registro/plan");
+      compra = {
+        montoCentavos: session.amount_total ?? 0,
+        moneda: session.currency ?? "mxn",
+        transaccion: session.id,
+      };
     } catch {
       redirect("/registro/plan");
     }
@@ -34,7 +45,7 @@ export default async function BienvenidaPage({
     .order("created_at", { ascending: true })
     .limit(1);
   const pet = pets?.[0];
-  // La espera arranca al APROBARSE la ficha (PM, 11-ago): recién pagado, la
+  // La espera arranca al APROBARSE el perfil (PM, 11-ago): recién pagado, la
   // mascota aún no tiene fechas. Si las tiene (ya la aprobaron), se muestran.
   const days =
     pet?.waiting_period_end_date && pet?.waiting_period_start_date
@@ -50,6 +61,13 @@ export default async function BienvenidaPage({
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-teal px-6 py-16">
+      {compra && (
+        <PurchaseEvent
+          montoCentavos={compra.montoCentavos}
+          moneda={compra.moneda}
+          transaccion={compra.transaccion}
+        />
+      )}
       <div className="blob absolute -left-[90px] -top-[70px] size-[320px] bg-white/[.12]" />
       <div
         className="absolute -bottom-[120px] -right-[100px] size-[380px] bg-white/10"
@@ -72,19 +90,19 @@ export default async function BienvenidaPage({
         </h1>
         <p className="text-base leading-relaxed text-white/[.92]">
           Tu membresía está activa y la orientación veterinaria 24/7 ya está
-          disponible.
+          lista.
           {pet &&
             (days ? (
               <>
                 {" "}
-                {pet.name} entra a revisión del comité y su período de espera
-                de {days} días ya está en curso.
+                Estamos validando la información de {pet.name}; su tiempo de
+                espera de {days} días ya está en curso.
               </>
             ) : (
               <>
                 {" "}
-                {pet.name} entra a revisión del comité; en cuanto su ficha sea
-                aprobada empezará su período de espera.
+                Estamos validando la información de {pet.name}; en cuanto quede
+                confirmada, iniciará su tiempo de espera.
               </>
             ))}
         </p>

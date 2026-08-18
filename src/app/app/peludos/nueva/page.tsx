@@ -5,7 +5,7 @@ import { PetForm } from "@/components/registro/PetForm";
 
 /**
  * Miembro activo agrega otro peludo — sin stepper ni "plan y pago":
- * la membresía ya está pagada, solo corre su período de espera.
+ * la membresía ya está pagada, solo corre su tiempo de espera.
  */
 export default async function NuevoPeludoPage() {
   const supabase = await createClient();
@@ -28,8 +28,8 @@ export default async function NuevoPeludoPage() {
           Registra a un nuevo peludo
         </h1>
         <p className="mt-1.5 text-[14.5px] leading-normal text-ink-secondary">
-          Tu membresía cubre hasta {MAX_ACTIVE_PETS} mascotas. El comité
-          revisará su ficha y su período de espera empieza hoy.
+          Tu membresía te permite registrar hasta {MAX_ACTIVE_PETS} peludos.
+          Confirmaremos su información para iniciar su tiempo de espera.
         </p>
       </div>
       <PetForm mode="member" />

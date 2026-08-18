@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicHeader } from "@/components/public/PublicHeader";
+import { datosConocidos } from "@/lib/datos-conocidos";
 import { AmbassadorForm } from "./AmbassadorForm";
 import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
 
@@ -13,22 +14,28 @@ export const metadata: Metadata = {
 const PERKS = [
   {
     emoji: "🔗",
+    // El ejemplo ya no lleva el prefijo `PATAMIGA-`: los códigos nuevos se
+    // eligen sin él (equipo, 16-ago), y se puede cambiar cuantas veces quiera.
     title: "Tu código único",
-    text: "Personalizable una vez (ej. PATAMIGA-PAOLA). Compártelo en tus redes o con tu comunidad.",
+    text: "Tú lo eliges (ej. PAOLA2026). Compártelo en tus redes o con tu comunidad.",
   },
   {
     emoji: "💸",
+    // El documento pedía «en los 10 primeros días». Pablo lo dejó como está:
+    // el día 5, que es lo que hace `payAmbassadorCut`.
     title: "Comisión por referido",
     text: `Cada suscripción con tu código te genera comisión. Corte mensual con pago el día ${AMBASSADOR_PAYOUT_DAY}.`,
   },
   {
     emoji: "🎨",
     title: "Materiales listos",
-    text: "Packs para historias, videos y guía de tono de marca para compartir sin complicarte.",
+    text: "Kits para historias, videos y guía de tono de marca para compartir sin complicarte.",
   },
 ];
 
-export default function EmbajadoresPage() {
+export default async function EmbajadoresPage() {
+  // Con sesión abierta el formulario llega lleno con lo que ya dio (15-ago).
+  const conocidos = await datosConocidos();
   return (
     <div className="min-h-dvh bg-cream">
       <PublicHeader />
@@ -41,13 +48,13 @@ export default function EmbajadoresPage() {
           </h1>
           <p className="max-w-[560px] text-[14.5px] leading-[1.55] text-white/85">
             Comparte Pata Amiga con tu comunidad y genera comisiones por cada
-            suscripción con tu código. Es marketing con causa — proteger a más
-            peludos en todo México.
+            suscripción con tu código. Sumando esfuerzos con causa para cuidar a
+            más peludos en todo México.
           </p>
           <p className="text-[12.5px] text-white/70">
             ¿Ya eres embajador?{" "}
             <Link href="/embajador" className="font-bold text-lime hover:underline">
-              Entra a tu dashboard →
+              Entra a tu perfil →
             </Link>
           </p>
         </div>
@@ -73,13 +80,20 @@ export default function EmbajadoresPage() {
               </div>
             </div>
           ))}
+          {/* CORRECCIÓN DE FONDO, no de tono (equipo 16-ago, confirmada por
+              Pablo). Esta línea decía que el código «no reduce tiempos de
+              espera» y era falso: `petWaitingPeriodDays` baja la espera de 180
+              a 90 días cuando la membresía trae código de embajador, desde el
+              11-jul. La página le estaba escondiendo al embajador su mejor
+              argumento para compartirlo. */}
           <p className="px-1 text-xs leading-relaxed text-ink-tertiary">
-            El programa de embajadores es de difusión: el código no reduce
-            períodos de espera ni modifica los beneficios de la membresía.
+            El programa de embajadores está pensado para influencers, refugios y
+            ONGs con fines de difusión: el código reduce el tiempo de espera de
+            6 a 3 meses, pero no modifica los demás beneficios de la membresía.
             Registro con revisión del comité — solo mayores de edad.
           </p>
         </div>
-        <AmbassadorForm />
+        <AmbassadorForm conocidos={conocidos} />
       </div>
     </div>
   );

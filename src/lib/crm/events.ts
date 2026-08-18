@@ -57,7 +57,7 @@ export type EventInput = {
 /**
  * SUMIDERO ÚNICO de todo lo que le pasa a un contacto.
  *
- * Alimenta tres cosas a la vez: la línea de tiempo de la ficha, los eventos
+ * Alimenta tres cosas a la vez: la línea de tiempo del perfil, los eventos
  * intercalados en el hilo de conversación, y —el día que se quiera— el motor de
  * automatizaciones, que se suscribirá aquí sin que haya que tocar una sola
  * pantalla. Por eso TODO cambio relevante pasa por esta función y no escribe

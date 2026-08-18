@@ -15,29 +15,37 @@ import { PhoneMockup } from "@/components/landing/PhoneMockup";
 export const metadata: Metadata = {
   title: "Club Pata Amiga — Protección para tu manada",
   description:
-    "Membresía de salud para tu perro o gato: orientación veterinaria 24/7, reintegros para gastos veterinarios y una red de centros aliados en todo México.",
+    "Membresía de salud para tu peludo (michi o lomito) orgullosamente 100% mexicana: orientación veterinaria 24/7, reintegros para gastos veterinarios y acceso a nuestra red de centros aliados.",
 };
 
 /** Landing pública (screen 2a + secciones del sitio actual pataamiga.mx). */
 
+/**
+ * Las tres tarjetas de «Amor que deja huella» (pantalla 02 del tono 2.0).
+ *
+ * El documento del equipo le asignó a la tarjeta de centros aliados el texto de
+ * reintegros —montos y 72 hrs, que ya está en la tarjeta de junto—, así que el
+ * cuerpo se tomó de su propia redacción nueva para el directorio (pantalla 26),
+ * que habla del mismo concepto y ya viene con el tono 2.0 (Pablo, 16-ago).
+ */
 const BENEFITS = [
   {
     emoji: "💬",
     bg: "bg-info-bg",
     title: "Orientación veterinaria 24/7",
-    text: "Orientación veterinaria inmediata, disponible desde el primer día de tu membresía.",
+    text: "Orientación veterinaria inmediata y personalizada, disponible desde el primer día de tu membresía.",
   },
   {
     emoji: "🐾",
     bg: "bg-warning-bg",
     title: "Reintegros",
-    text: "Hasta $3,000 MXN en gastos veterinarios, $2,000 por fallecimiento y $300 en vacunas. En 72 hrs.",
+    text: "Hasta $3,000 MXN en gastos veterinarios, $2,000 para momentos de despedida y $300 en vacunas. Proceso de reintegro en solo 72 hrs.",
   },
   {
     emoji: "📍",
     bg: "bg-success-bg",
-    title: "Centros aliados",
-    text: "Red de veterinarias, tiendas y hoteles con beneficios exclusivos para miembros, cerca de ti.",
+    title: "Centros aliados (Próximamente)",
+    text: "Clínicas, pet shops, hospedajes y más con beneficios para la manada en todo México.",
   },
 ];
 
@@ -129,14 +137,15 @@ export default async function Home() {
         <div className="blob absolute -bottom-[120px] -left-[100px] size-[360px] bg-white/10" />
         <div className="relative flex flex-col justify-center gap-5 px-5 py-12 sm:px-14 lg:py-14">
           <h1 className="font-display text-[40px] leading-[1.02] text-white sm:text-[58px]">
-            Protección
+            Salud y tranquilidad
             <br />
             para tu manada.
           </h1>
-          <p className="max-w-[420px] text-[16px] leading-[1.55] text-white/[.92] sm:text-[17px]">
-            Membresía de salud para tu perro o gato: orientación veterinaria
-            24/7, reintegros para gastos veterinarios y una red de centros
-            aliados en todo México. Mantienes a tu veterinario de confianza.
+          <p className="max-w-[440px] text-[16px] leading-[1.55] text-white/[.92] sm:text-[17px]">
+            Membresía de salud para tu peludo (michi o lomito) orgullosamente
+            100% mexicana. Disfruta de orientación veterinaria 24/7, reintegros
+            para gastos veterinarios y acceso a nuestra red de centros aliados.
+            Mantienes a tu veterinario de confianza.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Link
@@ -164,7 +173,7 @@ export default async function Home() {
               <>
                 FOTO
                 <br />
-                perro y gato mirando arriba
+                lomito y michi mirando arriba
                 <br />
                 (recorte sobre teal)
               </>
@@ -338,14 +347,14 @@ export default async function Home() {
             <h2 className="font-display text-[30px] leading-tight text-ink-title sm:text-4xl">
               Red veterinaria
               <br />
-              <span className="text-teal">y de cuidado</span>
+              <span className="text-teal">y de cuidado (Próximamente)</span>
             </h2>
             <p className="max-w-[560px] text-[14.5px] leading-[1.55] text-ink-secondary">
-              Estamos construyendo la red de cuidado más grande para mascotas:
-              clínicas veterinarias, hospitales y negocios pet-friendly que
-              comparten nuestros valores de cuidado, empatía y responsabilidad.
-              Explora los centros aliados o registra tu establecimiento hoy
-              mismo.
+              Estamos consolidando la red de cuidado más grande para nuestros
+              peludos: clínicas veterinarias, hospitales y comercios
+              pet-friendly que comparten nuestros valores de empatía y
+              responsabilidad. Explora nuestros centros aliados o suma tu
+              establecimiento a la manada hoy mismo.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
@@ -358,7 +367,7 @@ export default async function Home() {
                 href="/centros/registro"
                 className="grid h-[50px] place-items-center rounded-full border-2 border-teal px-7 text-[14px] font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
               >
-                Registrar mi centro
+                Unirme como aliado
               </Link>
             </div>
           </div>
@@ -366,14 +375,14 @@ export default async function Home() {
             // Collage con fondo transparente — sin marco ni sombra
             <img
               src={assets["landing-red"]}
-              alt="Mascotas de la red Pata Amiga"
+              alt="Peludos de la red Pata Amiga"
               className="mx-auto hidden max-h-[440px] w-full object-contain lg:block"
             />
           ) : (
             <div className="hidden h-[340px] place-items-center rounded-[24px] border-2 border-dashed border-[#C9C3B4] text-center text-[13px] font-semibold text-ink-placeholder lg:grid">
               FOTO
               <br />
-              mascotas de la red
+              peludos de la red
               <br />
               (collage con fondo transparente)
             </div>

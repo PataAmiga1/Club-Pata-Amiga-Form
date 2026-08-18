@@ -284,7 +284,7 @@ export default async function ConversacionesPage({
     }
   }
 
-  // Ficha compacta del contacto del hilo abierto
+  // Perfil compacto del contacto del hilo abierto
   let contacto = null;
   if (cabeza?.contactId) {
     const { data } = await admin
@@ -445,7 +445,7 @@ export default async function ConversacionesPage({
           )}
         </div>
 
-        {/* Ficha del contacto */}
+        {/* Perfil del contacto */}
         {contacto && (
           <aside className="hidden w-[240px] flex-none flex-col gap-2 rounded-[16px] bg-white p-4 shadow-[0_2px_10px_rgba(30,83,80,.05)] lg:flex">
             <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
@@ -488,7 +488,7 @@ export default async function ConversacionesPage({
               href={`/ventas/contactos/${contacto.id}`}
               className="mt-1 rounded-full border-[1.5px] border-border-input px-3 py-1.5 text-center text-[11.5px] font-bold text-teal-deep hover:border-teal"
             >
-              Ver ficha completa
+              Ver perfil completo
             </Link>
           </aside>
         )}

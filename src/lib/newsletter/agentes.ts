@@ -135,12 +135,12 @@ REGLAS QUE NO SE NEGOCIAN
    campo vacío: se marcará como sin verificar y NO podrá entrar al correo.
 2. No inventes cifras, fechas ni estudios. Si el brief pedía un dato y no lo
    tienes, ponlo en datosFaltantes. Es mucho mejor un hueco declarado que un
-   número inventado en un boletín de salud de mascotas.
+   número inventado en un boletín de salud de peludos.
 3. Nada de consejo clínico. Puedes decir "muchos veterinarios recomiendan una
    revisión anual, según <fuente>"; no puedes decir qué hacer con un animal
    enfermo, ni sugerir tratamientos, dosis o diagnósticos.
 4. Terminología vinculante desde el primer borrador: nunca seguro, póliza,
-   cobertura ni carencia. Se dice membresía, beneficios y período de espera.`;
+   cobertura ni carencia. Se dice membresía, beneficios y tiempo de espera.`;
 
 export type ResultadoCorrida<T> =
   | { ok: true; datos: T; costoCentavos: number; demo: boolean; runId: string }

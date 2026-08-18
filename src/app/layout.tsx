@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import localFont from "next/font/local";
+import { Analytics } from "@/components/analytics/Analytics";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -18,7 +19,7 @@ const fraiche = localFont({
 export const metadata: Metadata = {
   title: "Club Pata Amiga — Protección para tu manada",
   description:
-    "Membresía de salud para mascotas en México: reintegros de gastos veterinarios, orientación veterinaria 24/7, red de centros de bienestar y más. Disponible en todo México, 100% digital.",
+    "Membresía de salud para tu peludo en México: reintegros de gastos veterinarios, orientación veterinaria 24/7, red de centros aliados y más. Disponible en todo México, 100% digital.",
 };
 
 export default function RootLayout({
@@ -31,7 +32,11 @@ export default function RootLayout({
       lang="es-MX"
       className={`${outfit.variable} ${fraiche.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {/* Medición: no carga NADA mientras no existan las llaves de GA4/Meta */}
+        <Analytics />
+      </body>
     </html>
   );
 }

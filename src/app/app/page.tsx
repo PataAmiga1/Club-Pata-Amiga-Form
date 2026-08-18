@@ -34,7 +34,7 @@ export default async function AppHome() {
     supabase
       .from("pets")
       .select(
-        "id, name, species, breed, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at, is_senior, vet_certificate_url, info_requested",
+        "id, name, species, breed, sex, age_years, age_months, photo_url, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at, is_senior, vet_certificate_url, info_requested",
       )
       .eq("user_id", user.id)
       .eq("is_active", true)
@@ -49,7 +49,25 @@ export default async function AppHome() {
 
   const active = profile?.membership_status === "active";
   const name = profile?.first_name || profile?.email?.split("@")[0] || "";
-  const petList = (pets ?? []) as (PetRow & { created_at: string })[];
+  const petList = (pets ?? []) as (PetRow & {
+    created_at: string;
+    sex: string | null;
+  })[];
+
+  // Peludos a los que les falta algo (equipo, 13-ago): el alta pide solo tipo,
+  // nombre y edad, así que raza, sexo y foto se capturan después — y era fácil
+  // dejarlo a medias, sobre todo desde que subir la foto ya no encadena al
+  // siguiente peludo. Sin este aviso nadie se enteraba de lo que faltaba.
+  const faltantesPorPeludo = petList
+    .map((pet) => ({
+      pet,
+      falta: [
+        !pet.photo_url && "su foto",
+        !pet.breed && "su raza",
+        !pet.sex && "su sexo",
+      ].filter((x): x is string => Boolean(x)),
+    }))
+    .filter((p) => p.falta.length > 0);
   // Un miembro heredado de Memberstack no tiene plan ni período registrados:
   // antes se le mostraba "Plan mensual" inventado y una fecha de renovación ya
   // pasada (auditoría 11-ago). Ahora sale "Membresía activa" y sin fecha.
@@ -88,8 +106,8 @@ export default async function AppHome() {
       icon: "🐾",
       tone: "bg-info-bg",
       // La espera ya NO comienza al registrar: arranca cuando el comité
-      // aprueba la ficha (PM, 11-ago).
-      text: `Registraste a ${pet.name} — su ficha entró a revisión del comité`,
+      // aprueba el perfil (PM, 11-ago).
+      text: `Registraste a ${pet.name} — estamos confirmando sus datos`,
       at: new Date(pet.created_at),
     });
   }
@@ -146,7 +164,7 @@ export default async function AppHome() {
           </h1>
           <p className="text-[12.5px] text-ink-secondary md:text-sm">
             {active
-              ? `Tu manada está protegida.${renews ? ` Membresía activa hasta el ${formatDateEs(renews)}.` : ""}`
+              ? `Tu manada ya es parte del club.${renews ? ` Membresía activa hasta el ${formatDateEs(renews)}.` : ""}`
               : "Tu membresía aún no está activa."}
           </p>
         </div>
@@ -175,6 +193,34 @@ export default async function AppHome() {
           >
             Elegir plan
           </Link>
+        </div>
+      )}
+
+      {/* Datos pendientes de algún peludo — el comité no puede aprobar su
+          perfil sin ellos, y sin aprobación no arranca su tiempo de espera. */}
+      {faltantesPorPeludo.length > 0 && (
+        <div className="flex flex-col gap-2.5 rounded-[16px] bg-warning-bg px-5 py-4">
+          <span className="text-sm font-bold text-warning-text">
+            🐾 Nos faltan datos de{" "}
+            {faltantesPorPeludo.length === 1
+              ? faltantesPorPeludo[0].pet.name
+              : `${faltantesPorPeludo.length} de tus peludos`}
+          </span>
+          <span className="text-[12.5px] leading-relaxed text-warning-text/90">
+            El comité necesita el perfil completo para aprobarlo, y su tiempo de
+            espera empieza cuando lo aprueban.
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {faltantesPorPeludo.map(({ pet, falta }) => (
+              <Link
+                key={pet.id}
+                href={`/app/peludos/${pet.id}`}
+                className="rounded-full bg-white px-3.5 py-1.5 text-[12.5px] font-bold text-warning-text transition-colors hover:bg-white/70"
+              >
+                {pet.name}: falta {falta.join(", ").replace(/, ([^,]*)$/, " y $1")} →
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
@@ -254,7 +300,7 @@ export default async function AppHome() {
             </Link>
           ) : (
             <span className="text-[12.5px] text-ink-tertiary">
-              Al cumplirse los períodos de espera
+              Al cumplirse los tiempos de espera
             </span>
           )}
         </div>
@@ -345,12 +391,17 @@ export default async function AppHome() {
             className="absolute -right-[50px] -top-10 size-[170px] bg-white/[.08]"
             style={{ borderRadius: "58% 42% 45% 55% / 48% 57% 43% 52%" }}
           />
+          {/* «PRÓXIMAMENTE» (pantalla 15 del tono 2.0): la red todavía se está
+              armando, igual que en la portada. */}
           <h2 className="relative font-display text-xl text-white">
-            Centros aliados cerca de ti
+            Centros aliados cerca de ti{" "}
+            <span className="align-middle text-[11px] font-extrabold tracking-[.06em] text-lime">
+              PRÓXIMAMENTE
+            </span>
           </h2>
           <p className="relative text-[13px] leading-relaxed text-white/80">
-            Veterinarias, tiendas y hoteles con beneficios para miembros en
-            todo México.
+            Clínicas, pet shops, hospedajes y más con beneficios para la manada
+            en todo México.
           </p>
           <Link
             href="/app/centros"

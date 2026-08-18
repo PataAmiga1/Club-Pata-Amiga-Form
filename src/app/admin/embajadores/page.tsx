@@ -4,6 +4,7 @@ import { formatDateEs } from "@/lib/dates";
 import { formatMxn } from "@/lib/format";
 import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
 import { inicioDelMes } from "@/lib/zona-horaria";
+import { ligaFirmadaDeIne } from "@/lib/documentos-ine";
 import {
   DetailModal,
   DetailItem,
@@ -17,6 +18,61 @@ import {
   AmbassadorDeactivateButton,
 } from "./AmbassadorResolveButtons";
 import { PayCutButton } from "./PayCutButton";
+
+type LigasFirmadas = { frente: string | null; reverso: string | null };
+
+/**
+ * Ligas a la INE del embajador.
+ *
+ * Distingue tres casos, porque para el comité NO son lo mismo: nunca la subió,
+ * la subió y aquí está, o hay algo guardado pero el archivo no se pudo firmar.
+ * Ese tercer caso existe de verdad: las 18 filas heredadas de la plataforma
+ * anterior apuntan a archivos que en el proyecto de pruebas no están (se copió
+ * la base, no el bucket). Antes se pintaba una liga a "#" que no llevaba a
+ * ningún lado y parecía que el documento estaba roto.
+ */
+function LigasIne({
+  firmadas,
+  guardado,
+}: {
+  firmadas: LigasFirmadas | undefined;
+  guardado: { frente: string | null; reverso: string | null };
+}) {
+  const lados = [
+    { etiqueta: "Ver frente ↗", url: firmadas?.frente, hay: Boolean(guardado.frente) },
+    { etiqueta: "Ver reverso ↗", url: firmadas?.reverso, hay: Boolean(guardado.reverso) },
+  ].filter((l) => l.hay);
+
+  if (lados.length === 0)
+    return (
+      <span className="text-[12.5px] text-warning-text">
+        Sin identificación — se registró antes de que el alta la pidiera. Puede
+        subirla desde su portal.
+      </span>
+    );
+
+  return (
+    <span className="flex flex-wrap gap-3 text-[12.5px]">
+      {lados.map((l) =>
+        l.url ? (
+          <a
+            key={l.etiqueta}
+            href={l.url}
+            target="_blank"
+            className="font-bold text-teal-deep hover:underline"
+          >
+            {l.etiqueta}
+          </a>
+        ) : (
+          <span key={l.etiqueta} className="text-ink-tertiary">
+            {l.etiqueta.replace("Ver ", "").replace(" ↗", "")}: archivo no
+            disponible
+          </span>
+        ),
+      )}
+    </span>
+  );
+}
 
 type Row = {
   id: string;
@@ -41,6 +97,7 @@ type Row = {
   motivation: string | null;
   social_links: Record<string, string> | null;
   deactivation_reason: string | null;
+  deactivated_at: string | null;
   referrals: {
     commission_amount: number | null;
     status: string;
@@ -67,12 +124,31 @@ export default async function AdminEmbajadoresPage({
   const { data } = await admin
     .from("ambassadors")
     .select(
-      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, referrals(commission_amount, status, created_at)",
+      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, deactivated_at, referrals(commission_amount, status, created_at)",
     )
     .order("created_at", { ascending: masAntiguos });
 
   const rows = ((data ?? []) as Row[]).filter(
     (a) => !estado || a.status === estado,
+  );
+
+  // Ligas de INE FIRMADAS (13-ago): el bucket `ine-documents` es privado, así
+  // que lo que se guarda es la ruta y la liga hay que firmarla al pintar. Las
+  // filas heredadas traían la URL pública completa y daban 400 al abrirlas —
+  // `ligaFirmadaDeIne` entiende las dos formas.
+  const ineFirmadas = new Map<string, { frente: string | null; reverso: string | null }>(
+    await Promise.all(
+      rows.map(
+        async (a) =>
+          [
+            a.id,
+            {
+              frente: await ligaFirmadaDeIne(a.ine_front_url),
+              reverso: await ligaFirmadaDeIne(a.ine_back_url),
+            },
+          ] as const,
+      ),
+    ),
   );
   const pending = rows.filter((a) => a.status === "pending");
   const approved = rows.filter((a) => a.status === "approved");
@@ -102,8 +178,17 @@ export default async function AdminEmbajadoresPage({
   const monthStart = inicioDelMes();
 
   const stats = (a: Row) => {
+    // A quien se dio de baja se le paga hasta SU fecha de baja (Pablo, 16-ago):
+    // cuenta la membresía cobrada antes de que dejara de ser embajadora, no la
+    // que entró después. Mismo filtro que `payAmbassadorCut` y que el layout
+    // del banco — si los tres no coinciden, el panel promete un monto que el
+    // botón de pagar no liquida.
+    const corteBaja = a.deactivated_at ? new Date(a.deactivated_at) : null;
     const payable = a.referrals.filter(
-      (r) => r.status === "pending" && new Date(r.created_at) < monthStart,
+      (r) =>
+        r.status === "pending" &&
+        new Date(r.created_at) < monthStart &&
+        (!corteBaja || new Date(r.created_at) <= corteBaja),
     );
     return {
       count: a.referrals.length,
@@ -253,6 +338,19 @@ export default async function AdminEmbajadoresPage({
                       «{a.motivation}»
                     </p>
                   )}
+                  {/* La INE, EN EL POPUP DONDE SE APRUEBA (13-ago): desde que
+                      el registro la pide, el comité tiene que poder verla justo
+                      aquí. Antes solo aparecía en el detalle de los ya
+                      aprobados, o sea después de haber decidido a ciegas. */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                      IDENTIFICACIÓN (INE)
+                    </span>
+                    <LigasIne
+                      firmadas={ineFirmadas.get(a.id)}
+                      guardado={{ frente: a.ine_front_url, reverso: a.ine_back_url }}
+                    />
+                  </div>
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
                       REDES SOCIALES
@@ -442,26 +540,13 @@ export default async function AdminEmbajadoresPage({
                           label="INE"
                           value={
                             a.ine_front_url || a.ine_back_url ? (
-                              <span className="flex gap-2.5">
-                                {a.ine_front_url && (
-                                  <a
-                                    href={a.ine_front_url}
-                                    target="_blank"
-                                    className="font-bold text-teal-deep hover:underline"
-                                  >
-                                    Frente ↗
-                                  </a>
-                                )}
-                                {a.ine_back_url && (
-                                  <a
-                                    href={a.ine_back_url}
-                                    target="_blank"
-                                    className="font-bold text-teal-deep hover:underline"
-                                  >
-                                    Reverso ↗
-                                  </a>
-                                )}
-                              </span>
+                              <LigasIne
+                                firmadas={ineFirmadas.get(a.id)}
+                                guardado={{
+                                  frente: a.ine_front_url,
+                                  reverso: a.ine_back_url,
+                                }}
+                              />
                             ) : null
                           }
                         />
@@ -504,21 +589,36 @@ export default async function AdminEmbajadoresPage({
           </h2>
           <div className="flex flex-col rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
             {canceled.length > 0 ? (
-              canceled.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center gap-3 border-b border-[#F2EEE4] py-2.5 text-[13px] text-ink-body last:border-0"
-                >
-                  <span className="flex-1">
-                    <strong className="text-ink-title">{fullName(a)}</strong> ·{" "}
-                    {a.email}
-                    {a.referral_code ? ` · ${a.referral_code}` : ""}
-                  </span>
-                  <span className="rounded-full bg-cream px-2.5 py-1 text-[10.5px] font-extrabold text-ink-tertiary">
-                    🕊️ BAJA{a.deactivation_reason ? ` · ${a.deactivation_reason}` : ""}
-                  </span>
-                </div>
-              ))
+              canceled.map((a) => {
+                // Darse de baja NO borra lo ya ganado: al confirmar la baja se
+                // le promete que sus comisiones se pagan en el siguiente corte
+                // (equipo, 5-ago). Antes esa promesa no tenía cómo cumplirse —
+                // el layout del banco los excluía y aquí no había botón, así
+                // que los referidos se quedaban en "pendiente" para siempre.
+                const s = stats(a);
+                return (
+                  <div
+                    key={a.id}
+                    className="flex flex-wrap items-center gap-3 border-b border-[#F2EEE4] py-2.5 text-[13px] text-ink-body last:border-0"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <strong className="text-ink-title">{fullName(a)}</strong> ·{" "}
+                      {a.email}
+                      {a.referral_code ? ` · ${a.referral_code}` : ""}
+                    </span>
+                    {s.payableCount > 0 && (
+                      <span className="rounded-full bg-warning-bg px-2.5 py-1 text-[10.5px] font-extrabold text-warning-text">
+                        DEBE COBRAR {formatMxn(s.payable)} · {s.payableCount}{" "}
+                        {s.payableCount === 1 ? "referido" : "referidos"}
+                      </span>
+                    )}
+                    <span className="rounded-full bg-cream px-2.5 py-1 text-[10.5px] font-extrabold text-ink-tertiary">
+                      🕊️ BAJA{a.deactivation_reason ? ` · ${a.deactivation_reason}` : ""}
+                    </span>
+                    {s.payableCount > 0 && <PayCutButton ambassadorId={a.id} />}
+                  </div>
+                );
+              })
             ) : (
               <p className="text-sm text-ink-secondary">
                 Sin embajadores dados de baja.

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { waitingProgress } from "@/lib/dates";
 import { isMixedBreedName } from "@/lib/waiting-period";
+import { AppealButton } from "@/components/app/AppealButton";
 import { PetFichaEditor, type ThreadMessage } from "./PetFichaEditor";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
@@ -11,7 +12,7 @@ const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   rejected: { text: "RECHAZADO", cls: "bg-error-bg text-error-text" },
 };
 
-/** Ficha completa de la mascota: fotos, datos e hilo con el comité. */
+/** Perfil completo de la mascota: fotos, datos e hilo con el comité. */
 export default async function PetFichaPage({
   params,
 }: {
@@ -92,14 +93,42 @@ export default async function PetFichaPage({
       <p className="-mt-2 text-[13px] text-ink-secondary">
         {pet.breed ?? "Sin raza registrada"} · {ageLabel} ·{" "}
         {wait.done
-          ? "período de espera completado ✓"
-          : `período de espera: ${wait.elapsed}/${wait.total} días`}
-        {pet.approval_status === "rejected" && pet.approval_notes
-          ? ` · Observaciones: ${pet.approval_notes}`
-          : ""}
+          ? "tiempo de espera completado ✓"
+          : `tiempo de espera: ${wait.elapsed}/${wait.total} días`}
       </p>
 
-      {/* Período de espera cumplido: acceso directo a los beneficios */}
+      {/* RECHAZO, CON SU MOTIVO Y CÓMO SEGUIR (equipo, 15-ago).
+          Antes el motivo iba pegado a la línea gris de arriba, entre la edad y
+          el tiempo de espera: se leía como un dato más y nadie entendía qué
+          hacer con él. Ahora es su propia tarjeta, dice qué observó el comité
+          y trae la apelación aquí mismo, que es donde la persona está mirando
+          la foto y los datos que tiene que corregir. */}
+      {pet.approval_status === "rejected" && (
+        <section className="flex flex-col gap-2.5 rounded-[16px] border-[1.5px] border-[#F2C7D4] bg-error-bg px-5 py-4">
+          <span className="text-[13px] font-extrabold tracking-[.04em] text-error-text">
+            EL COMITÉ NO APROBÓ EL PERFIL DE {pet.name.toUpperCase()}
+          </span>
+          {pet.approval_notes ? (
+            <p className="text-[13.5px] leading-relaxed text-ink-body">
+              <strong className="text-ink-title">Lo que observaron:</strong>{" "}
+              «{pet.approval_notes}»
+            </p>
+          ) : (
+            <p className="text-[13.5px] leading-relaxed text-ink-body">
+              El comité no dejó una observación. Cuéntanos tu caso al apelar y
+              lo revisan de nuevo.
+            </p>
+          )}
+          <p className="text-[13px] leading-relaxed text-ink-secondary">
+            Corrige aquí abajo lo que haga falta —la foto, la raza, los datos—
+            y pide una segunda revisión. Puedes adjuntar fotos o documentos que
+            respalden tu caso.
+          </p>
+          <AppealButton petId={pet.id} subjectLabel={`el perfil de ${pet.name}`} />
+        </section>
+      )}
+
+      {/* Tiempo de espera cumplido: acceso directo a los beneficios */}
       {wait.done &&
         pet.approval_status === "approved" &&
         pet.is_active !== false && (
@@ -116,6 +145,8 @@ export default async function PetFichaPage({
           id: pet.id,
           userId: pet.user_id,
           name: pet.name,
+          species: pet.species as "dog" | "cat",
+          breed: pet.breed,
           isSenior: pet.is_senior,
           infoRequested: pet.info_requested,
           sex: pet.sex,

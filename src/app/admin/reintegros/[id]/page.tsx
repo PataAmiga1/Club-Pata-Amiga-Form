@@ -147,7 +147,7 @@ export default async function ReviewPage({
                   {member.member_since
                     ? ` · miembro desde ${formatDateEs(new Date(member.member_since))}`
                     : ""}
-                  {wait.done ? " · período de espera cumplido ✓" : ` · en espera (${wait.elapsed}/${wait.total})`}
+                  {wait.done ? " · tiempo de espera cumplido ✓" : ` · en espera (${wait.elapsed}/${wait.total})`}
                 </span>
               </div>
               <span

@@ -11,6 +11,7 @@ import {
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { FilterChips } from "@/components/panel/FilterChips";
 import { PetReviewRow } from "./PetReviewRow";
+import { etiquetaEspecie } from "@/lib/vocabulario";
 import { PetResolveButtons } from "./PetResolveButtons";
 
 export default async function AdminMascotasPage({
@@ -124,7 +125,7 @@ export default async function AdminMascotasPage({
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
       <h1 className="font-display text-[26px] text-ink-title">
-        Mascotas por aprobar
+        Peludos por aprobar
       </h1>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterChips
@@ -171,7 +172,7 @@ export default async function AdminMascotasPage({
               registered: formatDateEs(new Date(p.created_at)),
             }}
             detailSlot={
-              <DetailModal title={`Ficha de ${p.name}`}>
+              <DetailModal title={`Perfil de ${p.name}`}>
                 {/* Toda la información de la mascota y su dueño (patrón del sitio vivo) */}
                 <div className="flex flex-col gap-4">
                   {/* Faltantes visibles de un vistazo (equipo, 5-ago), incluidos
@@ -217,7 +218,7 @@ export default async function AdminMascotasPage({
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                     <DetailItem label="NOMBRE" value={p.name} />
-                    <DetailItem label="TIPO" value={p.species === "dog" ? "Perro" : "Gato"} />
+                    <DetailItem label="TIPO" value={etiquetaEspecie(p.species)} />
                     <DetailItem label="RAZA" value={p.breed} />
                     <DetailItem
                       label="EDAD"
@@ -237,15 +238,15 @@ export default async function AdminMascotasPage({
                         p.is_senior
                           ? "Sí 👴"
                           : // Vinculación edad ↔ clasificación (equipo, 11-ago): si la
-                            // edad guardada indica senior pero la ficha dice que no, el
-                            // comité lo ve — la ficha NO se recalcula sola (Regla X).
+                            // edad guardada indica senior pero el perfil dice que no, el
+                            // comité lo ve — el perfil NO se recalcula solo (Regla X).
                             (p.age_years ?? 0) >= SENIOR_PET_AGE_YEARS && !p.age_months
                             ? "No ⚠ (la edad indica senior)"
                             : "No"
                       }
                     />
                     <DetailItem
-                      label="PERÍODO DE ESPERA"
+                      label="TIEMPO DE ESPERA"
                       value={
                         p.waiting_period_end_date
                           ? `termina el ${formatDateEs(p.waiting_period_end_date)}`
@@ -314,14 +315,14 @@ export default async function AdminMascotasPage({
         ))}
         {pending.length === 0 && !verBajas && !verApelaciones && (
           <div className="rounded-[18px] bg-white p-6 text-sm text-ink-secondary shadow-[0_2px_10px_rgba(30,83,80,.05)]">
-            Sin mascotas pendientes de revisión. 🎉
+            Sin peludos pendientes de revisión. 🎉
           </div>
         )}
         {(verBajas || verApelaciones) && resolved.length === 0 && (
           <div className="rounded-[18px] bg-white p-6 text-sm text-ink-secondary shadow-[0_2px_10px_rgba(30,83,80,.05)]">
             {verBajas
-              ? "Sin mascotas dadas de baja."
-              : "Sin mascotas con apelación."}
+              ? "Sin peludos dados de baja."
+              : "Sin peludos con apelación."}
           </div>
         )}
       </div>
@@ -344,7 +345,7 @@ export default async function AdminMascotasPage({
               return (
                 <DetailModal
                   key={p.id}
-                  title={`Ficha de ${p.name}`}
+                  title={`Perfil de ${p.name}`}
                   trigger={
                     <div className="flex items-center gap-3 border-b border-[#F2EEE4] px-1 py-2.5 text-[13px] text-ink-body">
                       <span aria-hidden>{p.species === "dog" ? "🐕" : "🐈"}</span>
@@ -385,7 +386,7 @@ export default async function AdminMascotasPage({
                       />
                     )}
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                      <DetailItem label="ESPECIE" value={p.species === "dog" ? "Perro" : "Gato"} />
+                      <DetailItem label="ESPECIE" value={etiquetaEspecie(p.species)} />
                       <DetailItem label="RAZA" value={p.breed} />
                       <DetailItem label="SEXO" value={p.sex} />
                       <DetailItem label="EDAD" value={ageLabel(p)} />
@@ -405,10 +406,10 @@ export default async function AdminMascotasPage({
                       />
                       <DetailItem label="NOTAS DEL COMITÉ" value={p.approval_notes} />
                       <DetailItem
-                        label="PERÍODO DE ESPERA"
+                        label="TIEMPO DE ESPERA"
                         value={
                           p.waiting_period_bypassed
-                            ? "Sin período de espera"
+                            ? "Sin tiempo de espera"
                             : p.waiting_period_end_date
                               ? `Termina el ${formatDateEs(new Date(p.waiting_period_end_date + "T00:00:00"))}`
                               : null

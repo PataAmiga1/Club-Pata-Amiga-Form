@@ -26,14 +26,22 @@ export function EmergencyButton({ phone }: { phone: string }) {
 
   return (
     <>
+      {/* Solo el icono (equipo, 12-ago): las pastillas flotantes con texto
+          tapaban el contenido. El nombre vive en aria-label y en el tooltip,
+          así que se sigue anunciando en lectores de pantalla.
+
+          La altura NO es decorativa: medida contra la barra de escribir del
+          chat veterinario, este botón tapaba el botón de enviar (en
+          escritorio se encimaban de verdad, no era solo que estorbara).
+          116/88 px lo dejan por encima de esa fila con holgura. */}
       <button
         type="button"
         onClick={handleOpen}
-        className="fixed bottom-[92px] right-4 z-30 flex items-center gap-2 rounded-full bg-[#D93025] px-4 py-3 text-[13px] font-extrabold text-white shadow-[0_6px_20px_rgba(217,48,37,.4)] transition-transform hover:scale-105 md:bottom-6 md:right-6"
+        className="fixed bottom-[116px] right-4 z-30 grid size-14 place-items-center rounded-full bg-[#D93025] text-[22px] text-white shadow-[0_6px_20px_rgba(217,48,37,.4)] transition-transform hover:scale-105 md:bottom-[88px] md:right-6"
         aria-label="Emergencia"
+        title="Emergencia"
       >
         <span aria-hidden>🚨</span>
-        <span className="hidden sm:inline">Emergencia</span>
       </button>
 
       {open && (
@@ -68,7 +76,7 @@ export function EmergencyButton({ phone }: { phone: string }) {
               </li>
               <li>
                 <strong>3. Guarda tus facturas:</strong> los gastos de urgencia
-                aplican para reintegro si el período de espera de tu peludo ya
+                aplican para reintegro si el tiempo de espera de tu peludo ya
                 se cumplió.
               </li>
             </ol>

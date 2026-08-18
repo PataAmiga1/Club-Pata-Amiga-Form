@@ -4,9 +4,9 @@ import { PublicHeader } from "@/components/public/PublicHeader";
 import { CentersExplorer } from "@/components/centros/CentersExplorer";
 
 export const metadata: Metadata = {
-  title: "Centros de bienestar aliados · Club Pata Amiga",
+  title: "Centros aliados · Club Pata Amiga",
   description:
-    "Veterinarias, tiendas, hoteles y más con beneficios para miembros — en todo México.",
+    "Clínicas, pet shops, hospedajes y más con beneficios para la manada en todo México.",
 };
 
 export default async function CentrosPublicPage() {

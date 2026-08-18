@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { TextField, SelectField } from "@/components/ui/Field";
+import { TextField } from "@/components/ui/Field";
+import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
 import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
+import type { DatosConocidos } from "@/lib/datos-conocidos";
 import { registerCenter, type CenterLocationInput } from "./actions";
 
 type LocationDraft = CenterLocationInput & { colonies: string[] };
@@ -22,12 +24,31 @@ const emptyLocation = (): LocationDraft => ({
   colonies: [],
 });
 
-export function CenterForm() {
+/**
+ * `conocidos` llega del servidor cuando hay sesión: lo que la persona ya
+ * capturó como miembro o embajadora (equipo, 15-ago). El nombre del CENTRO no
+ * se prellena —eso sí es nuevo—, solo los datos de quien lo registra.
+ */
+export function CenterForm({
+  conocidos,
+}: {
+  conocidos: DatosConocidos | null;
+}) {
+  const nombreDeContacto = conocidos
+    ? [conocidos.firstName, conocidos.lastName, conocidos.secondLastName]
+        .filter(Boolean)
+        .join(" ")
+    : "";
   const [name, setName] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [contactName, setContactName] = useState(nombreDeContacto);
+  const [email, setEmail] = useState(conocidos?.email ?? "");
+  const [phone, setPhone] = useState(conocidos?.phone ?? "");
   const [website, setWebsite] = useState("");
+  const [social, setSocial] = useState<Record<string, string>>({
+    facebook: "",
+    instagram: "",
+    tiktok: "",
+  });
   const [services, setServices] = useState<WellnessService[]>([]);
   const [memberBenefit, setMemberBenefit] = useState("");
   const [locations, setLocations] = useState<LocationDraft[]>([emptyLocation()]);
@@ -75,6 +96,7 @@ export function CenterForm() {
         email,
         phone,
         website,
+        socialLinks: social,
         services,
         memberBenefit,
         locations: locations.map(({ colonies: _c, ...loc }) => loc),
@@ -115,13 +137,13 @@ export function CenterForm() {
           🎉
         </span>
         <h2 className="font-display text-[24px] text-ink-title">
-          ¡Solicitud recibida!
+          ¡Gracias por querer unirte a la manada!
         </h2>
         <p className="text-sm leading-relaxed text-ink-secondary">
-          Tu cuenta ya quedó creada. Inicia sesión con tu correo y contraseña
-          para entrar a tu panel y completar el perfil de{" "}
-          <strong>{name}</strong> mientras el comité revisa la solicitud. Al ser
-          aprobado, tu centro aparecerá en el directorio para toda la manada.
+          Tu cuenta está lista. Inicia sesión con tu correo y contraseña para
+          avanzar en el perfil de <strong>{name}</strong> mientras validamos la
+          información. En cuanto quede listo, tu centro formará parte de nuestra
+          red de centros aliados y estará visible para toda la manada.
         </p>
         <Link
           href="/iniciar-sesion?next=/centro"
@@ -142,7 +164,9 @@ export function CenterForm() {
       }}
     >
       <section className="flex flex-col gap-4 rounded-[20px] bg-white p-6 shadow-[0_2px_12px_rgba(30,83,80,.06)]">
-        <h2 className="font-display text-lg text-ink-title">Tu centro</h2>
+        <h2 className="font-display text-lg text-ink-title">
+          Cuéntanos de tu centro
+        </h2>
         <TextField
           label="Nombre del centro"
           value={name}
@@ -174,32 +198,68 @@ export function CenterForm() {
             required
           />
           <TextField
-            label="Sitio web o redes (opcional)"
+            label="Sitio web (opcional)"
             value={website}
             onChange={(e) => setWebsite(e.target.value)}
             placeholder="https://…"
           />
         </div>
-        <TextField
-          label="Contraseña"
-          type={showPassword ? "text" : "password"}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="new-password"
-          minLength={8}
-          placeholder="Mínimo 8 caracteres"
-          hint="Con ella entras a tu panel para completar tu perfil, aunque tu solicitud siga en revisión."
-          required
-          rightSlot={
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="text-[13px] font-semibold text-teal-deep"
-            >
-              {showPassword ? "Ocultar" : "Mostrar"}
-            </button>
-          }
-        />
+        {/* Redes propias, cada una en su campo (equipo, 15-ago). Antes había
+            un solo "sitio web o redes" donde cabía una sola cosa, así que un
+            centro con Instagram y Facebook tenía que elegir cuál perder. */}
+        <div className="flex flex-col gap-3 rounded-[14px] bg-cream/60 p-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold text-ink-title">
+              Tus redes sociales (opcional)
+            </span>
+            <span className="text-xs text-ink-tertiary">
+              Aparecen en tu tarjeta del directorio para que los miembros te
+              encuentren.
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                ["facebook", "Facebook"],
+                ["instagram", "Instagram"],
+                ["tiktok", "TikTok"],
+              ] as const
+            ).map(([key, label]) => (
+              <TextField
+                key={key}
+                label={label}
+                value={social[key] ?? ""}
+                onChange={(e) =>
+                  setSocial((prev) => ({ ...prev, [key]: e.target.value }))
+                }
+                placeholder="usuario o liga"
+              />
+            ))}
+          </div>
+        </div>
+        {/* Sin contraseña cuando ya hay sesión: la cuenta existe (15-ago). */}
+        {!conocidos && (
+          <TextField
+            label="Contraseña"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            minLength={8}
+            placeholder="Mínimo 8 caracteres"
+            hint="Con ella entras a tu panel para completar tu perfil, aunque tu solicitud siga en revisión."
+            required
+            rightSlot={
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="text-[13px] font-semibold text-teal-deep"
+              >
+                {showPassword ? "Ocultar" : "Mostrar"}
+              </button>
+            }
+          />
+        )}
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] font-semibold text-ink-title">
             Servicios que ofreces
@@ -231,7 +291,7 @@ export function CenterForm() {
           value={memberBenefit}
           onChange={(e) => setMemberBenefit(e.target.value)}
           placeholder='Ej. "10% en consultas"'
-          hint="Es el gancho que verán los miembros en el directorio."
+          hint="Este beneficio aparecerá destacado en el directorio para la manada."
           required
         />
       </section>
@@ -274,7 +334,12 @@ export function CenterForm() {
             }}
             required
           />
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* El CP se queda angosto y la colonia se lleva el resto: nombres
+              como "Nueva Industrial Vallejo" salían cortados en la lista
+              cerrada (equipo, 15-ago). De paso pasa a autocompletado, igual
+              que en el perfil del miembro: el catálogo se equivoca o le falta
+              la colonia de alguien, y así siempre se puede escribir otra. */}
+          <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
             <TextField
               label="Código postal"
               inputMode="numeric"
@@ -285,44 +350,39 @@ export function CenterForm() {
               }
               required
             />
-            {loc.colonies.length > 0 ? (
-              <SelectField
-                label="Colonia"
-                value={loc.colony}
-                onChange={(e) => patchLocation(i, { colony: e.target.value })}
-              >
-                {loc.colonies.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </SelectField>
-            ) : (
-              <TextField
-                label="Colonia"
-                value={loc.colony}
-                onChange={(e) => patchLocation(i, { colony: e.target.value })}
-              />
-            )}
-            <TextField
-              label="Ciudad"
-              value={loc.city}
-              onChange={(e) => patchLocation(i, { city: e.target.value })}
+            <AutocompleteField
+              label="Colonia"
+              options={loc.colonies}
+              value={loc.colony}
+              onChange={(colony) => patchLocation(i, { colony })}
+              placeholder="Escribe o elige tu colonia"
+              hint={
+                loc.colonies.length > 0
+                  ? "La sugerimos según tu código postal; si no es correcta, puedes cambiarla."
+                  : undefined
+              }
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* "Alcaldía o municipio", no "Ciudad" (equipo, 15-ago): en la
+                CDMX son alcaldías y en el resto del país municipios, y el
+                catálogo de Sepomex devuelve justo eso. */}
+            <TextField
+              label="Alcaldía o municipio"
+              value={loc.city}
+              onChange={(e) => patchLocation(i, { city: e.target.value })}
+            />
             <TextField
               label="Estado"
               value={loc.state}
               onChange={(e) => patchLocation(i, { state: e.target.value })}
             />
-            <TextField
-              label="Teléfono de esta sucursal (opcional)"
-              type="tel"
-              value={loc.phone ?? ""}
-              onChange={(e) => patchLocation(i, { phone: e.target.value })}
-            />
           </div>
+          <PhoneField
+            label="Teléfono de esta sucursal (opcional)"
+            value={loc.phone ?? ""}
+            onChange={(t) => patchLocation(i, { phone: t })}
+          />
         </section>
       ))}
 
@@ -331,7 +391,7 @@ export function CenterForm() {
         onClick={() => setLocations((prev) => [...prev, emptyLocation()])}
         className="self-start text-sm font-semibold text-teal-deep hover:underline"
       >
-        + Agregar otra ubicación
+        + Agregar otra sucursal
       </button>
 
       {error && (
@@ -344,8 +404,8 @@ export function CenterForm() {
         {busy ? "Enviando…" : "Enviar solicitud"}
       </Button>
       <p className="pb-8 text-center text-xs leading-relaxed text-ink-tertiary">
-        El comité revisa cada solicitud. Te contactaremos por correo con la
-        resolución.
+        Revisamos cada solicitud con detalle. Te contactaremos por correo
+        electrónico para confirmar la integración de tu centro a la manada.
       </p>
     </form>
   );

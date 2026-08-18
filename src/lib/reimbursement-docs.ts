@@ -17,7 +17,7 @@ export type DocSlot = {
 
 export const DOCS_BY_CATEGORY: Record<string, DocSlot[]> = {
   vet_expenses: [
-    { type: "evidence_photo", label: "Foto de tu mascota en la consulta" },
+    { type: "evidence_photo", label: "Foto de tu peludo en la consulta" },
     { type: "prescription", label: "Informe de salud" },
     { type: "receipt", label: "Factura o recibo de pago" },
   ],

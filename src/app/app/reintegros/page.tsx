@@ -150,7 +150,7 @@ export default async function ReintegrosPage({
               <span className="w-16 font-bold text-teal-deep">{r.folio}</span>
               <div className="flex flex-1 flex-col">
                 <span className="text-sm font-bold text-ink-title">
-                  {pet?.name ?? "Mascota"} ·{" "}
+                  {pet?.name ?? "Peludo"} ·{" "}
                   {REIMBURSEMENT_CATEGORY_LABELS[
                     r.category as keyof typeof REIMBURSEMENT_CATEGORY_LABELS
                   ] ?? r.category}
@@ -182,7 +182,7 @@ export default async function ReintegrosPage({
         {(rows ?? []).length === 0 && (
           <div className="rounded-[20px] bg-white p-6 text-sm text-ink-secondary shadow-[var(--shadow-card)]">
             Aún no tienes solicitudes de reintegro. Cuando tu peludo cumpla su
-            período de espera podrás enviar la primera.
+            tiempo de espera podrás enviar la primera.
           </div>
         )}
       </div>
