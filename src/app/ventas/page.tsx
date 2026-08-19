@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePortal } from "@/lib/panel-guard";
 import {
@@ -118,6 +119,18 @@ export default async function VentasResumenPage({
 
   return (
     <div className="flex flex-col gap-4 px-5 py-6 md:px-[30px] md:py-[26px]">
+      {/* Regreso al panel del comité (Pablo, 19-ago). Se llega aquí desde «Ver
+          el tablero completo» del bloque de ventas de /admin, y hasta hoy la
+          única salida era el conmutador de portales escondido en el avatar.
+          Solo se pinta para quien de verdad puede entrar a /admin. */}
+      {session.portals.includes("admin") && (
+        <Link
+          href="/admin"
+          className="self-start text-[12.5px] font-semibold text-teal-deep hover:underline"
+        >
+          ← Volver al panel del comité
+        </Link>
+      )}
       <h1 className="font-display text-[24px] text-ink-title">Resumen</h1>
 
       {/* useSearchParams pide un límite de Suspense cuando el padre es servidor. */}
