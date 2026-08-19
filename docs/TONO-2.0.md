@@ -150,9 +150,16 @@ Sin migración: no se borró ninguna columna, solo se dejó de pedir el dato.
 
 **El marco legal empuja en esa dirección, no en contra.** La LFPDPPP nueva
 (vigente 21-mar-2025) enumera la *proporcionalidad* entre sus principios: solo se
-justifica recabar lo necesario para la finalidad declarada. Antilavado tampoco lo
-exige — la lista de actividades vulnerables del art. 17 LFPIORPI es cerrada y
-pagar comisiones por referidos no encaja en ninguna fracción.
+justifica recabar lo necesario para la finalidad declarada.
+
+Sobre antilavado, con una precisión que faltaba: **pagar comisiones a un
+embajador** no encaja en ninguna fracción del art. 17 LFPIORPI. Pero el
+**Reglamento de Integridad §4.B** ya contempla que CLUB PATA AMIGA, A.C. sí puede
+actualizar la **fracción XIII (donativos)** cuando reciba donativos por 1,605 UMA
+o más (~$188,000 MXN al valor de 2026), con identificación del donante, aviso a
+la Secretaría y conservación de expedientes por 10 años. Es una hipótesis
+condicionada y distinta del alta de embajador, pero conviene no decir «antilavado
+no aplica» a secas: aplica a otra parte de la operación.
 
 ## Preguntas abiertas para el equipo
 
@@ -161,11 +168,28 @@ pagar comisiones por referidos no encaja en ninguna fracción.
   confirmen.
 - **Pantalla 21:** cambia «el comité» por «el equipo de Pata Amiga». ¿Aplica en todas las
   pantallas donde hoy decimos «el comité»? Son bastantes. Por ahora se cambia solo ahí.
-- **Del alta de embajador, para el despacho:** ¿el aviso de privacidad vigente
-  declara el domicilio del embajador como finalidad? ¿Y qué justifica conservar su
-  **INE por ambos lados**, y por cuánto tiempo? Es el dato más pesado que se
-  recaba de un embajador — más que la fecha o el CP — y hoy no hay política de
-  retención escrita.
+- **Del alta de embajador (CORREGIDO el 19-ago).** Se había anotado que «no hay
+  política de retención escrita». **Es falso** — se verificó contra
+  `legal-texts.ts` y sí la hay, en tres lugares:
+  - *Aviso de privacidad §9*: los datos se conservan «solo el tiempo necesario
+    para cumplir finalidades, obligaciones legales, atención de controversias y
+    auditoría/seguridad». Cualitativa, sin plazo fijo — válido bajo la LFPDPPP.
+  - *Reglamento de Integridad §4.7*: **al menos 10 años** para la documentación
+    ligada a la Actividad Vulnerable.
+  - Cláusulas equivalentes en Términos y en el Convenio.
+
+  El aviso **sí declara la INE (imagen)** y lo hace explícitamente «dependiendo
+  del perfil (miembro/titular, **embajador** o red veterinaria)». También declara
+  «domicilio completo (CP, entidad, municipio/alcaldía, colonia, calle, número)»,
+  o sea que pedir solo el CP recaba MENOS de lo declarado — que es la dirección
+  correcta, no un problema.
+
+  **Lo que sí falta es operativo, no legal:** nadie ha traducido «el tiempo
+  necesario» a un plazo para la INE de un embajador rechazado o dado de baja, y
+  **no hay nada en el código que borre esas imágenes**. El único cron que toca
+  documentos (`/api/cron/documentos`) manda recordatorios de datos faltantes, no
+  limpia archivos. Esa es la pregunta real para el despacho: qué plazo aplica, y
+  quién lo ejecuta.
 - **El título de la pestaña** (`layout.tsx` y `page.tsx`) sigue diciendo «Protección para
   tu manada». Con el encabezado nuevo («Salud y tranquilidad para tu manada») y la firma
   nueva de los correos («El mejor cuidado para tu manada») ya son tres frases para lo
