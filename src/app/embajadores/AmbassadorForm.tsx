@@ -4,14 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/Button";
-import { TextField, SelectField } from "@/components/ui/Field";
+import { TextField } from "@/components/ui/Field";
 import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
 import { FotoDocumento } from "@/components/ui/FotoDocumento";
 import { createClient } from "@/lib/supabase/client";
 import {
   EDAD_MINIMA,
   esMayorDeEdad,
-  fechaMaximaParaSerMayor,
+  fechaDeNacimientoDeCurp,
 } from "@/lib/edad";
 import type { DatosConocidos } from "@/lib/datos-conocidos";
 import { registerAmbassador } from "./actions";
@@ -41,8 +41,6 @@ export function AmbassadorForm({
   const [state, setState] = useState(conocidos?.state ?? "");
   const [city, setCity] = useState(conocidos?.city ?? "");
   const [isAdult, setIsAdult] = useState(false);
-  // Fecha de nacimiento y motivación (equipo, 5-ago)
-  const [birthDate, setBirthDate] = useState(conocidos?.birthDate ?? "");
   const [motivation, setMotivation] = useState("");
   // Contraseña: la cuenta se crea al aplicar (equipo, 11-ago)
   const [password, setPassword] = useState("");
@@ -52,10 +50,6 @@ export function AmbassadorForm({
     conocidos?.secondLastName ?? "",
   );
   const [postalCode, setPostalCode] = useState(conocidos?.postalCode ?? "");
-  const [colony, setColony] = useState(conocidos?.colony ?? "");
-  const [colonies, setColonies] = useState<string[]>(
-    conocidos?.colony ? [conocidos.colony] : [],
-  );
   const [social, setSocial] = useState<Record<string, string>>({
     facebook: "",
     instagram: "",
@@ -71,28 +65,38 @@ export function AmbassadorForm({
   // Popup de legales (equipo, 16-ago): null = cerrado
   const [legalSlug, setLegalSlug] = useState<string | null>(null);
 
-  /** CP → colonia y alcaldía/municipio. Editable: el catálogo puede fallar. */
+  /**
+   * El CP resuelve ciudad y estado SIN preguntarlos: la persona escribe cinco
+   * dígitos y nosotros guardamos la ubicación derivada. Si el catálogo falla,
+   * el alta sigue: queda el CP, que es el dato que se pidió conservar.
+   */
   const onCpChange = (cp: string) => {
     const clean = cp.replace(/\D/g, "").slice(0, 5);
     setPostalCode(clean);
-    if (clean.length !== 5) return;
+    if (clean.length !== 5) {
+      setState("");
+      setCity("");
+      return;
+    }
     fetch(`/api/sepomex?cp=${clean}`)
       .then((r) => r.json())
       .then((data) => {
         if (!data?.found) return;
         setState(data.state ?? "");
         setCity(data.city ?? "");
-        setColonies(data.colonies ?? []);
-        setColony((data.colonies ?? [])[0] ?? "");
       })
       .catch(() => {});
   };
+  /** Lo que se le confirma en pantalla, para que sepa que el CP se entendió. */
+  const ubicacion = [city, state].filter(Boolean).join(", ");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
-  const menorDeEdad =
-    /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && !esMayorDeEdad(birthDate);
+  // La edad sale de la CURP. Solo avisa cuando la CURP ya está completa y bien
+  // formada; mientras se escribe no tiene sentido gritarle a nadie.
+  const fechaDeCurp = fechaDeNacimientoDeCurp(curp);
+  const menorDeEdad = Boolean(fechaDeCurp) && !esMayorDeEdad(fechaDeCurp!);
 
   const submit = async () => {
     setError(null);
@@ -102,9 +106,9 @@ export function AmbassadorForm({
       );
       return;
     }
-    if (!esMayorDeEdad(birthDate)) {
+    if (menorDeEdad) {
       setError(
-        `El programa de embajadores es para mayores de ${EDAD_MINIMA} años. Revisa tu fecha de nacimiento.`,
+        `El programa de embajadores es para mayores de ${EDAD_MINIMA} años.`,
       );
       return;
     }
@@ -125,12 +129,10 @@ export function AmbassadorForm({
         state,
         city,
         isAdult,
-        birthDate,
         motivation,
         password,
         secondLastName,
         postalCode,
-        colony,
         socialLinks: social,
         ineFront,
         ineBack,
@@ -301,66 +303,32 @@ export function AmbassadorForm({
           />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="Código postal"
-          value={postalCode}
-          onChange={(e) => onCpChange(e.target.value)}
-          inputMode="numeric"
-          placeholder="5 dígitos"
-          hint="Completa tu colonia y alcaldía o municipio."
-        />
-        {colonies.length > 0 ? (
-          <SelectField
-            label="Colonia"
-            value={colony}
-            onChange={(e) => setColony(e.target.value)}
-          >
-            {colonies.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </SelectField>
-        ) : (
-          <TextField
-            label="Colonia"
-            value={colony}
-            onChange={(e) => setColony(e.target.value)}
-          />
-        )}
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="Ciudad, alcaldía o municipio"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-        />
-        <TextField
-          label="Estado"
-          value={state}
-          onChange={(e) => setState(e.target.value)}
-        />
-      </div>
-      {/* Obligatoria y validada desde el 13-ago: la casilla de "soy mayor de
-          edad" era la única barrera y no comprobaba nada. */}
+      {/* Del domicilio solo queda el CP (Pablo, 19-ago). Colonia, ciudad y
+          estado se pedían y NO se usaban para nada: ni para pagar comisiones
+          —el archivo del banco lleva CLABE, nombre y monto— ni para lo fiscal,
+          que opera con RFC. Se mostraban y ya. Con el CP basta para la
+          estadística, y ciudad y estado se derivan solos del catálogo. */}
       <TextField
-        label="Fecha de nacimiento"
-        type="date"
-        required
-        value={birthDate}
-        max={fechaMaximaParaSerMayor()}
-        onChange={(e) => setBirthDate(e.target.value)}
+        label="Código postal"
+        value={postalCode}
+        onChange={(e) => onCpChange(e.target.value)}
+        inputMode="numeric"
+        placeholder="5 dígitos"
         hint={
-          menorDeEdad
-            ? undefined
-            : `El programa es para mayores de ${EDAD_MINIMA} años.`
+          ubicacion
+            ? `Te ubicamos en ${ubicacion}.`
+            : "Lo usamos para saber en qué zonas está la manada."
         }
       />
+      {/* La fecha de nacimiento YA NO se teclea (Pablo, 19-ago): sale de la
+          CURP, que aquí es obligatoria y con formato validado. Antes se pedían
+          las dos y la que de verdad protegía era la CURP —quien escribía una
+          fecha falsa de adulto quedaba fuera igual—, así que el campo solo
+          agregaba un paso. Mismo criterio que el alta de miembro del 16-ago. */}
       {menorDeEdad && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">
-          Con esa fecha aún no cumples {EDAD_MINIMA} años, así que todavía no
-          puedes ser embajador. ¡Te esperamos cuando los cumplas! 🐾
+          Tu CURP indica que aún no cumples {EDAD_MINIMA} años, así que todavía
+          no puedes ser embajador. ¡Te esperamos cuando los cumplas! 🐾
         </div>
       )}
       <TextField

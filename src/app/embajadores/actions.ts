@@ -24,16 +24,17 @@ export type AmbassadorApplicationInput = {
   isAdult: boolean;
   /** Apellido materno (equipo, 11-ago). */
   secondLastName?: string;
-  /** CP de 5 dígitos: autocompleta colonia y alcaldía/municipio. */
+  /**
+   * CP de 5 dígitos — lo ÚNICO que se pide del domicilio (Pablo, 19-ago).
+   * Sirve para saber en qué zonas está la manada; ciudad y estado llegan
+   * derivados de él, no tecleados.
+   */
   postalCode?: string;
-  colony?: string;
   /**
    * Redes sociales: al menos una es OBLIGATORIA (equipo, 11-ago) — es como el
    * comité valora el alcance real de quien solicita.
    */
   socialLinks?: Record<string, string>;
-  /** yyyy-mm-dd — lo captura el propio solicitante (equipo, 5-ago) */
-  birthDate?: string;
   /** Por qué quiere ser embajador (equipo, 5-ago) */
   motivation?: string;
   /**
@@ -72,19 +73,23 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
   if (!curpCheck.isValid)
     return { error: curpCheck.error ?? "Revisa tu CURP (18 caracteres, formato oficial)." };
 
-  // 18+ DE VERDAD (equipo, 13-ago). Hasta hoy la única barrera era la casilla
-  // "confirmo que soy mayor de edad", que cualquiera palomea. Ahora se calcula
-  // la edad con la fecha capturada y, además, con la que trae la propia CURP:
-  // si la CURP dice que es menor, no hay fecha que valga.
-  const birthDate = input.birthDate?.trim();
+  // 18+ DE VERDAD (equipo, 13-ago), ahora SOLO desde la CURP (Pablo, 19-ago).
+  //
+  // Antes se pedían las dos cosas —la fecha tecleada y la CURP— y se validaban
+  // ambas. Sobraba: la CURP es obligatoria aquí y su formato ya se comprobó
+  // arriba, así que la fecha va dentro. Quien escribía una fecha falsa de
+  // adulto quedaba fuera igual por la CURP, o sea que el campo tecleado no
+  // aportaba seguridad, solo un paso más. Mismo criterio que el alta de
+  // miembro del 16-ago.
+  //
+  // Se calcula en el servidor a propósito: si viniera del navegador, bastaría
+  // con alterar la petición para saltarse la regla.
+  const birthDate = fechaDeNacimientoDeCurp(curp ?? "");
   if (!birthDate)
-    return { error: "Necesitamos tu fecha de nacimiento." };
-  if (!esMayorDeEdad(birthDate))
     return {
-      error: `El programa de embajadores es para mayores de ${EDAD_MINIMA} años.`,
+      error: "No pudimos leer tu fecha de nacimiento de la CURP. Revísala.",
     };
-  const fechaCurp = fechaDeNacimientoDeCurp(curp ?? "");
-  if (fechaCurp && !esMayorDeEdad(fechaCurp))
+  if (!esMayorDeEdad(birthDate))
     return {
       error: `Tu CURP indica que aún no cumples ${EDAD_MINIMA} años. El programa de embajadores es para mayores de edad.`,
     };
@@ -227,10 +232,10 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     state: input.state?.trim() || null,
     city: input.city?.trim() || null,
     postal_code: input.postalCode?.trim() || null,
-    colony: input.colony?.trim() || null,
     social_links: socialLinks,
-    birth_date:
-      birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
+    // Derivada de la CURP, no tecleada. La columna se conserva porque el panel
+    // la muestra y el corte de comisiones puede necesitar la edad.
+    birth_date: birthDate,
     motivation: input.motivation?.trim() || null,
     ine_front_url: ineFrontPath,
     ine_back_url: ineBackPath,
