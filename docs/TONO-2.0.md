@@ -133,6 +133,27 @@ no necesitaban nada. Ya verificadas como **hechas** antes de empezar:
 5. **Los materiales del embajador** (pantalla 20) siguen en «MUY PRONTO» porque los archivos
    no han llegado.
 
+## Datos que se dejaron de pedir (Pablo, 19-ago)
+
+En el **alta de embajador**:
+
+- **La fecha de nacimiento ya no se teclea**: sale de la CURP, que aquí es
+  obligatoria y con formato validado. La regla de 18+ no cambia; lo que cambia es
+  que se calcula en el SERVIDOR desde la CURP, no desde lo que mande el navegador.
+- **Del domicilio solo queda el código postal.** Colonia, ciudad y estado se
+  pedían y solo se mostraban: no los usa el archivo del banco (CLABE,
+  beneficiario, banco, monto, concepto, correo) ni lo fiscal, que opera con RFC y
+  CFDI. Ciudad y estado se siguen guardando pero **derivados del CP**, así que el
+  panel conserva la ubicación y el equipo la estadística.
+
+Sin migración: no se borró ninguna columna, solo se dejó de pedir el dato.
+
+**El marco legal empuja en esa dirección, no en contra.** La LFPDPPP nueva
+(vigente 21-mar-2025) enumera la *proporcionalidad* entre sus principios: solo se
+justifica recabar lo necesario para la finalidad declarada. Antilavado tampoco lo
+exige — la lista de actividades vulnerables del art. 17 LFPIORPI es cerrada y
+pagar comisiones por referidos no encaja en ninguna fracción.
+
 ## Preguntas abiertas para el equipo
 
 - **Pantalla 02, recuadro verde:** el texto que le asignaron a la tarjeta de centros aliados
@@ -140,6 +161,11 @@ no necesitaban nada. Ya verificadas como **hechas** antes de empezar:
   confirmen.
 - **Pantalla 21:** cambia «el comité» por «el equipo de Pata Amiga». ¿Aplica en todas las
   pantallas donde hoy decimos «el comité»? Son bastantes. Por ahora se cambia solo ahí.
+- **Del alta de embajador, para el despacho:** ¿el aviso de privacidad vigente
+  declara el domicilio del embajador como finalidad? ¿Y qué justifica conservar su
+  **INE por ambos lados**, y por cuánto tiempo? Es el dato más pesado que se
+  recaba de un embajador — más que la fecha o el CP — y hoy no hay política de
+  retención escrita.
 - **El título de la pestaña** (`layout.tsx` y `page.tsx`) sigue diciendo «Protección para
   tu manada». Con el encabezado nuevo («Salud y tranquilidad para tu manada») y la firma
   nueva de los correos («El mejor cuidado para tu manada») ya son tres frases para lo
