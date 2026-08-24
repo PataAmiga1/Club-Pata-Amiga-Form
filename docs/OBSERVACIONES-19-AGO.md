@@ -28,8 +28,10 @@ Tres hallazgos que cambian el trabajo respecto de cómo se planteó en la junta:
    e INE por ambos lados. Verificamos a quien comparte un código y no al negocio
    que publicamos y al que mandamos miembros.
 
-3. **De 23 plantillas de correo, solo 2 llevan liga a la plataforma.** El resto
-   solo trae los iconos de redes en el pie.
+3. **De 23 plantillas de correo, solo 3 llevan liga a la plataforma.** El resto
+   solo trae los iconos de redes en el pie. La mejor de las tres,
+   `pet_info_request`, ya tiene un boton con la marca y URL por variable: es el
+   modelo a copiar, no hay que inventarlo.
 
 Y dos datos de estructura que ahorran trabajo:
 
@@ -60,7 +62,7 @@ Y dos datos de estructura que ahorran trabajo:
 | 3.1 | Rechazado → Denegado | **En todo**: peludos, reintegros, apelaciones, embajadores y centros |
 | 3.2 | Textos legales | Se dejan fuera. Se le anotan al despacho |
 | 4.2 | Adjuntos en conversaciones | **Los dos hilos**, y **pueden adjuntar ambas partes** |
-| 4.3 | Ligas en correos | Se propone destino de cada uno y Pablo valida en tabla |
+| 4.3 | Ligas en correos | Decidido: reintegro denegado va **al detalle**; embajador y centro denegados van **sin liga**; **si se pasa el id** a las que lo necesitan |
 
 ### Por qué el RFC basta y el acta constitutiva no
 
@@ -170,32 +172,38 @@ recargar, PostgREST no las ve y las consultas fallan con 400, que se lee como
 
 ### Fase 4 · Ligas de acción en los correos — 2 jornadas
 
-**20 de 23 plantillas no llevan liga** a la plataforma. Solo `welcome`
-(→ `/app/perfil`) y `campaign_gift` (→ `/registro`) la tienen.
+**20 de 23 plantillas no llevan liga** a la plataforma. Las tres que sí:
+`welcome` (→ `/app/perfil`), `campaign_gift` (→ `/registro`) y
+**`pet_info_request`**, que es la mejor de todas y **el modelo a copiar**: ya trae
+un botón con la marca y una URL que llega por variable (`fichaUrl`).
 
-**Cómo:** un helper `BOTON(url, texto)` en `templates.ts`, junto a `WRAP`, y una
-liga por plantilla. `SITE_URL` ya está disponible en el módulo.
+**Cómo:** un helper `BOTON(url, texto)` en `templates.ts`, junto a `WRAP`,
+extrayendo el botón que `pet_info_request` ya tiene escrito a mano.
 
-**Destinos propuestos** — esta tabla es la que Pablo tiene que validar (4.3):
+> De paso: la variable se llama **`fichaUrl`** y debería llamarse `perfilUrl`.
+> Es de antes del barrido «ficha»→«perfil» del 13-ago. Se renombra en la
+> plantilla y en `admin/actions.ts:988`, que es quien la manda.
 
-| Plantilla | Liga propuesta | Texto del botón |
+**Destinos — decididos por Pablo el 19-ago, ya sin dudas abiertas:**
+
+| Plantilla | Liga | Texto del botón |
 |---|---|---|
 | `welcome` | `/app/perfil` *(ya la tiene)* | Completar mi perfil |
 | `pet_approved` | `/app/peludos` | Ver a mi peludo |
 | `pet_rejected` | `/app/peludos/<id>` | Ver qué falta |
-| `pet_info_request` | `/app/peludos/<id>` | Enviar lo que piden |
+| `pet_info_request` | `/app/peludos/<id>` *(ya la tiene)* | Enviar lo que piden |
 | `reimbursement_approved` | `/app/reintegros/<id>` | Ver mi reintegro |
-| `reimbursement_rejected` | `/app/reintegros/<id>` | Ver el motivo y apelar |
+| `reimbursement_rejected` | `/app/reintegros/<id>` | **Ver el detalle** |
 | `appeal_received` | `/app/apelaciones` | Ver mi apelación |
 | `appeal_accepted` | `/app/apelaciones` | Ver la resolución |
 | `appeal_rejected` | `/app/apelaciones` | Ver la resolución |
 | `ambassador_received` | `/embajador` | Ver mi solicitud |
 | `ambassador_approved` | `/embajador` | Ir a mi perfil de embajador |
-| `ambassador_rejected` | `/embajadores` | Volver a solicitar |
+| `ambassador_rejected` | **sin liga** | — |
 | `ambassador_deactivated` | `/embajador/cuenta` | Ver mi cuenta |
 | `center_received` | `/centro` | Ver mi solicitud |
 | `center_approved` | `/centro` | Ir a mi panel |
-| `center_rejected` | `/centros/registro` | Volver a solicitar |
+| `center_rejected` | **sin liga** | — |
 | `profile_incomplete_reminder` | `/app/perfil` | Completar mi perfil |
 | `cancellation` | `/app/cuenta` | Reactivar mi membresía |
 | `account_deactivated` | `/app/cuenta` | Ver mi cuenta |
@@ -203,12 +211,26 @@ liga por plantilla. `SITE_URL` ya está disponible en el módulo.
 | `birthday_member` · `birthday_pet` | `/app` | Entrar a mi cuenta |
 | `campaign_gift` | `/registro` *(ya la tiene)* | Obtener mi regalo |
 
-**Dudas de esa tabla, para resolver con Pablo:**
-- `reimbursement_rejected`: ¿al detalle, o directo a la pantalla de apelar?
-- `ambassador_rejected` y `center_rejected`: ¿conviene invitar a volver a
-  solicitar, o se lee como insistencia? Podrían no llevar liga.
-- Las que apuntan a `<id>`: hay que pasar el identificador como variable de la
-  plantilla; hoy varias no lo reciben.
+**Las tres decisiones, para que no se re-pregunten:**
+
+1. **`reimbursement_rejected` va al detalle, no directo a apelar.** Que la persona
+   lea el motivo antes de decidir. Desde ahí ya puede apelar si quiere.
+2. **`ambassador_rejected` y `center_rejected` van sin liga.** Invitar a volver a
+   solicitar justo en el correo que comunica un «no» se lee como insistencia.
+3. **Sí se pasa el identificador** a las plantillas que lo necesitan.
+
+**Qué variable le falta a cada una** (verificado el 19-ago):
+
+| Plantilla | Variables que recibe hoy | Qué agregar |
+|---|---|---|
+| `pet_rejected` | `petName`, `notes` | La URL del perfil del peludo |
+| `reimbursement_approved` | `folio`, `amount`, `petName` | La URL del reintegro |
+| `reimbursement_rejected` | `folio`, `petName`, `reason` | La URL del reintegro |
+| `pet_info_request` | ya trae `fichaUrl` | Solo renombrarla a `perfilUrl` |
+| Las de apelaciones | `firstName`, `folio`, … | Nada: van al listado, sin id |
+
+La URL se arma en quien manda el correo, no en la plantilla — como ya lo hace
+`admin/actions.ts` con `fichaUrl`. Eso mantiene a `templates.ts` sin lógica.
 
 **Y lo que NO es esta fase:** los 3 correos de Supabase. Esos se pegan a mano en
 el panel y ya están listos en `correos-plataforma/supabase-auth/`.
@@ -259,8 +281,8 @@ como embajador o centro es un supuesto que el despacho debería contemplar.
 
 1. Leer este documento y `CLAUDE.md`. Trabajar en
    `C:\Users\USER\dev\pata-amiga-live`, rama `staging`.
-2. **Antes de tocar nada, confirmar la tabla de ligas de la fase 4** y las tres
-   dudas que trae — es lo único que bloquea a esa fase.
+2. **No hay nada pendiente de confirmar.** Las tres dudas de la fase 4 las
+   cerró Pablo el 19-ago y están resueltas en la tabla de esa fase.
 3. Empezar por la **fase 1**, que es media jornada y da una victoria visible.
 4. Verificar cada fase en el navegador con las cuentas de prueba de `CLAUDE.md`,
    en escritorio y en 375px, antes de commitear.
@@ -269,7 +291,6 @@ como embajador o centro es un supuesto que el despacho debería contemplar.
 
 ## Lo que queda abierto
 
-- **La tabla de ligas de correo** (fase 4) — Pablo la valida.
 - **Las 3 plantillas de Supabase** — alguien las pega en el panel, en pruebas y
   en producción. Ya están listas en `correos-plataforma/supabase-auth/`.
 - **Para el despacho:** que los legales contemplen a la persona moral, y la
