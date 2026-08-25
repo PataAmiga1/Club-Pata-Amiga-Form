@@ -5,8 +5,51 @@ incorporadas. **Este documento es el punto de partida para retomar en otra
 sesión:** trae lo decidido, lo verificado, el plan por fases y lo que queda
 abierto.
 
-Nada de esto está construido todavía. Lo único que ya se hizo el 19-ago es la
-carpeta de correos (`correos-plataforma/` en la carpeta de consultoría) y el
+---
+
+## ⭐ Avance al 25-ago
+
+| Fase | Estado | Commit |
+|---|---|---|
+| 1 · «Rechazado» → «Denegado» | ✅ construida y verificada | `ea3ddad` |
+| 2 · Centros: pestañas, menú móvil y gráfica | ✅ construida y verificada | `5497470` |
+| 3 · Documentos en conversaciones | pendiente | — |
+| 4 · Ligas en correos | pendiente | — |
+| 5 · Persona física o moral | pendiente | — |
+
+Las dos están en `staging` y desplegadas en pruebas. Ninguna lleva migración,
+así que **Jorge no tiene nada nuevo que correr** por estas dos.
+
+### Tres correcciones a este documento, encontradas al construir
+
+1. **La fase 1 no eran 27 apariciones sino 74** de `rechaz*` en `src/` fuera de
+   los legales; unas 35 son texto visible y el resto comentarios. Y **no todas
+   se cambian**: «Pago rechazado» del webhook de Stripe es una tarjeta
+   declinada, no una resolución del comité, y los errores de terceros («Stripe
+   rechazó el cupón», «Resend rechazó el lote», «Meta rechazó la plantilla») son
+   español correcto sobre otra cosa. Se dejaron.
+2. **La tabla de pagos es `center_payments`**, no `wellness_center_payments`.
+   Esa segunda existe (migración de mayo) pero **no la usa ningún código**. Si
+   alguien planea sobre ella, planea sobre una tabla muerta.
+3. **`/app/apelaciones` no existe.** La fase 4 manda ahí tres plantillas
+   (`appeal_received`, `appeal_accepted`, `appeal_rejected`) y hoy sería un 404:
+   las apelaciones viven dentro del peludo o del reintegro (`AppealButton`), no
+   en un listado propio. **Hay que decidirlo antes de construir la fase 4**:
+   o las tres ligas van al detalle del sujeto apelado, o se construye el
+   listado. Es la única duda abierta que queda.
+
+### Datos de prueba que quedaron en staging
+
+Para verificar la gráfica se registraron **5 pagos de prueba** al centro
+`centro@pataamiga.dev` desde `/admin/centros/pagos` (total $10,100; $9,400
+dentro de la ventana de 12 meses). Sirven para que el equipo vea la gráfica con
+datos. Uno trae una nota equivocada —dice «fuera de los 12 meses» y sí está
+dentro—; se puede corregir o borrar desde la base cuando estorbe.
+
+---
+
+Lo demás **no está construido todavía**. Lo que ya se había hecho el 19-ago es
+la carpeta de correos (`correos-plataforma/` en la carpeta de consultoría) y el
 botón de regreso del tablero de ventas (commit `93b37a2`).
 
 ---
