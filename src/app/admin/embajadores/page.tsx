@@ -5,6 +5,14 @@ import { formatMxn } from "@/lib/format";
 import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
 import { inicioDelMes } from "@/lib/zona-horaria";
 import { ligaFirmadaDeIne } from "@/lib/documentos-ine";
+import { ExpedienteDocumentos } from "@/components/panel/ExpedienteDocumentos";
+import {
+  documentosDeSolicitud,
+  documentosRequeridos,
+  ETIQUETA_DOCUMENTO,
+  type DocumentoFirmado,
+  type TipoPersona,
+} from "@/lib/documentos-solicitud";
 import {
   DetailModal,
   DetailItem,
@@ -94,6 +102,10 @@ type Row = {
   ine_back_url: string | null;
   birth_date: string | null;
   rfc: string | null;
+  /** Persona física o moral (19-ago). En moral, los datos de persona son los
+      del representante legal y la entidad vive en `razon_social`. */
+  tipo_persona: string | null;
+  razon_social: string | null;
   motivation: string | null;
   social_links: Record<string, string> | null;
   deactivation_reason: string | null;
@@ -124,7 +136,7 @@ export default async function AdminEmbajadoresPage({
   const { data } = await admin
     .from("ambassadors")
     .select(
-      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, deactivated_at, referrals(commission_amount, status, created_at)",
+      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, deactivated_at, tipo_persona, razon_social, referrals(commission_amount, status, created_at)",
     )
     .order("created_at", { ascending: masAntiguos });
 
@@ -150,6 +162,18 @@ export default async function AdminEmbajadoresPage({
       ),
     ),
   );
+  // El expediente de cada solicitud: cada documento con su estado propio
+  // (decisión 1.5). Se firma aquí, como la INE, porque los buckets son
+  // privados.
+  const expedientes = new Map<string, DocumentoFirmado[]>(
+    await Promise.all(
+      rows.map(
+        async (a) =>
+          [a.id, await documentosDeSolicitud({ ambassadorId: a.id })] as const,
+      ),
+    ),
+  );
+
   const pending = rows.filter((a) => a.status === "pending");
   const approved = rows.filter((a) => a.status === "approved");
   const canceled = ((data ?? []) as Row[]).filter(
@@ -310,7 +334,25 @@ export default async function AdminEmbajadoresPage({
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-                    <DetailItem label="NOMBRE" value={fullName(a)} />
+                    <DetailItem
+                      label="TIPO DE PERSONA"
+                      value={
+                        a.tipo_persona === "moral"
+                          ? "Moral (empresa)"
+                          : "Física"
+                      }
+                    />
+                    {a.tipo_persona === "moral" && (
+                      <DetailItem label="RAZÓN SOCIAL" value={a.razon_social} />
+                    )}
+                    <DetailItem
+                      label={
+                        a.tipo_persona === "moral"
+                          ? "REPRESENTANTE LEGAL"
+                          : "NOMBRE"
+                      }
+                      value={fullName(a)}
+                    />
                     <DetailItem label="CORREO" value={a.email} />
                     <DetailItem label="TELÉFONO" value={a.phone} />
                     <DetailItem label="CURP" value={a.curp} />
@@ -338,19 +380,24 @@ export default async function AdminEmbajadoresPage({
                       «{a.motivation}»
                     </p>
                   )}
-                  {/* La INE, EN EL POPUP DONDE SE APRUEBA (13-ago): desde que
-                      el registro la pide, el comité tiene que poder verla justo
-                      aquí. Antes solo aparecía en el detalle de los ya
-                      aprobados, o sea después de haber decidido a ciegas. */}
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
-                      IDENTIFICACIÓN (INE)
-                    </span>
-                    <LigasIne
-                      firmadas={ineFirmadas.get(a.id)}
-                      guardado={{ frente: a.ine_front_url, reverso: a.ine_back_url }}
-                    />
-                  </div>
+                  {/* EL EXPEDIENTE, EN EL POPUP DONDE SE APRUEBA. Antes aquí
+                      colgaban solo las dos ligas de la INE (13-ago). Desde el
+                      19-ago cada documento trae su propio estado y sus botones,
+                      porque la revisión es documento por documento y con
+                      persona moral hay más de una identificación que mirar. */}
+                  <ExpedienteDocumentos
+                    documentos={expedientes.get(a.id) ?? []}
+                    faltantes={documentosRequeridos(
+                      (a.tipo_persona ?? "fisica") as TipoPersona,
+                    )
+                      .filter(
+                        (t) =>
+                          !(expedientes.get(a.id) ?? []).some(
+                            (d) => d.document_type === t,
+                          ),
+                      )
+                      .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                  />
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
                       REDES SOCIALES
@@ -532,6 +579,20 @@ export default async function AdminEmbajadoresPage({
                               : null
                           }
                         />
+                        <DetailItem
+                          label="TIPO DE PERSONA"
+                          value={
+                            a.tipo_persona === "moral"
+                              ? "Moral (empresa)"
+                              : "Física"
+                          }
+                        />
+                        {a.tipo_persona === "moral" && (
+                          <DetailItem
+                            label="RAZÓN SOCIAL"
+                            value={a.razon_social}
+                          />
+                        )}
                         <DetailItem label="RFC" value={a.rfc} />
                         <DetailItem label="BANCO" value={a.bank_name} />
                         <DetailItem label="CLABE" value={a.clabe} />
@@ -552,6 +613,20 @@ export default async function AdminEmbajadoresPage({
                         />
                       </div>
                     </SensitiveBlock>
+
+                    <ExpedienteDocumentos
+                      documentos={expedientes.get(a.id) ?? []}
+                      faltantes={documentosRequeridos(
+                        (a.tipo_persona ?? "fisica") as TipoPersona,
+                      )
+                        .filter(
+                          (t) =>
+                            !(expedientes.get(a.id) ?? []).some(
+                              (d) => d.document_type === t,
+                            ),
+                        )
+                        .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                    />
 
                     {/* Tablero dinámico por embajador (equipo, 5-ago) */}
                     <a

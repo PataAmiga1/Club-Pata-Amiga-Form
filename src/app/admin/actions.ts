@@ -1100,6 +1100,45 @@ export async function sendReimbursementMessage(
 }
 
 /**
+ * Resolver UN documento del expediente de una solicitud (equipo, 19-ago —
+ * decisión 1.5).
+ *
+ * Antes aprobar era UNA decisión sobre toda la solicitud. Con persona moral
+ * eso ya no alcanza: el comité tiene que poder dar por bueno el RFC y dejar
+ * pendiente la INE del representante, o al revés, sin resolver la solicitud
+ * entera. Esto NO cambia el estado de la solicitud: aprobar sus documentos y
+ * aprobar al embajador o al centro siguen siendo dos decisiones distintas.
+ */
+export async function reviewDocument(
+  documentId: string,
+  status: "pendiente" | "aprobado" | "denegado",
+  notes?: string,
+) {
+  const { admin, adminId } = await requireAdmin();
+  if (!["pendiente", "aprobado", "denegado"].includes(status))
+    return { error: "Estado inválido." };
+  const nota = notes?.trim() || null;
+  if (status === "denegado" && !nota)
+    return { error: "Escribe por qué se deniega — la persona tiene que saber qué corregir." };
+
+  const { error } = await admin
+    .from("documents")
+    .update({
+      status,
+      review_notes: nota,
+      reviewed_by: adminId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+  if (error) return { error: "No pudimos guardar la revisión." };
+
+  revalidatePath("/admin/embajadores");
+  revalidatePath("/admin/centros");
+  revalidatePath("/admin/miembros");
+  return { ok: true as const };
+}
+
+/**
  * Da de baja la cuenta de un miembro — EXCLUSIVO del super admin (regla del
  * sitio vivo, confirmada 16-jul). Cancela la suscripción en Stripe de
  * inmediato, desactiva la membresía y avisa al miembro por correo
