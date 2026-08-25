@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/Field";
 import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
 import { FotoDocumento } from "@/components/ui/FotoDocumento";
+import { TipoPersonaFields } from "@/components/ui/TipoPersonaFields";
 import { createClient } from "@/lib/supabase/client";
 import {
   EDAD_MINIMA,
@@ -14,6 +15,8 @@ import {
   fechaDeNacimientoDeCurp,
 } from "@/lib/edad";
 import type { DatosConocidos } from "@/lib/datos-conocidos";
+import type { TipoPersona } from "@/lib/documentos-solicitud";
+import { esRfcDeMoral } from "@/lib/rfc";
 import { registerAmbassador } from "./actions";
 
 // Los textos legales pesan miles de líneas: el popup se carga SOLO cuando
@@ -62,6 +65,14 @@ export function AmbassadorForm({
   // salían en el panel marcados como "falta INE" para siempre.
   const [ineFront, setIneFront] = useState("");
   const [ineBack, setIneBack] = useState("");
+  // Persona física o moral (equipo, 19-ago). Por omisión física: es el caso
+  // de la enorme mayoría y así el formulario se ve igual que siempre para
+  // quien no necesita nada de esto.
+  const [tipoPersona, setTipoPersona] = useState<TipoPersona>("fisica");
+  const [razonSocial, setRazonSocial] = useState("");
+  const [rfc, setRfc] = useState("");
+  const [rfcConstancia, setRfcConstancia] = useState("");
+  const esMoral = tipoPersona === "moral";
   // Popup de legales (equipo, 16-ago): null = cerrado
   const [legalSlug, setLegalSlug] = useState<string | null>(null);
 
@@ -114,9 +125,27 @@ export function AmbassadorForm({
     }
     if (!ineFront || !ineBack) {
       setError(
-        "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
+        esMoral
+          ? "Falta la INE del representante legal. Necesitamos los dos lados —frente y reverso— en foto o PDF."
+          : "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
       );
       return;
+    }
+    if (esMoral) {
+      if (!razonSocial.trim()) {
+        setError("Escribe la razón social de la empresa.");
+        return;
+      }
+      if (!esRfcDeMoral(rfc)) {
+        setError(
+          "Revisa el RFC de la empresa: son 12 caracteres. Uno de 13 es el de una persona física.",
+        );
+        return;
+      }
+      if (!rfcConstancia) {
+        setError("Falta la constancia de situación fiscal de la empresa.");
+        return;
+      }
     }
     setBusy(true);
     try {
@@ -136,6 +165,10 @@ export function AmbassadorForm({
         socialLinks: social,
         ineFront,
         ineBack,
+        tipoPersona,
+        razonSocial,
+        rfc,
+        rfcConstancia,
       });
       if (result.error) {
         setError(result.error);
@@ -204,6 +237,23 @@ export function AmbassadorForm({
           y corrige lo que haya cambiado.
         </div>
       )}
+      <TipoPersonaFields
+        tipo={tipoPersona}
+        onTipo={setTipoPersona}
+        razonSocial={razonSocial}
+        onRazonSocial={setRazonSocial}
+        rfc={rfc}
+        onRfc={setRfc}
+        constancia={rfcConstancia}
+        onConstancia={setRfcConstancia}
+        quien="embajador"
+      />
+      {esMoral && (
+        <div className="rounded-[12px] bg-info-bg px-4 py-3 text-[12.5px] leading-relaxed text-info-text">
+          Lo que sigue son los datos del <strong>representante legal</strong> —
+          quien responde por la empresa. La CURP y la identificación son suyas.
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField
           label="Nombre(s)"
@@ -268,12 +318,16 @@ export function AmbassadorForm({
         />
       )}
       <TextField
-        label="CURP"
+        label={esMoral ? "CURP del representante legal" : "CURP"}
         value={curp}
         onChange={(e) => setCurp(e.target.value.toUpperCase())}
         maxLength={18}
         placeholder="18 caracteres"
-        hint="La usamos para validar que eres mayor de edad."
+        hint={
+          esMoral
+            ? "La usamos para validar que el representante es mayor de edad."
+            : "La usamos para validar que eres mayor de edad."
+        }
         required
       />
       {/* INE por los dos lados: el comité valida identidad con ella y las
@@ -281,11 +335,14 @@ export function AmbassadorForm({
       <div className="flex flex-col gap-3 rounded-[14px] bg-cream/60 p-4">
         <div className="flex flex-col gap-0.5">
           <span className="text-[13px] font-semibold text-ink-title">
-            Tu identificación oficial (INE)
+            {esMoral
+              ? "Identificación oficial del representante legal (INE)"
+              : "Tu identificación oficial (INE)"}
           </span>
           <span className="text-xs text-ink-tertiary">
-            Los dos lados, en foto o PDF. Solo la ve el comité, para validar tu
-            identidad y pagarte tus comisiones a tu nombre.
+            {esMoral
+              ? "Los dos lados, en foto o PDF. Solo la ve el comité, para saber quién responde por la empresa."
+              : "Los dos lados, en foto o PDF. Solo la ve el comité, para validar tu identidad y pagarte tus comisiones a tu nombre."}
           </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
