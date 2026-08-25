@@ -15,15 +15,31 @@ abierto.
 | 2 · Centros: pestañas, menú móvil y gráfica | ✅ construida y verificada | `5497470` |
 | 3 · Documentos en conversaciones | ✅ construida y verificada | `d55a9ad` |
 | 4 · Ligas de acción en los correos | ✅ construida y verificada | `16bcb17` |
-| 5 · Persona física o moral | pendiente — **la más grande (4-5 jornadas)** | — |
+| 5 · Persona física o moral | ✅ construida y verificada, en cuatro tramos | `3d0c643` · `e1012ed` · `be49848` · `6d2aec1` |
 
-Las cuatro están en `staging` y desplegadas en pruebas.
+**Las cinco están en `staging` y desplegadas en pruebas.**
 
-🔴 **Jorge tiene UNA migración nueva que correr en producción:**
-`20260825000001_conversaciones_con_documentos.sql`. Ya está corrida en
-staging. Sin ella, adjuntar un archivo en el hilo de un peludo o de un
-reintegro truena. Lleva `notify pgrst, 'reload schema'` al final.
+🔴 **Jorge tiene CUATRO migraciones nuevas que correr en producción**, todas
+ya corridas en staging y **en este orden**:
+
+1. `20260825000001_conversaciones_con_documentos.sql` — sin ella, adjuntar un
+   archivo en el hilo de un peludo o de un reintegro truena.
+2. `20260825000002_tipos_de_documento_persona_moral.sql` — va **sola**, en su
+   propia corrida: `alter type ... add value` no deja usar el valor nuevo en
+   la misma transacción que lo agrega.
+3. `20260825000003_persona_fisica_o_moral.sql` — depende de la 2.
+4. `20260825000004_bucket_documentos_solicitud.sql`.
+
+Detalle y comprobaciones en `juntas/41-jorge-migracion-25ago-produccion.md`.
 Las fases 1, 2 y 4 no llevan migración.
+
+### ⚠ Un cambio de comportamiento que conviene anunciar
+
+Desde la fase 5c, **un centro ya no puede darse de alta sin CURP e INE**. Es
+lo que se pidió —hasta ahora se validaba al embajador que comparte un código
+y no al negocio que publicamos— pero vale más decirlo que esperar a que
+alguien reporte que "el formulario ya no deja". Los 12 centros que ya están
+no se tocaron: nacieron como `fisica` por el default de la migración.
 
 ### Tres correcciones a este documento, encontradas al construir
 
