@@ -7,9 +7,14 @@ import { TextField } from "@/components/ui/Field";
 import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { PhoneField } from "@/components/ui/PhoneField";
 import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
+import { FotoDocumento } from "@/components/ui/FotoDocumento";
+import { TipoPersonaFields } from "@/components/ui/TipoPersonaFields";
 import { WELLNESS_SERVICES, type WellnessService } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 import type { DatosConocidos } from "@/lib/datos-conocidos";
+import type { TipoPersona } from "@/lib/documentos-solicitud";
+import { esRfcDeMoral } from "@/lib/rfc";
+import { EDAD_MINIMA, esMayorDeEdad, fechaDeNacimientoDeCurp } from "@/lib/edad";
 import { registerCenter, type CenterLocationInput } from "./actions";
 
 type LocationDraft = CenterLocationInput & { colonies: string[] };
@@ -55,6 +60,21 @@ export function CenterForm({
   // Contraseña: la cuenta se crea al aplicar (equipo, 11-ago)
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  // Persona física o moral (equipo, 19-ago). Para los centros esto no es
+  // "agregar una rama": es ESTRENAR la captura de documentos. Hasta hoy no se
+  // les pedía ni CURP ni INE ni RFC — se validaba a quien comparte un código y
+  // no al negocio al que se manda a los miembros.
+  const [tipoPersona, setTipoPersona] = useState<TipoPersona>("fisica");
+  const [razonSocial, setRazonSocial] = useState("");
+  const [rfc, setRfc] = useState("");
+  const [rfcConstancia, setRfcConstancia] = useState("");
+  const [curp, setCurp] = useState(conocidos?.curp ?? "");
+  const [ineFront, setIneFront] = useState("");
+  const [ineBack, setIneBack] = useState("");
+  const esMoral = tipoPersona === "moral";
+  // La edad sale de la CURP; solo avisa cuando ya está completa y bien formada.
+  const fechaDeCurp = fechaDeNacimientoDeCurp(curp);
+  const menorDeEdad = Boolean(fechaDeCurp) && !esMayorDeEdad(fechaDeCurp!);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -88,6 +108,38 @@ export function CenterForm({
 
   const submit = async () => {
     setError(null);
+    if (menorDeEdad) {
+      setError(
+        esMoral
+          ? `El representante legal tiene que ser mayor de ${EDAD_MINIMA} años.`
+          : `Quien registra el centro tiene que ser mayor de ${EDAD_MINIMA} años.`,
+      );
+      return;
+    }
+    if (!ineFront || !ineBack) {
+      setError(
+        esMoral
+          ? "Falta la INE del representante legal. Necesitamos los dos lados —frente y reverso— en foto o PDF."
+          : "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
+      );
+      return;
+    }
+    if (esMoral) {
+      if (!razonSocial.trim()) {
+        setError("Escribe la razón social de la empresa.");
+        return;
+      }
+      if (!esRfcDeMoral(rfc)) {
+        setError(
+          "Revisa el RFC de la empresa: son 12 caracteres. Uno de 13 es el de una persona física.",
+        );
+        return;
+      }
+      if (!rfcConstancia) {
+        setError("Falta la constancia de situación fiscal de la empresa.");
+        return;
+      }
+    }
     setBusy(true);
     try {
       const result = await registerCenter({
@@ -101,6 +153,13 @@ export function CenterForm({
         memberBenefit,
         locations: locations.map(({ colonies: _c, ...loc }) => loc),
         password,
+        tipoPersona,
+        razonSocial,
+        rfc,
+        rfcConstancia,
+        curp,
+        ineFront,
+        ineBack,
       });
       if (result.error) {
         setError(result.error);
@@ -164,6 +223,20 @@ export function CenterForm({
       }}
     >
       <section className="flex flex-col gap-4 rounded-[20px] bg-white p-6 shadow-[0_2px_12px_rgba(30,83,80,.06)]">
+        <TipoPersonaFields
+          tipo={tipoPersona}
+          onTipo={setTipoPersona}
+          razonSocial={razonSocial}
+          onRazonSocial={setRazonSocial}
+          rfc={rfc}
+          onRfc={setRfc}
+          constancia={rfcConstancia}
+          onConstancia={setRfcConstancia}
+          quien="centro"
+        />
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-[20px] bg-white p-6 shadow-[0_2px_12px_rgba(30,83,80,.06)]">
         <h2 className="font-display text-lg text-ink-title">
           Cuéntanos de tu centro
         </h2>
@@ -176,7 +249,11 @@ export function CenterForm({
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
-            label="Nombre completo de contacto"
+            label={
+              esMoral
+                ? "Nombre completo del representante legal"
+                : "Nombre completo de contacto"
+            }
             value={contactName}
             onChange={(e) => setContactName(e.target.value)}
             required
@@ -203,6 +280,59 @@ export function CenterForm({
             onChange={(e) => setWebsite(e.target.value)}
             placeholder="https://…"
           />
+        </div>
+        {/* IDENTIDAD DE QUIEN REGISTRA (equipo, 19-ago). Es lo que estrena el
+            alta de centro: hasta hoy no se pedía ni un documento, así que se
+            validaba al embajador que comparte un código y no al negocio al que
+            se manda a los miembros. En persona moral son los datos del
+            REPRESENTANTE LEGAL (decisión 1.2). */}
+        <div className="flex flex-col gap-3 rounded-[14px] bg-cream/60 p-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-semibold text-ink-title">
+              {esMoral
+                ? "Identificación del representante legal"
+                : "Tu identificación"}
+            </span>
+            <span className="text-xs text-ink-tertiary">
+              Solo la ve el comité, para saber quién responde por el centro que
+              vamos a publicar.
+            </span>
+          </div>
+          <TextField
+            label={esMoral ? "CURP del representante legal" : "CURP"}
+            value={curp}
+            onChange={(e) => setCurp(e.target.value.toUpperCase())}
+            maxLength={18}
+            placeholder="18 caracteres"
+            hint={
+              esMoral
+                ? "La usamos para validar que el representante es mayor de edad."
+                : "La usamos para validar que eres mayor de edad."
+            }
+            required
+          />
+          {menorDeEdad && (
+            <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">
+              Esa CURP indica que aún no se cumplen {EDAD_MINIMA} años.{" "}
+              {esMoral
+                ? "El representante legal tiene que ser mayor de edad."
+                : "Quien registra el centro tiene que ser mayor de edad."}
+            </div>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FotoDocumento
+              label="INE — frente"
+              hint="El lado de la foto."
+              value={ineFront}
+              onChange={setIneFront}
+            />
+            <FotoDocumento
+              label="INE — reverso"
+              hint="El lado del código de barras."
+              value={ineBack}
+              onChange={setIneBack}
+            />
+          </div>
         </div>
         {/* Redes propias, cada una en su campo (equipo, 15-ago). Antes había
             un solo "sitio web o redes" donde cabía una sola cosa, así que un
