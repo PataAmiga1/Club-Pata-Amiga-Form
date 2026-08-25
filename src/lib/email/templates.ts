@@ -179,11 +179,11 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   {
     key: "reimbursement_rejected",
     name: "Reintegro no aprobado",
-    description: "Cuando el comité rechaza un reintegro (incluye motivo).",
+    description: "Cuando el comité deniega un reintegro (incluye motivo).",
     variables: {
       folio: "Folio de la solicitud",
       petName: "Nombre del peludo",
-      reason: "Motivo del rechazo",
+      reason: "Motivo de la denegación",
     },
     sample: { folio: "R-0001", petName: "Max", reason: "Factura ilegible" },
     subject: "Resolución de tu reintegro {{folio}}",
@@ -299,10 +299,10 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   {
     key: "ambassador_rejected",
     name: "Embajador no aprobado",
-    description: "Cuando el comité rechaza una solicitud de embajador.",
+    description: "Cuando el comité deniega una solicitud de embajador.",
     variables: {
       firstName: "Nombre del solicitante",
-      reason: "Motivo del rechazo",
+      reason: "Motivo de la denegación",
     },
     sample: { firstName: "Paola", reason: "Información incompleta" },
     subject: "Resolución de tu solicitud de embajador",
@@ -463,11 +463,11 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   {
     key: "center_rejected",
     name: "Centro aliado no aprobado",
-    description: "Cuando el comité rechaza la solicitud de un centro.",
+    description: "Cuando el comité deniega la solicitud de un centro.",
     variables: {
       contactName: "Nombre de contacto",
       centerName: "Nombre del centro",
-      reason: "Motivo del rechazo",
+      reason: "Motivo de la denegación",
     },
     sample: {
       contactName: "Dra. Lucía Ramos",

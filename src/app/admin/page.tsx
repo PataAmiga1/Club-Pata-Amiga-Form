@@ -285,7 +285,7 @@ export default async function AdminHome() {
     "",
     `*Miembros activos:* ${(activeQ.count ?? 0).toLocaleString("es-MX")} (${(newMembersQ.count ?? 0).toLocaleString("es-MX")} altas en ${monthLabel})`,
     `*MRR:* ${formatMxn(Math.round(mrr))} MXN`,
-    `*Reintegros de ${monthLabel}:* ${formatMxn(monthTotal)} MXN (${monthApproved.length} aprobados · ${monthRejected.length} rechazados)`,
+    `*Reintegros de ${monthLabel}:* ${formatMxn(monthTotal)} MXN (${monthApproved.length} aprobados · ${monthRejected.length} denegados)`,
     `*Tiempo de respuesta:* ${avgHours != null ? `${avgHours} hrs` : "sin datos"} (compromiso: ${REIMBURSEMENT_SLA_HOURS} hrs)`,
     `*Orientación veterinaria 24/7:* ${(monthVetQ.count ?? 0).toLocaleString("es-MX")} conversaciones este mes`,
     `*Embajadores:* ${(ambassadorsQ.count ?? 0).toLocaleString("es-MX")} activos · ${(monthReferrals.count ?? 0).toLocaleString("es-MX")} referidos este mes · ${formatMxn(payableCommissions)} MXN por pagar en el corte`,
@@ -393,7 +393,7 @@ export default async function AdminHome() {
       href: "/admin/reintegros",
       label: "REINTEGROS DEL MES",
       value: formatMxn(monthTotal),
-      note: `${monthApproved.length} aprobados · ${monthRejected.length} rechazados`,
+      note: `${monthApproved.length} aprobados · ${monthRejected.length} denegados`,
       noteCls: "text-ink-tertiary",
     },
     {

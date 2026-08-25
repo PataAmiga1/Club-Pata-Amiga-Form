@@ -44,7 +44,7 @@ export function AmbassadorResolveButtons({
           onClick={() => run({ approve: false, reason: reason.trim() })}
           className="grid h-10 flex-none place-items-center rounded-full bg-error-text px-4 text-[13px] font-bold text-white disabled:opacity-50"
         >
-          Rechazar
+          Denegar
         </button>
       </div>
     );
@@ -66,7 +66,7 @@ export function AmbassadorResolveButtons({
         onClick={() => setRejecting(true)}
         className="grid h-10 place-items-center rounded-full border-[1.5px] border-[#F2C7D4] px-5 text-[13px] font-semibold text-error-text transition-colors hover:bg-error-bg"
       >
-        Rechazar…
+        Denegar…
       </button>
     </div>
   );

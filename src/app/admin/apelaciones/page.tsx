@@ -98,10 +98,10 @@ export default async function AdminApelacionesPage({
         : `Centro: ${a.wellness_centers?.name ?? ""}`;
   const originalOf = (a: Row) =>
     a.reimbursement_id
-      ? (a.reimbursements?.rejection_reason ?? "Rechazado")
+      ? (a.reimbursements?.rejection_reason ?? "Denegado")
       : a.pet_id
-        ? (a.pets?.approval_notes ?? "Perfil rechazado")
-        : (a.wellness_centers?.rejection_reason ?? "Solicitud rechazada");
+        ? (a.pets?.approval_notes ?? "Perfil denegado")
+        : (a.wellness_centers?.rejection_reason ?? "Solicitud denegada");
 
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">

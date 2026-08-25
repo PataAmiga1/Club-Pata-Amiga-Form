@@ -236,7 +236,7 @@ export default async function AdminEmbajadoresPage({
           options={[
             { value: "pending", label: "Pendientes" },
             { value: "approved", label: "Aprobados" },
-            { value: "rejected", label: "Rechazados" },
+            { value: "rejected", label: "Denegados" },
             ...(isSuper ? [{ value: "canceled", label: "🕊️ Bajas" }] : []),
           ]}
         />

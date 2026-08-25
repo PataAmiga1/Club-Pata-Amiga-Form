@@ -34,8 +34,8 @@ function ageLabel(pet: PetRow) {
 const STATUS_CHIP = {
   approved: { text: "✓ APROBADO", cls: "bg-success-bg text-success-text" },
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
-  // "rechazado", no "denegado" (equipo, 11-ago)
-  rejected: { text: "RECHAZADO", cls: "bg-error-bg text-error-text" },
+  // "denegado", no "rechazado" (equipo, 19-ago — decisión 3.1; revierte al 11-ago)
+  rejected: { text: "DENEGADO", cls: "bg-error-bg text-error-text" },
 } as const;
 
 export function PetCard({ pet }: { pet: PetRow }) {

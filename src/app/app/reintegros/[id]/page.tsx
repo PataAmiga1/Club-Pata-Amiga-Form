@@ -19,7 +19,7 @@ const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   in_review: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
   approved: { text: "✓ APROBADO", cls: "bg-success-bg text-success-text" },
   partial: { text: "✓ APROBADO PARCIAL", cls: "bg-success-bg text-success-text" },
-  rejected: { text: "RECHAZADO", cls: "bg-error-bg text-error-text" },
+  rejected: { text: "DENEGADO", cls: "bg-error-bg text-error-text" },
   paid: { text: "✓ PAGADO", cls: "bg-info-bg text-info-text" },
 };
 
@@ -166,7 +166,7 @@ export default async function ReintegroDetailPage({
 
       {req.status === "rejected" && req.rejection_reason && (
         <div className="rounded-[14px] bg-error-bg px-4 py-3 text-[13.5px] leading-relaxed text-error-text">
-          <strong>Motivo del rechazo:</strong> {req.rejection_reason}
+          <strong>Motivo de la denegación:</strong> {req.rejection_reason}
         </div>
       )}
 

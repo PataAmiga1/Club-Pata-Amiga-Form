@@ -62,7 +62,7 @@ export function ResolutionPanel({
             }`}
           >
             {status === "rejected"
-              ? `Rechazado · ${rejectionReason ?? ""}`
+              ? `Denegado · ${rejectionReason ?? ""}`
               : `Aprobado ${formatMxn(amountApproved ?? amountRequested)} MXN`}
           </div>
         ) : (
@@ -122,7 +122,7 @@ export function ResolutionPanel({
                 onClick={() => setMode("reject")}
                 className="grid h-11 place-items-center rounded-full border-[1.5px] border-[#F2C7D4] text-[13px] font-semibold text-error-text transition-colors hover:bg-error-bg"
               >
-                Rechazar…
+                Denegar…
               </button>
             ) : (
               <button
@@ -135,13 +135,13 @@ export function ResolutionPanel({
                 }
                 className="grid h-11 place-items-center rounded-full bg-error-text text-[13px] font-bold text-white disabled:opacity-50"
               >
-                Confirmar rechazo{reason ? `: ${reason}` : " (elige un motivo)"}
+                Confirmar denegación{reason ? `: ${reason}` : " (elige un motivo)"}
               </button>
             )}
 
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-bold text-ink-tertiary">
-                MOTIVOS PREDETERMINADOS (si rechazas)
+                MOTIVOS PREDETERMINADOS (si deniegas)
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {REJECTION_REASONS.map((r) => (

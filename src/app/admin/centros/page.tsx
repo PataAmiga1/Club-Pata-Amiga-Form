@@ -125,7 +125,7 @@ export default async function AdminCentrosPage({
           options={[
             { value: "pending", label: "Pendientes" },
             { value: "approved", label: "Aprobados" },
-            { value: "rejected", label: "Rechazados" },
+            { value: "rejected", label: "Denegados" },
             ...(isSuper
               ? [
                   { value: "apelacion", label: "⚖️ Apelaciones" },
@@ -301,7 +301,7 @@ export default async function AdminCentrosPage({
                           ? "🕊️ BAJA"
                           : c.status === "pending"
                             ? "PENDIENTE"
-                            : "RECHAZADO"}
+                            : "DENEGADO"}
                     </span>
                   </div>
                 }
@@ -348,9 +348,9 @@ export default async function AdminCentrosPage({
                     />
                     <DetailItem
                       label="ESTATUS"
-                      value={c.status === "approved" ? "Aprobado" : "Rechazado"}
+                      value={c.status === "approved" ? "Aprobado" : "Denegado"}
                     />
-                    <DetailItem label="MOTIVO DE RECHAZO" value={c.rejection_reason} />
+                    <DetailItem label="MOTIVO DE LA DENEGACIÓN" value={c.rejection_reason} />
                     <DetailItem
                       label="SOLICITÓ"
                       value={formatDateEs(new Date(c.created_at))}

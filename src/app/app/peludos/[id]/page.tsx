@@ -9,7 +9,7 @@ import { PetFichaEditor, type ThreadMessage } from "./PetFichaEditor";
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   approved: { text: "✓ APROBADO", cls: "bg-success-bg text-success-text" },
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
-  rejected: { text: "RECHAZADO", cls: "bg-error-bg text-error-text" },
+  rejected: { text: "DENEGADO", cls: "bg-error-bg text-error-text" },
 };
 
 /** Perfil completo de la mascota: fotos, datos e hilo con el comité. */

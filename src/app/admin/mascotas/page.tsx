@@ -135,7 +135,7 @@ export default async function AdminMascotasPage({
           options={[
             { value: "pending", label: "En revisión" },
             { value: "approved", label: "Aprobadas" },
-            { value: "rejected", label: "Rechazadas" },
+            { value: "rejected", label: "Denegadas" },
             ...(isSuper
               ? [
                   { value: "apelacion", label: "⚖️ Apelaciones" },
@@ -371,7 +371,7 @@ export default async function AdminMascotasPage({
                           ? `🕊️ BAJA${p.deactivation_reason ? ` · ${p.deactivation_reason}` : ""}`
                           : p.approval_status === "approved"
                             ? "APROBADA"
-                            : "RECHAZADA"}
+                            : "DENEGADA"}
                       </span>
                     </div>
                   }
@@ -402,7 +402,7 @@ export default async function AdminMascotasPage({
                       />
                       <DetailItem
                         label="ESTATUS"
-                        value={p.approval_status === "approved" ? "Aprobada" : "Rechazada"}
+                        value={p.approval_status === "approved" ? "Aprobada" : "Denegada"}
                       />
                       <DetailItem label="NOTAS DEL COMITÉ" value={p.approval_notes} />
                       <DetailItem

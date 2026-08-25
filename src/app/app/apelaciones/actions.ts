@@ -64,7 +64,7 @@ export async function submitAppeal(input: AppealInput) {
     if (!r || r.user_id !== user.id)
       return { error: "No encontramos esa solicitud." };
     if (r.status !== "rejected")
-      return { error: "Solo se apelan solicitudes rechazadas." };
+      return { error: "Solo se apelan solicitudes denegadas." };
     subjectLabel = `el reintegro ${r.folio}`;
   } else if (input.petId) {
     const { data: p } = await admin
@@ -75,7 +75,7 @@ export async function submitAppeal(input: AppealInput) {
     if (!p || p.user_id !== user.id)
       return { error: "No encontramos ese peludo." };
     if (p.approval_status !== "rejected")
-      return { error: "Solo se apelan perfiles rechazados." };
+      return { error: "Solo se apelan perfiles denegados." };
     subjectLabel = `el perfil de ${p.name}`;
   } else if (input.centerId) {
     const { data: c } = await admin
@@ -86,7 +86,7 @@ export async function submitAppeal(input: AppealInput) {
     if (!c || c.user_id !== user.id)
       return { error: "No encontramos ese centro." };
     if (c.status !== "rejected")
-      return { error: "Solo se apelan solicitudes rechazadas." };
+      return { error: "Solo se apelan solicitudes denegadas." };
     subjectLabel = `la solicitud del centro ${c.name}`;
   }
 
