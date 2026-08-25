@@ -13,12 +13,17 @@ abierto.
 |---|---|---|
 | 1 · «Rechazado» → «Denegado» | ✅ construida y verificada | `ea3ddad` |
 | 2 · Centros: pestañas, menú móvil y gráfica | ✅ construida y verificada | `5497470` |
-| 3 · Documentos en conversaciones | pendiente | — |
-| 4 · Ligas en correos | pendiente | — |
-| 5 · Persona física o moral | pendiente | — |
+| 3 · Documentos en conversaciones | ✅ construida y verificada | `d55a9ad` |
+| 4 · Ligas de acción en los correos | ✅ construida y verificada | `16bcb17` |
+| 5 · Persona física o moral | pendiente — **la más grande (4-5 jornadas)** | — |
 
-Las dos están en `staging` y desplegadas en pruebas. Ninguna lleva migración,
-así que **Jorge no tiene nada nuevo que correr** por estas dos.
+Las cuatro están en `staging` y desplegadas en pruebas.
+
+🔴 **Jorge tiene UNA migración nueva que correr en producción:**
+`20260825000001_conversaciones_con_documentos.sql`. Ya está corrida en
+staging. Sin ella, adjuntar un archivo en el hilo de un peludo o de un
+reintegro truena. Lleva `notify pgrst, 'reload schema'` al final.
+Las fases 1, 2 y 4 no llevan migración.
 
 ### Tres correcciones a este documento, encontradas al construir
 
