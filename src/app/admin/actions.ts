@@ -468,7 +468,7 @@ export async function registerCenterPayment(input: {
   if (error) return { error: "No pudimos registrar el pago." };
 
   revalidatePath("/admin/centros/pagos");
-  revalidatePath("/centro");
+  revalidatePath("/centro", "layout");
   return { ok: true as const };
 }
 

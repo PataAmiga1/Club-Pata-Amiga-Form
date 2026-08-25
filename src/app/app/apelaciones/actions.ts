@@ -159,6 +159,6 @@ export async function submitAppeal(input: AppealInput) {
 
   revalidatePath("/app/reintegros");
   revalidatePath("/app/peludos");
-  revalidatePath("/centro");
+  revalidatePath("/centro", "layout");
   return { ok: true as const, folio: appeal.folio };
 }
