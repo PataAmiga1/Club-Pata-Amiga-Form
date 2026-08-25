@@ -115,7 +115,12 @@ export async function resolveReimbursement(
       },
       {
         template: "reimbursement_rejected",
-        vars: { folio: req.folio, petName, reason: resolution.reason },
+        vars: {
+          folio: req.folio,
+          petName,
+          reason: resolution.reason,
+          reintegroUrl: `${SITE_URL}/app/reintegros/${id}`,
+        },
       },
     );
   } else {
@@ -137,7 +142,12 @@ export async function resolveReimbursement(
       },
       {
         template: "reimbursement_approved",
-        vars: { folio: req.folio, petName, amount: formatMxn(amount) },
+        vars: {
+          folio: req.folio,
+          petName,
+          amount: formatMxn(amount),
+          reintegroUrl: `${SITE_URL}/app/reintegros/${id}`,
+        },
       },
     );
   }
@@ -225,7 +235,14 @@ export async function resolvePet(
         },
     decision.approve
       ? { template: "pet_approved", vars: { petName: pet.name } }
-      : { template: "pet_rejected", vars: { petName: pet.name, notes } },
+      : {
+          template: "pet_rejected",
+          vars: {
+            petName: pet.name,
+            notes,
+            perfilUrl: `${SITE_URL}/app/peludos/${petId}`,
+          },
+        },
   );
 
   revalidatePath("/admin");
@@ -891,6 +908,14 @@ export async function resolveAppeal(
     }
   }
 
+  // A dónde manda el botón del correo: al detalle de lo apelado, porque
+  // /app/apelaciones no existe — la apelación se ve dentro de su sujeto.
+  const asuntoUrl = appeal.reimbursement_id
+    ? `${SITE_URL}/app/reintegros/${appeal.reimbursement_id}`
+    : appeal.pet_id
+      ? `${SITE_URL}/app/peludos/${appeal.pet_id}`
+      : `${SITE_URL}/centro`;
+
   const subjectLabel = appeal.reimbursement_id
     ? `tu reintegro ${reimbursement?.folio ?? ""}`
     : appeal.pet_id
@@ -924,11 +949,11 @@ export async function resolveAppeal(
     decision.accept
       ? {
           template: "appeal_accepted",
-          vars: { folio: appeal.folio, outcome },
+          vars: { folio: appeal.folio, outcome, asuntoUrl },
         }
       : {
           template: "appeal_rejected",
-          vars: { folio: appeal.folio, notes: decision.notes },
+          vars: { folio: appeal.folio, notes: decision.notes, asuntoUrl },
         },
   );
 
@@ -992,7 +1017,7 @@ export async function requestPetInfo(
         petName: pet.name,
         itemsList: validItems.map((i) => `<li>${ITEM_LABELS[i]}</li>`).join(""),
         message: text || "Por favor envíanos lo solicitado. ¡Gracias!",
-        fichaUrl: `${SITE_URL}/app/peludos/${petId}`,
+        perfilUrl: `${SITE_URL}/app/peludos/${petId}`,
       },
     },
   );

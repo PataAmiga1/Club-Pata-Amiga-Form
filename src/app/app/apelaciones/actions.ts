@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
+
+const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.pataamiga.mx";
 import { APPEAL_MAX_PER_SUBJECT, CENTER_APPEAL_MAX } from "@/lib/constants";
 import { beneficiosDeUsuario } from "@/lib/plans/resolve";
 
@@ -141,10 +143,18 @@ export async function submitAppeal(input: AppealInput) {
     .eq("id", user.id)
     .single();
   if (profile?.email) {
+    // Al detalle de lo apelado: /app/apelaciones no existe, la apelación se
+    // ve dentro del peludo o del reintegro (Pablo, 25-ago).
+    const asuntoUrl = input.reimbursementId
+      ? `${SITIO}/app/reintegros/${input.reimbursementId}`
+      : input.petId
+        ? `${SITIO}/app/peludos/${input.petId}`
+        : `${SITIO}/centro`;
     await sendTemplatedEmail("appeal_received", profile.email, {
       firstName: profile.first_name ?? "",
       folio: appeal.folio,
       subject: subjectLabel,
+      asuntoUrl,
     });
   }
   await notifyTeam(

@@ -54,6 +54,18 @@ const WRAP = (inner: string) =>
 </table>`;
 
 /**
+ * Botón de acción de un correo — "a prueba de balas": tabla + estilos inline,
+ * porque Outlook ignora el padding de un <a> y Gmail no aplica hojas de estilo.
+ *
+ * Sale de `pet_info_request`, que era la ÚNICA de las 23 plantillas con un
+ * botón decente (y una de solo tres con liga a la plataforma). Estaba escrito
+ * a mano dentro de su HTML; aquí queda una sola vez para las veinte que lo
+ * necesitaban (equipo, 19-ago).
+ */
+const BOTON = (url: string, texto: string) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:22px auto 6px"><tr><td style="background-color:#1CBCAD;border-radius:999px"><a href="${url}" style="display:inline-block;padding:13px 28px;color:#FFFFFF;font-size:15px;font-weight:700;text-decoration:none">${texto}</a></td></tr></table>`;
+
+/**
  * Correo brandeado de la campaña de regalo — HTML apto para clientes de
  * correo: solo tablas + estilos inline (Gmail/Outlook no soportan flexbox
  * ni hojas de estilo). Ancho 600px, botones a prueba de balas.
@@ -141,7 +153,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     html: WRAP(`<h1 style="color:#1E5350">¡Bienvenido a la manada, {{firstName}}!</h1>
 <p>Tu membresía de Club Pata Amiga está <strong>activa</strong> y la orientación veterinaria 24/7 ya está disponible para ti.</p>
 <p>{{petNotice}}</p>
-<p>Siguiente paso: completa tu perfil para habilitar los reintegros.</p>`),
+<p>Siguiente paso: completa tu perfil para habilitar los reintegros.</p>
+${BOTON("{{siteUrl}}/app/perfil", "Completar mi perfil")}`),
   },
   {
     key: "cancellation",
@@ -159,7 +172,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     subject: "Confirmamos la cancelación de tu membresía",
     html: WRAP(`<h2 style="color:#1E5350">Lamentamos que te vayas, {{firstName}} 🐾</h2>
 <p>Tu membresía seguirá activa {{coverageEndLine}}. Hasta entonces, tu manada sigue protegida.</p>
-<p>Cuando quieras volver, tu información seguirá aquí — reingresar a la manada toma un minuto.</p>`),
+<p>Cuando quieras volver, tu información seguirá aquí — reingresar a la manada toma un minuto.</p>
+${BOTON("{{siteUrl}}/app/cuenta", "Reactivar mi membresía")}`),
   },
   {
     key: "reimbursement_approved",
@@ -169,12 +183,17 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       folio: "Folio de la solicitud (ej. R-0001)",
       amount: "Monto aprobado con formato (ej. $1,250)",
       petName: "Nombre del peludo",
+      reintegroUrl: "URL del reintegro",
     },
-    sample: { folio: "R-0001", amount: "$1,250", petName: "Max" },
+    sample: {
+      folio: "R-0001", amount: "$1,250", petName: "Max",
+      reintegroUrl: "https://pataamiga.mx/app/reintegros/xxx",
+    },
     subject: "¡Tu reintegro {{folio}} fue aprobado! 🎉",
     html: WRAP(`<h2 style="color:#1E5350">¡Tu reintegro {{folio}} fue aprobado! 🎉</h2>
 <p>Aprobamos <strong>{{amount}} MXN</strong> para <strong>{{petName}}</strong>.</p>
-<p>Recibirás tu transferencia bancaria en un máximo de <strong>72 horas</strong>.</p>`),
+<p>Recibirás tu transferencia bancaria en un máximo de <strong>72 horas</strong>.</p>
+${BOTON("{{reintegroUrl}}", "Ver mi reintegro")}`),
   },
   {
     key: "reimbursement_rejected",
@@ -184,13 +203,18 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       folio: "Folio de la solicitud",
       petName: "Nombre del peludo",
       reason: "Motivo de la denegación",
+      reintegroUrl: "URL del reintegro",
     },
-    sample: { folio: "R-0001", petName: "Max", reason: "Factura ilegible" },
+    sample: {
+      folio: "R-0001", petName: "Max", reason: "Factura ilegible",
+      reintegroUrl: "https://pataamiga.mx/app/reintegros/xxx",
+    },
     subject: "Resolución de tu reintegro {{folio}}",
     html: WRAP(`<h2 style="color:#1E5350">Resolución de tu reintegro {{folio}}</h2>
 <p>Tu solicitud para <strong>{{petName}}</strong> no pudo aprobarse en esta revisión.</p>
 <p><strong>Motivo:</strong> {{reason}}</p>
-<p>Si crees que hay un error, puedes apelar desde tu cuenta y el comité hará una segunda revisión.</p>`),
+<p>Si crees que hay un error, puedes apelar desde tu cuenta y el comité hará una segunda revisión.</p>
+${BOTON("{{reintegroUrl}}", "Ver el detalle")}`),
   },
   {
     key: "pet_approved",
@@ -200,7 +224,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     sample: { petName: "Max" },
     subject: "¡{{petName}} fue aprobado por el comité! 🐾",
     html: WRAP(`<h2 style="color:#1E5350">¡{{petName}} fue aprobado por el comité! 🐾</h2>
-<p>Su perfil quedó aprobado y su tiempo de espera sigue corriendo con normalidad.</p>`),
+<p>Su perfil quedó aprobado y su tiempo de espera sigue corriendo con normalidad.</p>
+${BOTON("{{siteUrl}}/app/peludos", "Ver a mi peludo")}`),
   },
   {
     key: "pet_rejected",
@@ -209,12 +234,17 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     variables: {
       petName: "Nombre del peludo",
       notes: "Observaciones del comité",
+      perfilUrl: "URL del perfil del peludo",
     },
-    sample: { petName: "Max", notes: "Falta el certificado veterinario." },
+    sample: {
+      petName: "Max", notes: "Falta el certificado veterinario.",
+      perfilUrl: "https://pataamiga.mx/app/peludos/xxx",
+    },
     subject: "El perfil de {{petName}} necesita atención",
     html: WRAP(`<h2 style="color:#1E5350">El perfil de {{petName}} necesita atención</h2>
 <p><strong>Observaciones del comité:</strong> {{notes}}</p>
-<p>Entra a tu cuenta para actualizar la información o los documentos.</p>`),
+<p>Entra a tu cuenta para actualizar la información o los documentos.</p>
+${BOTON("{{perfilUrl}}", "Ver qué falta")}`),
   },
   {
     key: "pet_info_request",
@@ -226,21 +256,21 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       petName: "Nombre del peludo",
       itemsList: "Lista de lo solicitado (puede venir vacía)",
       message: "Mensaje del comité",
-      fichaUrl: "URL del perfil del peludo",
+      perfilUrl: "URL del perfil del peludo",
     },
     sample: {
       firstName: "Cipatli",
       petName: "Max",
       itemsList: "<li>📸 Foto principal</li><li>🏥 Certificado veterinario</li>",
       message: "La foto actual no permite ver bien a Max, ¿puedes subir una más clara?",
-      fichaUrl: "https://pataamiga.mx/app/peludos/xxx",
+      perfilUrl: "https://pataamiga.mx/app/peludos/xxx",
     },
     subject: "El comité necesita información sobre {{petName}} 🐾",
     html: WRAP(`<h2 style="color:#1E5350">Necesitamos tu ayuda con {{petName}}</h2>
 <p>Hola {{firstName}}, el comité te escribió sobre el perfil de <strong>{{petName}}</strong>:</p>
 <ul>{{itemsList}}</ul>
 <p style="background:#FAF7F1;border-radius:12px;padding:12px">{{message}}</p>
-<p style="text-align:center;margin:16px 0"><a href="{{fichaUrl}}" style="background:#1CBCAD;color:#fff;padding:12px 26px;border-radius:999px;font-weight:700;text-decoration:none">Abrir el perfil de {{petName}}</a></p>`),
+${BOTON("{{perfilUrl}}", "Enviar lo que piden")}`),
   },
   {
     key: "ambassador_received",
@@ -251,7 +281,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     subject: "Recibimos tu solicitud de embajador 🐾",
     html: WRAP(`<h2 style="color:#1E5350">¡Gracias, {{firstName}}!</h2>
 <p>Recibimos tu solicitud para ser embajador de Club Pata Amiga.</p>
-<p>El comité la revisará y te contactaremos por este correo. Al ser aprobada, recibirás tu código único para empezar a generar comisiones.</p>`),
+<p>El comité la revisará y te contactaremos por este correo. Al ser aprobada, recibirás tu código único para empezar a generar comisiones.</p>
+${BOTON("{{siteUrl}}/embajador", "Ver mi solicitud")}`),
   },
   {
     key: "ambassador_approved",
@@ -274,7 +305,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
 <p>El comité aprobó tu solicitud. Tu código de embajador es:</p>
 <p style="font-size:24px;font-weight:800;color:#1E5350;letter-spacing:.04em">{{code}}</p>
 <p>Cada suscripción con tu código te genera comisión, con corte mensual y pago el día 5.</p>
-<p>{{accessLine}}</p>`),
+<p>{{accessLine}}</p>
+${BOTON("{{siteUrl}}/embajador", "Ir a mi perfil de embajador")}`),
   },
   {
     key: "account_deactivated",
@@ -294,7 +326,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
 <p>Te escribimos para informarte que tu membresía de Club Pata Amiga fue dada de baja por el comité.</p>
 <p><strong>Motivo:</strong> {{reason}}</p>
-<p>A partir de hoy tu membresía deja de estar activa. Si crees que hay un error o quieres compartir tu versión, responde a este correo y con gusto lo revisamos.</p>`),
+<p>A partir de hoy tu membresía deja de estar activa. Si crees que hay un error o quieres compartir tu versión, responde a este correo y con gusto lo revisamos.</p>
+${BOTON("{{siteUrl}}/app/cuenta", "Ver mi cuenta")}`),
   },
   {
     key: "ambassador_rejected",
@@ -329,7 +362,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
 <p>Tu membresía de Club Pata Amiga está activa, pero aún nos faltan algunos datos para habilitar tus reintegros:</p>
 <p style="background:#FDF3E0;border-radius:12px;padding:12px 16px"><strong>{{missingList}}</strong></p>
 <p>Completa tu perfil en un par de minutos y tu manada queda protegida al 100%.</p>
-<p><a href="https://www.pataamiga.mx/app/perfil" style="display:inline-block;background:#1CBCAD;color:#fff;border-radius:999px;padding:12px 26px;font-weight:700;text-decoration:none">Completar mi perfil</a></p>`),
+${BOTON("{{siteUrl}}/app/perfil", "Completar mi perfil")}`),
   },
   {
     key: "ambassador_deactivated",
@@ -348,7 +381,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
 <p>Te escribimos para informarte que tu participación como embajador de Club Pata Amiga fue dada de baja por el comité.</p>
 <p><strong>Motivo:</strong> {{reason}}</p>
-<p>Tu código de embajador deja de generar comisiones nuevas a partir de hoy. Si crees que hay un error o quieres compartir tu versión, responde a este correo y con gusto lo revisamos.</p>`),
+<p>Tu código de embajador deja de generar comisiones nuevas a partir de hoy. Si crees que hay un error o quieres compartir tu versión, responde a este correo y con gusto lo revisamos.</p>
+${BOTON("{{siteUrl}}/embajador/cuenta", "Ver mi cuenta")}`),
   },
   {
     key: "campaign_gift",
@@ -380,12 +414,17 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       firstName: "Nombre del miembro",
       folio: "Folio de la apelación (ej. A-0001)",
       subject: "Qué se apela (ej. 'el reintegro R-0001' o 'el perfil de Max')",
+      asuntoUrl: "URL de lo apelado (peludo, reintegro o centro)",
     },
-    sample: { firstName: "Cipatli", folio: "A-0001", subject: "el reintegro R-0001" },
+    sample: {
+      firstName: "Cipatli", folio: "A-0001", subject: "el reintegro R-0001",
+      asuntoUrl: "https://pataamiga.mx/app/peludos/xxx",
+    },
     subject: "Recibimos tu apelación {{folio}}",
     html: WRAP(`<h2 style="color:#1E5350">Recibimos tu apelación {{folio}}</h2>
 <p>El comité hará una segunda revisión sobre {{subject}} y te avisaremos por este medio con la resolución.</p>
-<p>Gracias por tu paciencia, {{firstName}} 🐾</p>`),
+<p>Gracias por tu paciencia, {{firstName}} 🐾</p>
+${BOTON("{{asuntoUrl}}", "Ver mi apelación")}`),
   },
   {
     key: "appeal_accepted",
@@ -395,16 +434,19 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       firstName: "Nombre del miembro",
       folio: "Folio de la apelación",
       outcome: "Qué pasa ahora (ej. 'tu solicitud volvió a revisión' / 'el perfil de Max quedó aprobado')",
+      asuntoUrl: "URL de lo apelado (peludo, reintegro o centro)",
     },
     sample: {
       firstName: "Cipatli",
       folio: "A-0001",
       outcome: "tu solicitud R-0001 volvió a revisión del comité",
+      asuntoUrl: "https://pataamiga.mx/app/peludos/xxx",
     },
     subject: "¡Tu apelación {{folio}} fue aceptada! 🎉",
     html: WRAP(`<h2 style="color:#1E5350">¡Tu apelación {{folio}} fue aceptada!</h2>
 <p>Tras la segunda revisión, {{outcome}}.</p>
-<p>Gracias por la información adicional, {{firstName}}.</p>`),
+<p>Gracias por la información adicional, {{firstName}}.</p>
+${BOTON("{{asuntoUrl}}", "Ver la resolución")}`),
   },
   {
     key: "appeal_rejected",
@@ -414,17 +456,20 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       firstName: "Nombre del miembro",
       folio: "Folio de la apelación",
       notes: "Explicación del comité",
+      asuntoUrl: "URL de lo apelado (peludo, reintegro o centro)",
     },
     sample: {
       firstName: "Cipatli",
       folio: "A-0001",
       notes: "La factura sigue sin cumplir los requisitos fiscales.",
+      asuntoUrl: "https://pataamiga.mx/app/peludos/xxx",
     },
     subject: "Resolución de tu apelación {{folio}}",
     html: WRAP(`<h2 style="color:#1E5350">Resolución de tu apelación {{folio}}</h2>
 <p>El comité hizo una segunda revisión y la decisión original se mantiene.</p>
 <p><strong>Explicación:</strong> {{notes}}</p>
-<p>Si tienes información nueva, {{firstName}}, puedes escribirnos a este correo.</p>`),
+<p>Si tienes información nueva, {{firstName}}, puedes escribirnos a este correo.</p>
+${BOTON("{{asuntoUrl}}", "Ver la resolución")}`),
   },
   {
     key: "center_received",
@@ -438,7 +483,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     subject: "Recibimos tu solicitud de centro aliado 🐾",
     html: WRAP(`<h2 style="color:#1E5350">¡Gracias, {{contactName}}!</h2>
 <p>Recibimos la solicitud de <strong>{{centerName}}</strong> para unirse a la red de centros aliados de Club Pata Amiga.</p>
-<p>El comité la revisará y te contactaremos por este correo con la resolución.</p>`),
+<p>El comité la revisará y te contactaremos por este correo con la resolución.</p>
+${BOTON("{{siteUrl}}/centro", "Ver mi solicitud")}`),
   },
   {
     key: "center_approved",
@@ -458,7 +504,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     html: WRAP(`<h2 style="color:#1E5350">¡Bienvenidos a la red, {{contactName}}!</h2>
 <p>El comité aprobó la solicitud de <strong>{{centerName}}</strong>. Tu centro ya aparece en el directorio público:</p>
 <p><a href="{{directoryUrl}}" style="color:#0E8377">{{directoryUrl}}</a></p>
-<p>Los miembros de la manada verán tu beneficio y podrán visitarte. 🐾</p>`),
+<p>Los miembros de la manada verán tu beneficio y podrán visitarte. 🐾</p>
+${BOTON("{{siteUrl}}/centro", "Ir a mi panel")}`),
   },
   {
     key: "center_rejected",
@@ -500,7 +547,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
 <p>Actualizamos los beneficios de tu membresía de Club Pata Amiga. Esto es lo que cambió:</p>
 {{cambiosHtml}}
 <p>No tienes que hacer nada: el cambio ya está aplicado en tu cuenta y lo puedes ver en cualquier momento desde tu panel.</p>
-<p>Si tienes dudas, respóndenos este correo y con gusto te explicamos.</p>`),
+<p>Si tienes dudas, respóndenos este correo y con gusto te explicamos.</p>
+${BOTON("{{siteUrl}}/app/cuenta", "Ver mis beneficios")}`),
   },
   {
     key: "birthday_member",
@@ -517,7 +565,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     html: WRAP(`<h1 style="color:#1E5350">¡Feliz cumpleaños, {{firstName}}! 🎉</h1>
 <p>Hoy toda la manada de Club Pata Amiga celebra contigo. Gracias por cuidar a tus peludos con tanto cariño durante todo el año.</p>
 <p>Que tu día esté lleno de lengüetazos, ronroneos y mucho amor. 🐾</p>
-<p>Con cariño,<br>El equipo de Pata Amiga</p>`),
+<p>Con cariño,<br>El equipo de Pata Amiga</p>
+${BOTON("{{siteUrl}}/app", "Entrar a mi cuenta")}`),
   },
   {
     key: "birthday_pet",
@@ -540,7 +589,8 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
     html: WRAP(`<h1 style="color:#1E5350">¡Feliz cumpleaños, {{petName}}! {{petEmoji}}</h1>
 <p>Hola {{firstName}}, hoy es un día muy especial: {{petName}} está de fiesta. {{ageLine}}</p>
 <p>En Club Pata Amiga celebramos a cada integrante de la manada. Consiéntelo con un premio, unos mimos extra y mucho juego. 🐾</p>
-<p>Con cariño,<br>El equipo de Pata Amiga</p>`),
+<p>Con cariño,<br>El equipo de Pata Amiga</p>
+${BOTON("{{siteUrl}}/app", "Entrar a mi cuenta")}`),
   },
 ];
 
