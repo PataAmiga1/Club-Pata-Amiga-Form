@@ -31,12 +31,18 @@ así que **Jorge no tiene nada nuevo que correr** por estas dos.
 2. **La tabla de pagos es `center_payments`**, no `wellness_center_payments`.
    Esa segunda existe (migración de mayo) pero **no la usa ningún código**. Si
    alguien planea sobre ella, planea sobre una tabla muerta.
-3. **`/app/apelaciones` no existe.** La fase 4 manda ahí tres plantillas
+3. **`/app/apelaciones` no existe.** La fase 4 mandaba ahí tres plantillas
    (`appeal_received`, `appeal_accepted`, `appeal_rejected`) y hoy sería un 404:
    las apelaciones viven dentro del peludo o del reintegro (`AppealButton`), no
-   en un listado propio. **Hay que decidirlo antes de construir la fase 4**:
-   o las tres ligas van al detalle del sujeto apelado, o se construye el
-   listado. Es la única duda abierta que queda.
+   en un listado propio. **Resuelto por Pablo el 25-ago: las tres van al detalle
+   del sujeto apelado**, no se construye listado. Como se puede apelar tres
+   cosas, la liga sale del campo que traiga la apelación:
+
+   | Apelación sobre | Liga |
+   |---|---|
+   | un peludo (`pet_id`) | `/app/peludos/<id>` |
+   | un reintegro (`reimbursement_id`) | `/app/reintegros/<id>` |
+   | un centro (`center_id`) | `/centro` |
 
 ### Datos de prueba que quedaron en staging
 

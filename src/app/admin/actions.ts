@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMxn } from "@/lib/format";
 import {
+  sanearAdjuntos,
+  type AdjuntoConversacion,
+} from "@/lib/documentos-conversacion";
+import {
   hoyEnMexico,
   ZONA_MX,
   inicioDelMes,
@@ -943,6 +947,7 @@ export async function requestPetInfo(
   petId: string,
   items: string[],
   message: string,
+  documents?: AdjuntoConversacion[],
 ) {
   const { admin, adminId } = await requireAdmin();
   const { data: pet } = await admin
@@ -952,8 +957,9 @@ export async function requestPetInfo(
     .single();
   if (!pet) throw new Error("Peludo no encontrado");
   const text = message?.trim();
-  if (!text && items.length === 0)
-    return { error: "Elige qué solicitar o escribe un mensaje." };
+  const adjuntos = sanearAdjuntos(documents);
+  if (!text && items.length === 0 && !adjuntos.length)
+    return { error: "Elige qué solicitar, escribe un mensaje o adjunta algo." };
 
   const ITEM_LABELS: Record<string, string> = {
     foto_principal: "📸 Foto principal",
@@ -968,6 +974,7 @@ export async function requestPetInfo(
     author_id: adminId,
     message: text || "Por favor envíanos lo solicitado. ¡Gracias!",
     requested_items: validItems,
+    documents: adjuntos,
   });
   await admin.from("pets").update({ info_requested: true }).eq("id", petId);
 
@@ -995,7 +1002,11 @@ export async function requestPetInfo(
 }
 
 /** Mensaje directo del comité en el hilo de una mascota (sin correo). */
-export async function sendPetMessage(petId: string, message: string) {
+export async function sendPetMessage(
+  petId: string,
+  message: string,
+  documents?: AdjuntoConversacion[],
+) {
   const { admin, adminId } = await requireAdmin();
   const { data: pet } = await admin
     .from("pets")
@@ -1003,19 +1014,22 @@ export async function sendPetMessage(petId: string, message: string) {
     .eq("id", petId)
     .single();
   if (!pet) throw new Error("Peludo no encontrado");
-  const text = message?.trim();
-  if (!text) return { error: "Escribe el mensaje." };
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  if (!text && !adjuntos.length)
+    return { error: "Escribe el mensaje o adjunta un archivo." };
 
   await admin.from("pet_messages").insert({
     pet_id: petId,
     sender: "admin",
     author_id: adminId,
-    message: text,
+    message: text || "(el comité envió archivos)",
+    documents: adjuntos,
   });
   await notifyMember(admin, pet.user_id, {
     type: "pet_message",
     title: `Mensaje del comité sobre ${pet.name}`,
-    message: text,
+    message: text || "El comité te envió archivos.",
   });
 
   revalidatePath(`/admin/miembros/${pet.user_id}`);
@@ -1029,6 +1043,7 @@ export async function sendPetMessage(petId: string, message: string) {
 export async function sendReimbursementMessage(
   reimbursementId: string,
   message: string,
+  documents?: AdjuntoConversacion[],
 ) {
   const { admin, adminId } = await requireAdmin();
   const { data: req } = await admin
@@ -1037,19 +1052,22 @@ export async function sendReimbursementMessage(
     .eq("id", reimbursementId)
     .single();
   if (!req) throw new Error("Reintegro no encontrado");
-  const text = message?.trim();
-  if (!text) return { error: "Escribe el mensaje." };
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  if (!text && !adjuntos.length)
+    return { error: "Escribe el mensaje o adjunta un archivo." };
 
   await admin.from("reimbursement_messages").insert({
     reimbursement_id: reimbursementId,
     sender: "admin",
     author_id: adminId,
-    message: text,
+    message: text || "(el comité envió archivos)",
+    documents: adjuntos,
   });
   await notifyMember(admin, req.user_id, {
     type: "reimbursement_message",
     title: `Mensaje del comité sobre tu reintegro ${req.folio}`,
-    message: text,
+    message: text || "El comité te envió archivos.",
   });
 
   revalidatePath(`/admin/reintegros/${reimbursementId}`);

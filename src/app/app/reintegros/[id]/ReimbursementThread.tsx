@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { replyReimbursementThread } from "./actions";
+import { AdjuntosPicker } from "@/components/app/AdjuntosPicker";
+import { AdjuntosLista } from "@/components/app/AdjuntosLista";
+import type {
+  AdjuntoConversacion,
+  AdjuntoFirmado,
+} from "@/lib/documentos-conversacion";
 
 export type ReimbursementMessage = {
   id: string;
@@ -19,12 +25,17 @@ export type ReimbursementMessage = {
 export function ReimbursementThread({
   reimbursementId,
   thread,
+  adjuntos,
 }: {
   reimbursementId: string;
   thread: ReimbursementMessage[];
+  /** Adjuntos ya firmados por la página, por id de mensaje. */
+  adjuntos: Record<string, AdjuntoFirmado[]>;
 }) {
   const router = useRouter();
   const [reply, setReply] = useState("");
+  const [porEnviar, setPorEnviar] = useState<AdjuntoConversacion[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +64,7 @@ export function ReimbursementThread({
               }).format(new Date(m.created_at))}
             </span>
             {m.message}
+            <AdjuntosLista adjuntos={adjuntos[m.id] ?? []} />
           </div>
         ))}
       </div>
@@ -60,34 +72,50 @@ export function ReimbursementThread({
         <span className="text-sm font-semibold text-error-text">{error}</span>
       )}
       <form
-        className="flex items-end gap-2"
+        className="flex flex-col gap-2"
         onSubmit={async (e) => {
           e.preventDefault();
-          if (!reply.trim()) return;
+          if (!reply.trim() && !porEnviar.length) return;
           setBusy(true);
           setError(null);
-          const result = await replyReimbursementThread(reimbursementId, reply);
+          const result = await replyReimbursementThread(
+            reimbursementId,
+            reply,
+            porEnviar,
+          );
           setBusy(false);
           if (!result.error) {
             setReply("");
+            setPorEnviar([]);
             router.refresh();
           } else setError(result.error);
         }}
       >
-        <textarea
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          rows={2}
-          placeholder="Escribe tu respuesta al comité…"
-          className="min-w-0 flex-1 rounded-[12px] border-[1.5px] border-border-input p-3 text-sm text-ink-body outline-none focus:border-teal"
+        <div className="flex items-end gap-2">
+          <textarea
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            rows={2}
+            placeholder="Escribe tu respuesta al comité…"
+            className="min-w-0 flex-1 rounded-[12px] border-[1.5px] border-border-input p-3 text-sm text-ink-body outline-none focus:border-teal"
+          />
+          <button
+            type="submit"
+            disabled={busy || subiendo || (!reply.trim() && !porEnviar.length)}
+            className="grid h-11 flex-none place-items-center rounded-full bg-teal px-5 text-[13px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
+          >
+            {busy ? "Enviando…" : "Enviar"}
+          </button>
+        </div>
+        <AdjuntosPicker
+          adjuntos={porEnviar}
+          onChange={setPorEnviar}
+          onError={setError}
+          disabled={busy}
+          subiendo={subiendo}
+          onSubiendo={setSubiendo}
+          ayuda="Si el comité te pidió una factura o un comprobante, mándalo aquí."
         />
-        <button
-          type="submit"
-          disabled={busy || !reply.trim()}
-          className="grid h-11 flex-none place-items-center rounded-full bg-teal px-5 text-[13px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
-        >
-          {busy ? "Enviando…" : "Enviar"}
-        </button>
       </form>
     </section>
   );

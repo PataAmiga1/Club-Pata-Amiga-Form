@@ -13,6 +13,7 @@ import {
   ReimbursementThread,
   type ReimbursementMessage,
 } from "./ReimbursementThread";
+import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
@@ -50,7 +51,7 @@ export default async function ReintegroDetailPage({
         .maybeSingle(),
       supabase
         .from("reimbursement_messages")
-        .select("id, sender, message, created_at")
+        .select("id, sender, message, documents, created_at")
         .eq("reimbursement_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -88,6 +89,13 @@ export default async function ReintegroDetailPage({
 
   const thread = (messages ?? []) as ReimbursementMessage[];
   const showThread = thread.some((m) => m.sender === "admin");
+  // Los adjuntos del hilo se firman aquí: el bucket es privado y el miembro no
+  // puede leer directo lo que subió el comité (vive en la carpeta del admin).
+  const adjuntosDelHilo = Object.fromEntries(
+    await firmarAdjuntosDeHilo(
+      (messages ?? []) as { id: string; documents?: unknown }[],
+    ),
+  );
   const pendingAppeal = (appeals ?? []).find((a) => a.status === "pending");
 
   const rows: { label: string; value: string | null }[] = [
@@ -242,7 +250,11 @@ export default async function ReintegroDetailPage({
 
       {/* Hilo con el comité — visible solo cuando el comité ya escribió */}
       {showThread && (
-        <ReimbursementThread reimbursementId={req.id} thread={thread} />
+        <ReimbursementThread
+          reimbursementId={req.id}
+          thread={thread}
+          adjuntos={adjuntosDelHilo}
+        />
       )}
     </div>
   );

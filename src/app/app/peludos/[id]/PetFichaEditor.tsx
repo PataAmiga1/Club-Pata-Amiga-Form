@@ -10,6 +10,12 @@ import { Button } from "@/components/ui/Button";
 import { PET_GALLERY_MAX, SENIOR_PET_AGE_YEARS } from "@/lib/constants";
 import { DOG_BREED_NAMES, CAT_BREED_NAMES } from "@/data/pet-catalogs";
 import { updatePetFicha, replyPetThread, deactivatePet } from "./actions";
+import { AdjuntosPicker } from "@/components/app/AdjuntosPicker";
+import { AdjuntosLista } from "@/components/app/AdjuntosLista";
+import type {
+  AdjuntoConversacion,
+  AdjuntoFirmado,
+} from "@/lib/documentos-conversacion";
 
 export type PetFicha = {
   id: string;
@@ -49,9 +55,12 @@ const REQUEST_LABELS: Record<string, string> = {
 export function PetFichaEditor({
   pet,
   thread,
+  adjuntosDelHilo,
 }: {
   pet: PetFicha;
   thread: ThreadMessage[];
+  /** Adjuntos ya firmados por la página, por id de mensaje. */
+  adjuntosDelHilo: Record<string, AdjuntoFirmado[]>;
 }) {
   const router = useRouter();
   // ?completar=1 → venimos del flujo guiado que arranca en "completa tu perfil"
@@ -60,6 +69,8 @@ export function PetFichaEditor({
   const galleryRef = useRef<HTMLInputElement>(null);
   const certRef = useRef<HTMLInputElement>(null);
 
+  const [porEnviar, setPorEnviar] = useState<AdjuntoConversacion[]>([]);
+  const [subiendoAdjuntos, setSubiendoAdjuntos] = useState(false);
   const [photoUrl, setPhotoUrl] = useState(pet.photoUrl);
   const [gallery, setGallery] = useState<string[]>(pet.galleryPhotos);
   const [certUrl, setCertUrl] = useState(pet.vetCertificateUrl);
@@ -413,6 +424,7 @@ export function PetFichaEditor({
                 </span>
               )}
               {m.message}
+              <AdjuntosLista adjuntos={adjuntosDelHilo[m.id] ?? []} />
             </div>
           ))}
           {thread.length === 0 && (
@@ -423,33 +435,51 @@ export function PetFichaEditor({
           )}
         </div>
         <form
-          className="flex items-end gap-2"
+          className="flex flex-col gap-2"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!reply.trim()) return;
+            if (!reply.trim() && !porEnviar.length) return;
             setBusy("reply");
-            const result = await replyPetThread(pet.id, reply);
+            const result = await replyPetThread(pet.id, reply, porEnviar);
             setBusy(null);
             if (!result.error) {
               setReply("");
+              setPorEnviar([]);
               router.refresh();
             } else setError(result.error);
           }}
         >
-          <textarea
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            rows={2}
-            placeholder="Escribe tu respuesta al comité…"
-            className="min-w-0 flex-1 rounded-[12px] border-[1.5px] border-border-input p-3 text-sm text-ink-body outline-none focus:border-teal"
+          <div className="flex items-end gap-2">
+            <textarea
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              rows={2}
+              placeholder="Escribe tu respuesta al comité…"
+              className="min-w-0 flex-1 rounded-[12px] border-[1.5px] border-border-input p-3 text-sm text-ink-body outline-none focus:border-teal"
+            />
+            <button
+              type="submit"
+              disabled={
+                busy === "reply" ||
+                subiendoAdjuntos ||
+                (!reply.trim() && !porEnviar.length)
+              }
+              className="grid h-11 flex-none place-items-center rounded-full bg-teal px-5 text-[13px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
+            >
+              {busy === "reply" ? "Enviando…" : "Enviar"}
+            </button>
+          </div>
+          {/* Aquí es donde más falta hacía: el comité pide por este hilo la foto
+              o el certificado, y antes no había dónde entregarlos. */}
+          <AdjuntosPicker
+            adjuntos={porEnviar}
+            onChange={setPorEnviar}
+            onError={setError}
+            disabled={busy === "reply"}
+            subiendo={subiendoAdjuntos}
+            onSubiendo={setSubiendoAdjuntos}
+            ayuda="Si el comité te pidió una foto o un documento, mándalo aquí."
           />
-          <button
-            type="submit"
-            disabled={busy === "reply" || !reply.trim()}
-            className="grid h-11 flex-none place-items-center rounded-full bg-teal px-5 text-[13px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
-          >
-            {busy === "reply" ? "Enviando…" : "Enviar"}
-          </button>
         </form>
       </section>
       )}

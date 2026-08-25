@@ -11,6 +11,7 @@ import { formatMxn, hoursSince } from "@/lib/format";
 import { formatDateEs, waitingProgress } from "@/lib/dates";
 import { ResolutionPanel } from "./ResolutionPanel";
 import { ThreadPanel } from "./ThreadPanel";
+import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 
 export default async function ReviewPage({
   params,
@@ -31,9 +32,17 @@ export default async function ReviewPage({
 
   const { data: threadRows } = await admin
     .from("reimbursement_messages")
-    .select("id, sender, message, created_at")
+    .select("id, sender, message, documents, created_at")
     .eq("reimbursement_id", id)
     .order("created_at", { ascending: true });
+
+  // Firmadas aquí porque el bucket es privado y el adjunto del miembro vive en
+  // la carpeta del miembro.
+  const adjuntosDelHilo = Object.fromEntries(
+    await firmarAdjuntosDeHilo(
+      (threadRows ?? []) as { id: string; documents?: unknown }[],
+    ),
+  );
 
   const pet = (Array.isArray(req.pets) ? req.pets[0] : req.pets) as {
     name: string;
@@ -279,6 +288,7 @@ export default async function ReviewPage({
             message: string;
             created_at: string;
           }[]}
+          adjuntos={adjuntosDelHilo}
         />
       </div>
     </div>

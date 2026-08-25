@@ -9,6 +9,7 @@ import { curpCoincide } from "@/lib/curp";
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
 import { PetThreadPanel } from "./PetThreadPanel";
+import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 import { PetResolveButtons } from "../../mascotas/PetResolveButtons";
 import { NOTA_HEREDADO_ADMIN } from "@/lib/membresia";
 import { EditMemberButton, EditPetButton } from "./EditPanels";
@@ -58,7 +59,7 @@ export default async function AdminMiembroDetailPage({
       admin
         .from("pets")
         .select(
-          "id, name, species, breed, sex, age_years, age_months, coat_color, eye_color, nose_color, is_adopted, adoption_story, is_senior, photo_url, gallery_photos, vet_certificate_url, approval_status, is_active, deactivation_reason, waiting_period_end_date, info_requested, pet_messages(id, sender, message, requested_items, created_at)",
+          "id, name, species, breed, sex, age_years, age_months, coat_color, eye_color, nose_color, is_adopted, adoption_story, is_senior, photo_url, gallery_photos, vet_certificate_url, approval_status, is_active, deactivation_reason, waiting_period_end_date, info_requested, pet_messages(id, sender, message, requested_items, documents, created_at)",
         )
         .eq("user_id", id)
         .order("created_at", { ascending: true }),
@@ -102,6 +103,17 @@ export default async function AdminMiembroDetailPage({
         .createSignedUrl(d.file_path, 3600);
       return { ...d, url: signed?.signedUrl ?? null };
     }),
+  );
+
+  // Los adjuntos de TODOS los hilos de este expediente se firman de una vez:
+  // el pintado ocurre dentro de un .map() de JSX, donde ya no se puede esperar.
+  const adjuntosDeHilos = Object.fromEntries(
+    await firmarAdjuntosDeHilo(
+      (pets ?? []).flatMap(
+        (p) =>
+          (p.pet_messages ?? []) as { id: string; documents?: unknown }[],
+      ),
+    ),
   );
 
   const chip = STATUS_CHIP[m.membership_status] ?? STATUS_CHIP.pending_payment;
@@ -462,6 +474,7 @@ export default async function AdminMiembroDetailPage({
                 petName={p.name}
                 infoRequested={p.info_requested}
                 thread={thread}
+                adjuntos={adjuntosDeHilos}
               />
             </div>
           );
