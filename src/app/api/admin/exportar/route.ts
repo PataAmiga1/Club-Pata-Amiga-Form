@@ -4,6 +4,7 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { csvCell } from "@/lib/banks";
 import { getStripe } from "@/lib/stripe";
 import { sexoDeMiembro } from "@/lib/sexo";
+import { cargarBajas, ETIQUETA_ORIGEN_BAJA } from "@/lib/bajas";
 import { edadEnAnios } from "@/lib/edad";
 import { diaEnMexico } from "@/lib/zona-horaria";
 import { reportePorGrano, type GranoDeReporte } from "@/lib/exportacion";
@@ -102,7 +103,7 @@ type ClienteAdmin = ReturnType<typeof createAdminClient>;
 type PerfilExport = Awaited<ReturnType<typeof cargarPerfiles>>;
 
 async function cargarPerfiles(admin: ClienteAdmin) {
-  const [{ data: perfiles }, { data: subs }, { data: bajas }, { data: peludos }] =
+  const [{ data: perfiles }, { data: subs }, bajas, { data: peludos }] =
     await Promise.all([
       admin
         .from("profiles")
@@ -113,20 +114,16 @@ async function cargarPerfiles(admin: ClienteAdmin) {
       admin
         .from("subscriptions")
         .select("user_id, plan, plan_name, amount, status, stripe_customer_id"),
-      admin
-        .from("cancellations")
-        .select("user_id, reason, survey, coverage_end_date, rejoined_at, created_at")
-        .order("created_at", { ascending: false }),
+      // Las bajas se resuelven juntando las tres señales fechadas — ver
+      // `src/lib/bajas.ts`. Contarlas solo desde `cancellations` desaparecía a
+      // quien se fue por un cobro fallido.
+      cargarBajas(admin),
       admin.from("pets").select("user_id").eq("is_active", true),
     ]);
 
-  // La baja que vale es la MÁS RECIENTE de cada quien: alguien puede haberse
-  // ido, regresado y vuelto a irse.
-  const listaBajas = bajas ?? [];
-  const listaSubs = subs ?? [];
-  const bajaDe = new Map<string, (typeof listaBajas)[number]>();
-  for (const b of listaBajas) if (!bajaDe.has(b.user_id)) bajaDe.set(b.user_id, b);
+  const bajaDe = bajas.porUsuario;
 
+  const listaSubs = subs ?? [];
   const subDe = new Map<string, (typeof listaSubs)[number]>();
   for (const s of listaSubs) if (!subDe.has(s.user_id)) subDe.set(s.user_id, s);
 
@@ -134,7 +131,7 @@ async function cargarPerfiles(admin: ClienteAdmin) {
   for (const p of peludos ?? [])
     peludosDe.set(p.user_id, (peludosDe.get(p.user_id) ?? 0) + 1);
 
-  return { perfiles: perfiles ?? [], bajaDe, subDe, peludosDe };
+  return { perfiles: perfiles ?? [], bajaDe, subDe, peludosDe, bajas };
 }
 
 /** Todas las columnas posibles de UN miembro, ya resueltas. */
@@ -160,11 +157,12 @@ function filaDeMiembro(p: PerfilExport["perfiles"][number], ctx: PerfilExport): 
     monto_plan: sub?.amount ?? "",
     registro: dia(p.created_at),
     alta: dia(p.member_since),
-    baja: dia(baja?.created_at),
-    motivo_baja: baja?.reason ?? "",
+    baja: baja?.fecha ?? "",
+    motivo_baja: baja?.motivo ?? "",
+    origen_baja: baja ? ETIQUETA_ORIGEN_BAJA[baja.origen] : "",
     encuesta_baja: baja?.survey ? JSON.stringify(baja.survey) : "",
-    fin_cobertura: baja?.coverage_end_date ?? "",
-    regreso: dia(baja?.rejoined_at),
+    fin_cobertura: baja?.finCobertura ?? "",
+    regreso: baja?.regresoEl ?? "",
     peludos: ctx.peludosDe.get(p.id) ?? 0,
     codigo_embajador: p.ambassador_code_used ?? "",
     utm_source: p.utm_source ?? "",
@@ -326,15 +324,13 @@ async function filasMensuales(
   }
 
   for (const [, b] of ctx.bajaDe) {
-    const c = celda(diaEnMexico(new Date(b.created_at)).slice(0, 7));
+    const c = celda(b.fecha.slice(0, 7));
     c.bajas++;
-    const motivo = (b.reason ?? "").trim();
-    if (motivo) {
+    if (b.motivo) {
       c.conMotivo++;
-      c.motivos.set(motivo, (c.motivos.get(motivo) ?? 0) + 1);
+      c.motivos.set(b.motivo, (c.motivos.get(b.motivo) ?? 0) + 1);
     }
-    if (b.rejoined_at)
-      celda(diaEnMexico(new Date(b.rejoined_at)).slice(0, 7)).regresos++;
+    if (b.regresoEl) celda(b.regresoEl.slice(0, 7)).regresos++;
   }
 
   return [...meses.entries()]

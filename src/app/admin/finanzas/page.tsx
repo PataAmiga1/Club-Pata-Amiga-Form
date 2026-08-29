@@ -7,6 +7,7 @@ import { inicioDelMes, ZONA_MX, hoyEnMexico, diaEnMexico } from "@/lib/zona-hora
 import { mesDe, ultimosMeses, etiquetaMes } from "@/lib/costos";
 import { MiniBarChart } from "@/components/panel/MiniBarChart";
 import { sexoDeMiembro } from "@/lib/sexo";
+import { cargarBajas } from "@/lib/bajas";
 import { DetailModal, DetailItem } from "@/components/panel/DetailModal";
 
 type PaymentRow = {
@@ -90,13 +91,16 @@ export default async function AdminFinanzasPage() {
 
   // Altas y bajas por mes (equipo, 26-ago). Van en consultas aparte de las de
   // arriba porque necesitan TODAS las filas, no un conteo ni las 15 últimas.
-  const [{ data: altasRaw }, { data: bajasRaw }] = await Promise.all([
+  const [{ data: altasRaw }, bajasResueltas] = await Promise.all([
     admin
       .from("profiles")
       .select("member_since, gender, curp")
       .eq("role", "member")
       .not("member_since", "is", null),
-    admin.from("cancellations").select("created_at, reason"),
+    // Las bajas juntan las tres señales fechadas — ver `src/lib/bajas.ts`.
+    // Contarlas solo desde `cancellations` desaparecía del tablero a todo el
+    // que se fue por un cobro fallido.
+    cargarBajas(admin),
   ]);
 
   // Doce meses de altas y bajas, anclados en `hoyEnMexico()`: con `new Date()`
@@ -117,11 +121,10 @@ export default async function AdminFinanzasPage() {
     else if (sexo === "Mujer") sexos.Mujer++;
     else sexos.otro++;
   }
-  for (const b of bajasRaw ?? []) {
-    const m = mesDe(diaEnMexico(new Date(b.created_at as string)));
+  for (const [, b] of bajasResueltas.porUsuario) {
+    const m = b.fecha.slice(0, 7);
     if (bajasPorMes.has(m)) bajasPorMes.set(m, bajasPorMes.get(m)! + 1);
-    const motivo = (b.reason ?? "").trim();
-    if (motivo) motivos.set(motivo, (motivos.get(motivo) ?? 0) + 1);
+    if (b.motivo) motivos.set(b.motivo, (motivos.get(b.motivo) ?? 0) + 1);
     else bajasSinMotivo++;
   }
 
@@ -134,7 +137,7 @@ export default async function AdminFinanzasPage() {
     value: bajasPorMes.get(m) ?? 0,
   }));
   const motivosOrdenados = [...motivos.entries()].sort((a, b) => b[1] - a[1]);
-  const totalBajas = (bajasRaw ?? []).length;
+  const totalBajas = bajasResueltas.porUsuario.size;
 
   const subs = subsQ.data ?? [];
   type Baja = {
@@ -426,12 +429,12 @@ export default async function AdminFinanzasPage() {
           <span className="font-display text-lg text-ink-title">
             Por qué cancelaron
           </span>
-          {/* Se dice de dónde sale el número ANTES de la lista: quien lo lea
-              tiene que saber que este corte es un piso y no el total. */}
+          {/* De dónde sale el número, ANTES de la lista. El motivo solo puede
+              venir de quien canceló a propósito: una tarjeta rechazada no da
+              motivos, y eso no es un hueco que se pueda tapar. */}
           <span className="text-[12px] leading-relaxed text-ink-tertiary">
-            Solo cuenta las bajas hechas EN LA PLATAFORMA. Quien se fue por
-            Stripe, por la plataforma anterior o por un cobro fallido no dejó
-            motivo, así que esta cifra es un piso, no el total.
+            El motivo solo existe para quien canceló desde su cuenta. Las bajas
+            por cobro fallido cuentan en la gráfica, pero no dejan motivo.
           </span>
           {motivosOrdenados.length > 0 ? (
             <>
@@ -457,6 +460,16 @@ export default async function AdminFinanzasPage() {
               {bajasSinMotivo > 0 && (
                 <span className="mt-1 rounded-[10px] bg-warning-bg px-3 py-2 text-[11.5px] font-semibold text-warning-text">
                   {bajasSinMotivo} de {totalBajas} bajas no traen motivo.
+                </span>
+              )}
+              {bajasResueltas.sinFecha > 0 && (
+                <span className="rounded-[10px] bg-warning-bg px-3 py-2 text-[11.5px] font-semibold text-warning-text">
+                  Aparte, {bajasResueltas.sinFecha} de{" "}
+                  {bajasResueltas.totalCancelados} miembros marcados como dados
+                  de baja no tienen fecha en ninguna fuente, así que no salen en
+                  la gráfica. Son bajas que quedaron registradas en el perfil
+                  sin que nadie anotara cuándo; de aquí en adelante toda baja
+                  nueva sí queda fechada.
                 </span>
               )}
             </>

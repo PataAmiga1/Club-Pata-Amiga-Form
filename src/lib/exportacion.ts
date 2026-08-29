@@ -106,6 +106,7 @@ export const REPORTES: ReporteExportable[] = [
       { key: "alta", label: "Fecha de alta (miembro desde)", grupo: "Membresía", porOmision: true },
       { key: "baja", label: "Fecha de baja", grupo: "Membresía", porOmision: true },
       { key: "motivo_baja", label: "Motivo de la baja", grupo: "Membresía", porOmision: true },
+      { key: "origen_baja", label: "Cómo se detectó la baja", grupo: "Membresía" },
       { key: "encuesta_baja", label: "Encuesta de la baja", grupo: "Membresía" },
       { key: "fin_cobertura", label: "Fin de la cobertura", grupo: "Membresía" },
       { key: "regreso", label: "Regresó el", grupo: "Membresía" },
@@ -129,7 +130,7 @@ export const REPORTES: ReporteExportable[] = [
     descripcion:
       "Cuántos entraron y cuántos se fueron cada mes. Es el archivo para ver la tendencia, no para ver personas.",
     advertencia:
-      "Las bajas cuentan las que se hicieron EN LA PLATAFORMA. Quien se fue por Stripe, por la plataforma anterior o por un cobro fallido no dejó registro aquí, así que esta cifra es un piso, no el total. La columna «bajas sin motivo» dice qué tanto se puede confiar en el corte del mes.",
+      "Las bajas juntan las tres señales que traen fecha: la cancelación hecha en la plataforma, la que detectó la pasarela y la suscripción cancelada. El MOTIVO solo existe para la primera — una tarjeta rechazada no da motivos —, y por eso «bajas sin motivo» casi siempre trae número.",
     columnas: [
       { key: "mes", label: "Mes", grupo: "Mes", porOmision: true },
       { key: "altas", label: "Altas", grupo: "Movimiento", porOmision: true },
