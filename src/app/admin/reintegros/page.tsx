@@ -9,7 +9,7 @@ const STATUS_LABEL: Record<string, string> = {
   in_review: "En revisión",
   approved: "Aprobado",
   partial: "Parcial",
-  rejected: "Rechazado",
+  rejected: "Denegado",
   paid: "Pagado",
 };
 
@@ -79,7 +79,7 @@ export default async function AdminReintegrosPage({
             { value: "pending", label: "Pendientes" },
             { value: "in_review", label: "En revisión" },
             { value: "approved", label: "Aprobados" },
-            { value: "rejected", label: "Rechazados" },
+            { value: "rejected", label: "Denegados" },
             { value: "paid", label: "Pagados" },
           ]}
         />

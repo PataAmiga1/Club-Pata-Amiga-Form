@@ -133,6 +133,34 @@ no necesitaban nada. Ya verificadas como **hechas** antes de empezar:
 5. **Los materiales del embajador** (pantalla 20) siguen en «MUY PRONTO» porque los archivos
    no han llegado.
 
+## Datos que se dejaron de pedir (Pablo, 19-ago)
+
+En el **alta de embajador**:
+
+- **La fecha de nacimiento ya no se teclea**: sale de la CURP, que aquí es
+  obligatoria y con formato validado. La regla de 18+ no cambia; lo que cambia es
+  que se calcula en el SERVIDOR desde la CURP, no desde lo que mande el navegador.
+- **Del domicilio solo queda el código postal.** Colonia, ciudad y estado se
+  pedían y solo se mostraban: no los usa el archivo del banco (CLABE,
+  beneficiario, banco, monto, concepto, correo) ni lo fiscal, que opera con RFC y
+  CFDI. Ciudad y estado se siguen guardando pero **derivados del CP**, así que el
+  panel conserva la ubicación y el equipo la estadística.
+
+Sin migración: no se borró ninguna columna, solo se dejó de pedir el dato.
+
+**El marco legal empuja en esa dirección, no en contra.** La LFPDPPP nueva
+(vigente 21-mar-2025) enumera la *proporcionalidad* entre sus principios: solo se
+justifica recabar lo necesario para la finalidad declarada.
+
+Sobre antilavado, con una precisión que faltaba: **pagar comisiones a un
+embajador** no encaja en ninguna fracción del art. 17 LFPIORPI. Pero el
+**Reglamento de Integridad §4.B** ya contempla que CLUB PATA AMIGA, A.C. sí puede
+actualizar la **fracción XIII (donativos)** cuando reciba donativos por 1,605 UMA
+o más (~$188,000 MXN al valor de 2026), con identificación del donante, aviso a
+la Secretaría y conservación de expedientes por 10 años. Es una hipótesis
+condicionada y distinta del alta de embajador, pero conviene no decir «antilavado
+no aplica» a secas: aplica a otra parte de la operación.
+
 ## Preguntas abiertas para el equipo
 
 - **Pantalla 02, recuadro verde:** el texto que le asignaron a la tarjeta de centros aliados
@@ -140,6 +168,28 @@ no necesitaban nada. Ya verificadas como **hechas** antes de empezar:
   confirmen.
 - **Pantalla 21:** cambia «el comité» por «el equipo de Pata Amiga». ¿Aplica en todas las
   pantallas donde hoy decimos «el comité»? Son bastantes. Por ahora se cambia solo ahí.
+- **Del alta de embajador (CORREGIDO el 19-ago).** Se había anotado que «no hay
+  política de retención escrita». **Es falso** — se verificó contra
+  `legal-texts.ts` y sí la hay, en tres lugares:
+  - *Aviso de privacidad §9*: los datos se conservan «solo el tiempo necesario
+    para cumplir finalidades, obligaciones legales, atención de controversias y
+    auditoría/seguridad». Cualitativa, sin plazo fijo — válido bajo la LFPDPPP.
+  - *Reglamento de Integridad §4.7*: **al menos 10 años** para la documentación
+    ligada a la Actividad Vulnerable.
+  - Cláusulas equivalentes en Términos y en el Convenio.
+
+  El aviso **sí declara la INE (imagen)** y lo hace explícitamente «dependiendo
+  del perfil (miembro/titular, **embajador** o red veterinaria)». También declara
+  «domicilio completo (CP, entidad, municipio/alcaldía, colonia, calle, número)»,
+  o sea que pedir solo el CP recaba MENOS de lo declarado — que es la dirección
+  correcta, no un problema.
+
+  **Lo que sí falta es operativo, no legal:** nadie ha traducido «el tiempo
+  necesario» a un plazo para la INE de un embajador rechazado o dado de baja, y
+  **no hay nada en el código que borre esas imágenes**. El único cron que toca
+  documentos (`/api/cron/documentos`) manda recordatorios de datos faltantes, no
+  limpia archivos. Esa es la pregunta real para el despacho: qué plazo aplica, y
+  quién lo ejecuta.
 - **El título de la pestaña** (`layout.tsx` y `page.tsx`) sigue diciendo «Protección para
   tu manada». Con el encabezado nuevo («Salud y tranquilidad para tu manada») y la firma
   nueva de los correos («El mejor cuidado para tu manada») ya son tres frases para lo

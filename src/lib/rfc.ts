@@ -14,3 +14,19 @@ export function esRfcValido(rfc: string | null | undefined): boolean {
   if (!rfc) return false;
   return RFC_REGEX.test(rfc.trim().toUpperCase());
 }
+
+/** RFC de PERSONA MORAL: 12 caracteres (3 letras + fecha + homoclave). */
+export const RFC_MORAL_REGEX = /^[A-ZÑ&]{3}\d{6}[A-Z0-9]{3}$/;
+
+/**
+ * ¿Es el RFC de una persona moral y no el de una física?
+ *
+ * Se comprueba aparte desde el 25-ago porque el alta de persona moral pide el
+ * RFC de la ENTIDAD: si alguien escribe ahí su RFC personal —13 caracteres— la
+ * constancia que suba no va a corresponder con la razón social, y el comité lo
+ * descubre hasta la revisión. Vale más decirlo en el formulario.
+ */
+export function esRfcDeMoral(rfc: string | null | undefined): boolean {
+  if (!rfc) return false;
+  return RFC_MORAL_REGEX.test(rfc.trim().toUpperCase());
+}

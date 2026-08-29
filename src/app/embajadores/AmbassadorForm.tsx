@@ -4,16 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/Button";
-import { TextField, SelectField } from "@/components/ui/Field";
+import { TextField } from "@/components/ui/Field";
 import { PhoneField, telefonoCompleto } from "@/components/ui/PhoneField";
 import { FotoDocumento } from "@/components/ui/FotoDocumento";
+import { TipoPersonaFields } from "@/components/ui/TipoPersonaFields";
 import { createClient } from "@/lib/supabase/client";
 import {
   EDAD_MINIMA,
   esMayorDeEdad,
-  fechaMaximaParaSerMayor,
+  fechaDeNacimientoDeCurp,
 } from "@/lib/edad";
 import type { DatosConocidos } from "@/lib/datos-conocidos";
+import type { TipoPersona } from "@/lib/documentos-solicitud";
+import { esRfcDeMoral } from "@/lib/rfc";
 import { registerAmbassador } from "./actions";
 
 // Los textos legales pesan miles de líneas: el popup se carga SOLO cuando
@@ -41,8 +44,6 @@ export function AmbassadorForm({
   const [state, setState] = useState(conocidos?.state ?? "");
   const [city, setCity] = useState(conocidos?.city ?? "");
   const [isAdult, setIsAdult] = useState(false);
-  // Fecha de nacimiento y motivación (equipo, 5-ago)
-  const [birthDate, setBirthDate] = useState(conocidos?.birthDate ?? "");
   const [motivation, setMotivation] = useState("");
   // Contraseña: la cuenta se crea al aplicar (equipo, 11-ago)
   const [password, setPassword] = useState("");
@@ -52,10 +53,6 @@ export function AmbassadorForm({
     conocidos?.secondLastName ?? "",
   );
   const [postalCode, setPostalCode] = useState(conocidos?.postalCode ?? "");
-  const [colony, setColony] = useState(conocidos?.colony ?? "");
-  const [colonies, setColonies] = useState<string[]>(
-    conocidos?.colony ? [conocidos.colony] : [],
-  );
   const [social, setSocial] = useState<Record<string, string>>({
     facebook: "",
     instagram: "",
@@ -68,31 +65,49 @@ export function AmbassadorForm({
   // salían en el panel marcados como "falta INE" para siempre.
   const [ineFront, setIneFront] = useState("");
   const [ineBack, setIneBack] = useState("");
+  // Persona física o moral (equipo, 19-ago). Por omisión física: es el caso
+  // de la enorme mayoría y así el formulario se ve igual que siempre para
+  // quien no necesita nada de esto.
+  const [tipoPersona, setTipoPersona] = useState<TipoPersona>("fisica");
+  const [razonSocial, setRazonSocial] = useState("");
+  const [rfc, setRfc] = useState("");
+  const [rfcConstancia, setRfcConstancia] = useState("");
+  const esMoral = tipoPersona === "moral";
   // Popup de legales (equipo, 16-ago): null = cerrado
   const [legalSlug, setLegalSlug] = useState<string | null>(null);
 
-  /** CP → colonia y alcaldía/municipio. Editable: el catálogo puede fallar. */
+  /**
+   * El CP resuelve ciudad y estado SIN preguntarlos: la persona escribe cinco
+   * dígitos y nosotros guardamos la ubicación derivada. Si el catálogo falla,
+   * el alta sigue: queda el CP, que es el dato que se pidió conservar.
+   */
   const onCpChange = (cp: string) => {
     const clean = cp.replace(/\D/g, "").slice(0, 5);
     setPostalCode(clean);
-    if (clean.length !== 5) return;
+    if (clean.length !== 5) {
+      setState("");
+      setCity("");
+      return;
+    }
     fetch(`/api/sepomex?cp=${clean}`)
       .then((r) => r.json())
       .then((data) => {
         if (!data?.found) return;
         setState(data.state ?? "");
         setCity(data.city ?? "");
-        setColonies(data.colonies ?? []);
-        setColony((data.colonies ?? [])[0] ?? "");
       })
       .catch(() => {});
   };
+  /** Lo que se le confirma en pantalla, para que sepa que el CP se entendió. */
+  const ubicacion = [city, state].filter(Boolean).join(", ");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
-  const menorDeEdad =
-    /^\d{4}-\d{2}-\d{2}$/.test(birthDate) && !esMayorDeEdad(birthDate);
+  // La edad sale de la CURP. Solo avisa cuando la CURP ya está completa y bien
+  // formada; mientras se escribe no tiene sentido gritarle a nadie.
+  const fechaDeCurp = fechaDeNacimientoDeCurp(curp);
+  const menorDeEdad = Boolean(fechaDeCurp) && !esMayorDeEdad(fechaDeCurp!);
 
   const submit = async () => {
     setError(null);
@@ -102,17 +117,35 @@ export function AmbassadorForm({
       );
       return;
     }
-    if (!esMayorDeEdad(birthDate)) {
+    if (menorDeEdad) {
       setError(
-        `El programa de embajadores es para mayores de ${EDAD_MINIMA} años. Revisa tu fecha de nacimiento.`,
+        `El programa de embajadores es para mayores de ${EDAD_MINIMA} años.`,
       );
       return;
     }
     if (!ineFront || !ineBack) {
       setError(
-        "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
+        esMoral
+          ? "Falta la INE del representante legal. Necesitamos los dos lados —frente y reverso— en foto o PDF."
+          : "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
       );
       return;
+    }
+    if (esMoral) {
+      if (!razonSocial.trim()) {
+        setError("Escribe la razón social de la empresa.");
+        return;
+      }
+      if (!esRfcDeMoral(rfc)) {
+        setError(
+          "Revisa el RFC de la empresa: son 12 caracteres. Uno de 13 es el de una persona física.",
+        );
+        return;
+      }
+      if (!rfcConstancia) {
+        setError("Falta la constancia de situación fiscal de la empresa.");
+        return;
+      }
     }
     setBusy(true);
     try {
@@ -125,15 +158,17 @@ export function AmbassadorForm({
         state,
         city,
         isAdult,
-        birthDate,
         motivation,
         password,
         secondLastName,
         postalCode,
-        colony,
         socialLinks: social,
         ineFront,
         ineBack,
+        tipoPersona,
+        razonSocial,
+        rfc,
+        rfcConstancia,
       });
       if (result.error) {
         setError(result.error);
@@ -202,6 +237,23 @@ export function AmbassadorForm({
           y corrige lo que haya cambiado.
         </div>
       )}
+      <TipoPersonaFields
+        tipo={tipoPersona}
+        onTipo={setTipoPersona}
+        razonSocial={razonSocial}
+        onRazonSocial={setRazonSocial}
+        rfc={rfc}
+        onRfc={setRfc}
+        constancia={rfcConstancia}
+        onConstancia={setRfcConstancia}
+        quien="embajador"
+      />
+      {esMoral && (
+        <div className="rounded-[12px] bg-info-bg px-4 py-3 text-[12.5px] leading-relaxed text-info-text">
+          Lo que sigue son los datos del <strong>representante legal</strong> —
+          quien responde por la empresa. La CURP y la identificación son suyas.
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField
           label="Nombre(s)"
@@ -266,12 +318,16 @@ export function AmbassadorForm({
         />
       )}
       <TextField
-        label="CURP"
+        label={esMoral ? "CURP del representante legal" : "CURP"}
         value={curp}
         onChange={(e) => setCurp(e.target.value.toUpperCase())}
         maxLength={18}
         placeholder="18 caracteres"
-        hint="La usamos para validar que eres mayor de edad."
+        hint={
+          esMoral
+            ? "La usamos para validar que el representante es mayor de edad."
+            : "La usamos para validar que eres mayor de edad."
+        }
         required
       />
       {/* INE por los dos lados: el comité valida identidad con ella y las
@@ -279,11 +335,14 @@ export function AmbassadorForm({
       <div className="flex flex-col gap-3 rounded-[14px] bg-cream/60 p-4">
         <div className="flex flex-col gap-0.5">
           <span className="text-[13px] font-semibold text-ink-title">
-            Tu identificación oficial (INE)
+            {esMoral
+              ? "Identificación oficial del representante legal (INE)"
+              : "Tu identificación oficial (INE)"}
           </span>
           <span className="text-xs text-ink-tertiary">
-            Los dos lados, en foto o PDF. Solo la ve el comité, para validar tu
-            identidad y pagarte tus comisiones a tu nombre.
+            {esMoral
+              ? "Los dos lados, en foto o PDF. Solo la ve el comité, para saber quién responde por la empresa."
+              : "Los dos lados, en foto o PDF. Solo la ve el comité, para validar tu identidad y pagarte tus comisiones a tu nombre."}
           </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -301,66 +360,32 @@ export function AmbassadorForm({
           />
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="Código postal"
-          value={postalCode}
-          onChange={(e) => onCpChange(e.target.value)}
-          inputMode="numeric"
-          placeholder="5 dígitos"
-          hint="Completa tu colonia y alcaldía o municipio."
-        />
-        {colonies.length > 0 ? (
-          <SelectField
-            label="Colonia"
-            value={colony}
-            onChange={(e) => setColony(e.target.value)}
-          >
-            {colonies.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </SelectField>
-        ) : (
-          <TextField
-            label="Colonia"
-            value={colony}
-            onChange={(e) => setColony(e.target.value)}
-          />
-        )}
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="Ciudad, alcaldía o municipio"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-        />
-        <TextField
-          label="Estado"
-          value={state}
-          onChange={(e) => setState(e.target.value)}
-        />
-      </div>
-      {/* Obligatoria y validada desde el 13-ago: la casilla de "soy mayor de
-          edad" era la única barrera y no comprobaba nada. */}
+      {/* Del domicilio solo queda el CP (Pablo, 19-ago). Colonia, ciudad y
+          estado se pedían y NO se usaban para nada: ni para pagar comisiones
+          —el archivo del banco lleva CLABE, nombre y monto— ni para lo fiscal,
+          que opera con RFC. Se mostraban y ya. Con el CP basta para la
+          estadística, y ciudad y estado se derivan solos del catálogo. */}
       <TextField
-        label="Fecha de nacimiento"
-        type="date"
-        required
-        value={birthDate}
-        max={fechaMaximaParaSerMayor()}
-        onChange={(e) => setBirthDate(e.target.value)}
+        label="Código postal"
+        value={postalCode}
+        onChange={(e) => onCpChange(e.target.value)}
+        inputMode="numeric"
+        placeholder="5 dígitos"
         hint={
-          menorDeEdad
-            ? undefined
-            : `El programa es para mayores de ${EDAD_MINIMA} años.`
+          ubicacion
+            ? `Te ubicamos en ${ubicacion}.`
+            : "Lo usamos para saber en qué zonas está la manada."
         }
       />
+      {/* La fecha de nacimiento YA NO se teclea (Pablo, 19-ago): sale de la
+          CURP, que aquí es obligatoria y con formato validado. Antes se pedían
+          las dos y la que de verdad protegía era la CURP —quien escribía una
+          fecha falsa de adulto quedaba fuera igual—, así que el campo solo
+          agregaba un paso. Mismo criterio que el alta de miembro del 16-ago. */}
       {menorDeEdad && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-[12.5px] leading-normal text-error-text">
-          Con esa fecha aún no cumples {EDAD_MINIMA} años, así que todavía no
-          puedes ser embajador. ¡Te esperamos cuando los cumplas! 🐾
+          Tu CURP indica que aún no cumples {EDAD_MINIMA} años, así que todavía
+          no puedes ser embajador. ¡Te esperamos cuando los cumplas! 🐾
         </div>
       )}
       <TextField

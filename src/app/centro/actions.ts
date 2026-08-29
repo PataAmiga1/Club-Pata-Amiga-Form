@@ -31,7 +31,10 @@ async function ownCenter() {
 }
 
 function refreshCenterPages() {
-  revalidatePath("/centro");
+  // "layout" y no la ruta pelona: desde el 19-ago el portal son cuatro
+  // pestañas (/centro, /centro/promociones, /centro/pagos, /centro/cuenta) y
+  // revalidar solo "/centro" dejaba a las otras tres con datos viejos.
+  revalidatePath("/centro", "layout");
   revalidatePath("/centros");
   revalidatePath("/app/centros");
 }

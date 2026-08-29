@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
+
+const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.pataamiga.mx";
 import { APPEAL_MAX_PER_SUBJECT, CENTER_APPEAL_MAX } from "@/lib/constants";
 import { beneficiosDeUsuario } from "@/lib/plans/resolve";
 
@@ -64,7 +66,7 @@ export async function submitAppeal(input: AppealInput) {
     if (!r || r.user_id !== user.id)
       return { error: "No encontramos esa solicitud." };
     if (r.status !== "rejected")
-      return { error: "Solo se apelan solicitudes rechazadas." };
+      return { error: "Solo se apelan solicitudes denegadas." };
     subjectLabel = `el reintegro ${r.folio}`;
   } else if (input.petId) {
     const { data: p } = await admin
@@ -75,7 +77,7 @@ export async function submitAppeal(input: AppealInput) {
     if (!p || p.user_id !== user.id)
       return { error: "No encontramos ese peludo." };
     if (p.approval_status !== "rejected")
-      return { error: "Solo se apelan perfiles rechazados." };
+      return { error: "Solo se apelan perfiles denegados." };
     subjectLabel = `el perfil de ${p.name}`;
   } else if (input.centerId) {
     const { data: c } = await admin
@@ -86,7 +88,7 @@ export async function submitAppeal(input: AppealInput) {
     if (!c || c.user_id !== user.id)
       return { error: "No encontramos ese centro." };
     if (c.status !== "rejected")
-      return { error: "Solo se apelan solicitudes rechazadas." };
+      return { error: "Solo se apelan solicitudes denegadas." };
     subjectLabel = `la solicitud del centro ${c.name}`;
   }
 
@@ -141,10 +143,18 @@ export async function submitAppeal(input: AppealInput) {
     .eq("id", user.id)
     .single();
   if (profile?.email) {
+    // Al detalle de lo apelado: /app/apelaciones no existe, la apelación se
+    // ve dentro del peludo o del reintegro (Pablo, 25-ago).
+    const asuntoUrl = input.reimbursementId
+      ? `${SITIO}/app/reintegros/${input.reimbursementId}`
+      : input.petId
+        ? `${SITIO}/app/peludos/${input.petId}`
+        : `${SITIO}/centro`;
     await sendTemplatedEmail("appeal_received", profile.email, {
       firstName: profile.first_name ?? "",
       folio: appeal.folio,
       subject: subjectLabel,
+      asuntoUrl,
     });
   }
   await notifyTeam(
@@ -159,6 +169,6 @@ export async function submitAppeal(input: AppealInput) {
 
   revalidatePath("/app/reintegros");
   revalidatePath("/app/peludos");
-  revalidatePath("/centro");
+  revalidatePath("/centro", "layout");
   return { ok: true as const, folio: appeal.folio };
 }

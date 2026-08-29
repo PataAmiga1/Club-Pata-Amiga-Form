@@ -7,6 +7,14 @@ import { FilterChips } from "@/components/panel/FilterChips";
 import { SocialLinks } from "@/components/panel/SocialLinks";
 import { CenterReviewRow } from "./CenterReviewRow";
 import { CenterResolveButtons } from "./CenterResolveButtons";
+import { ExpedienteDocumentos } from "@/components/panel/ExpedienteDocumentos";
+import {
+  documentosDeSolicitud,
+  documentosRequeridos,
+  ETIQUETA_DOCUMENTO,
+  type DocumentoFirmado,
+  type TipoPersona,
+} from "@/lib/documentos-solicitud";
 
 type Row = {
   id: string;
@@ -21,6 +29,12 @@ type Row = {
   status: string;
   rejection_reason: string | null;
   created_at: string;
+  /** Persona física o moral (19-ago). En moral, `contact_name`, `curp` y la
+      INE son del representante legal; la entidad vive en `razon_social`. */
+  tipo_persona: string | null;
+  razon_social: string | null;
+  rfc: string | null;
+  curp: string | null;
   social_links: Record<string, string> | null;
   wellness_center_locations: {
     address: string | null;
@@ -74,7 +88,7 @@ export default async function AdminCentrosPage({
     admin
       .from("wellness_centers")
       .select(
-        "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, created_at, social_links, wellness_center_locations(address, colony, city, state, postal_code), center_promotions(title, discount_label, is_active, valid_until)",
+        "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, created_at, tipo_persona, razon_social, rfc, curp, social_links, wellness_center_locations(address, colony, city, state, postal_code), center_promotions(title, discount_label, is_active, valid_until)",
       )
       .order("created_at", { ascending: masAntiguos }),
     admin
@@ -98,6 +112,17 @@ export default async function AdminCentrosPage({
         ? c.status === "deactivated"
         : !estado || c.status === estado,
   );
+  // El expediente de cada centro: cada documento con su estado propio
+  // (decisión 1.5). Se firma aquí porque los buckets son privados.
+  const expedientes = new Map<string, DocumentoFirmado[]>(
+    await Promise.all(
+      rows.map(
+        async (c) =>
+          [c.id, await documentosDeSolicitud({ centerId: c.id })] as const,
+      ),
+    ),
+  );
+
   const pending = rows.filter(
     (c) => c.status === "pending" && !verApelaciones && !verBajas,
   );
@@ -125,7 +150,7 @@ export default async function AdminCentrosPage({
           options={[
             { value: "pending", label: "Pendientes" },
             { value: "approved", label: "Aprobados" },
-            { value: "rejected", label: "Rechazados" },
+            { value: "rejected", label: "Denegados" },
             ...(isSuper
               ? [
                   { value: "apelacion", label: "⚖️ Apelaciones" },
@@ -182,7 +207,36 @@ export default async function AdminCentrosPage({
                   )}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                     <DetailItem label="CENTRO" value={c.name} />
-                    <DetailItem label="CONTACTO" value={c.contact_name} />
+                    <DetailItem
+                      label="TIPO DE PERSONA"
+                      value={
+                        c.tipo_persona === "moral"
+                          ? "Moral (empresa)"
+                          : "Física"
+                      }
+                    />
+                    {c.tipo_persona === "moral" && (
+                      <>
+                        <DetailItem label="RAZÓN SOCIAL" value={c.razon_social} />
+                        <DetailItem label="RFC" value={c.rfc} />
+                      </>
+                    )}
+                    <DetailItem
+                      label={
+                        c.tipo_persona === "moral"
+                          ? "REPRESENTANTE LEGAL"
+                          : "CONTACTO"
+                      }
+                      value={c.contact_name}
+                    />
+                    <DetailItem
+                      label={
+                        c.tipo_persona === "moral"
+                          ? "CURP DEL REPRESENTANTE"
+                          : "CURP"
+                      }
+                      value={c.curp}
+                    />
                     <DetailItem label="CORREO" value={c.email} />
                     <DetailItem label="TELÉFONO" value={c.phone} />
                     <DetailItem
@@ -212,6 +266,22 @@ export default async function AdminCentrosPage({
                       value={formatDateEs(new Date(c.created_at))}
                     />
                   </div>
+                  {/* El expediente, en el popup DONDE SE APRUEBA: hasta el
+                      19-ago el alta de centro no pedía ni un documento, así
+                      que aquí no había nada que mirar antes de decidir. */}
+                  <ExpedienteDocumentos
+                    documentos={expedientes.get(c.id) ?? []}
+                    faltantes={documentosRequeridos(
+                      (c.tipo_persona ?? "fisica") as TipoPersona,
+                    )
+                      .filter(
+                        (t) =>
+                          !(expedientes.get(c.id) ?? []).some(
+                            (d) => d.document_type === t,
+                          ),
+                      )
+                      .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                  />
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
                       UBICACIONES
@@ -301,7 +371,7 @@ export default async function AdminCentrosPage({
                           ? "🕊️ BAJA"
                           : c.status === "pending"
                             ? "PENDIENTE"
-                            : "RECHAZADO"}
+                            : "DENEGADO"}
                     </span>
                   </div>
                 }
@@ -347,15 +417,50 @@ export default async function AdminCentrosPage({
                       value={c.member_benefit}
                     />
                     <DetailItem
-                      label="ESTATUS"
-                      value={c.status === "approved" ? "Aprobado" : "Rechazado"}
+                      label="TIPO DE PERSONA"
+                      value={
+                        c.tipo_persona === "moral"
+                          ? "Moral (empresa)"
+                          : "Física"
+                      }
                     />
-                    <DetailItem label="MOTIVO DE RECHAZO" value={c.rejection_reason} />
+                    {c.tipo_persona === "moral" && (
+                      <>
+                        <DetailItem label="RAZÓN SOCIAL" value={c.razon_social} />
+                        <DetailItem label="RFC" value={c.rfc} />
+                      </>
+                    )}
+                    <DetailItem
+                      label={
+                        c.tipo_persona === "moral"
+                          ? "CURP DEL REPRESENTANTE"
+                          : "CURP"
+                      }
+                      value={c.curp}
+                    />
+                    <DetailItem
+                      label="ESTATUS"
+                      value={c.status === "approved" ? "Aprobado" : "Denegado"}
+                    />
+                    <DetailItem label="MOTIVO DE LA DENEGACIÓN" value={c.rejection_reason} />
                     <DetailItem
                       label="SOLICITÓ"
                       value={formatDateEs(new Date(c.created_at))}
                     />
                   </div>
+                  <ExpedienteDocumentos
+                    documentos={expedientes.get(c.id) ?? []}
+                    faltantes={documentosRequeridos(
+                      (c.tipo_persona ?? "fisica") as TipoPersona,
+                    )
+                      .filter(
+                        (t) =>
+                          !(expedientes.get(c.id) ?? []).some(
+                            (d) => d.document_type === t,
+                          ),
+                      )
+                      .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                  />
                   {(c.wellness_center_locations ?? []).length > 0 && (
                     <div className="flex flex-col gap-1.5">
                       <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">

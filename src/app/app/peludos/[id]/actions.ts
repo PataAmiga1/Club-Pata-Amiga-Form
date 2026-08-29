@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTeam } from "@/lib/alerts";
 import { PET_GALLERY_MAX } from "@/lib/constants";
+import {
+  sanearAdjuntos,
+  type AdjuntoConversacion,
+} from "@/lib/documentos-conversacion";
 
 async function ownPet(petId: string) {
   const supabase = await createClient();
@@ -66,18 +70,32 @@ export async function updatePetFicha(petId: string, input: PetFichaInput) {
   return { ok: true as const };
 }
 
-/** Respuesta del miembro en el hilo con el comité. */
-export async function replyPetThread(petId: string, message: string) {
+/**
+ * Respuesta del miembro en el hilo con el comité, CON ADJUNTOS desde el 19-ago.
+ * Es el hilo por el que el comité pide "foto principal" o "certificado
+ * veterinario" (`requested_items`) y hasta hoy no había dónde entregarlos.
+ *
+ * Un mensaje puede ser SOLO adjuntos: mandar la foto que pidieron sin escribir
+ * nada es una respuesta completa, y exigir dos palabras sería un trámite.
+ */
+export async function replyPetThread(
+  petId: string,
+  message: string,
+  documents?: AdjuntoConversacion[],
+) {
   const ctx = await ownPet(petId);
   if (!ctx) return { error: "No encontramos a tu peludo." };
-  const text = message?.trim();
-  if (!text || text.length < 2) return { error: "Escribe tu mensaje." };
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  if (text.length < 2 && !adjuntos.length)
+    return { error: "Escribe tu mensaje o adjunta un archivo." };
 
   await ctx.admin.from("pet_messages").insert({
     pet_id: petId,
     sender: "member",
     author_id: ctx.userId,
-    message: text,
+    message: text || "(envió archivos)",
+    documents: adjuntos,
   });
   // El miembro ya respondió: se apaga la bandera de "info solicitada"
   await ctx.admin
@@ -89,7 +107,8 @@ export async function replyPetThread(petId: string, message: string) {
     "notify_pets",
     `Respuesta sobre ${ctx.pet.name} 🐾`,
     `<h2 style="color:#1E5350">El miembro respondió sobre ${ctx.pet.name}</h2>
-     <p>${text}</p>
+     <p>${text || "(sin texto)"}</p>
+     ${adjuntos.length ? `<p>Adjuntó ${adjuntos.length} archivo(s).</p>` : ""}
      <p>Revisa el hilo en el panel → Miembros → expediente.</p>`,
   );
 

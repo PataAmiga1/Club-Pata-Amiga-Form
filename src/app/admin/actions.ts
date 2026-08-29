@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMxn } from "@/lib/format";
 import {
+  sanearAdjuntos,
+  type AdjuntoConversacion,
+} from "@/lib/documentos-conversacion";
+import {
   hoyEnMexico,
   ZONA_MX,
   inicioDelMes,
@@ -111,7 +115,12 @@ export async function resolveReimbursement(
       },
       {
         template: "reimbursement_rejected",
-        vars: { folio: req.folio, petName, reason: resolution.reason },
+        vars: {
+          folio: req.folio,
+          petName,
+          reason: resolution.reason,
+          reintegroUrl: `${SITE_URL}/app/reintegros/${id}`,
+        },
       },
     );
   } else {
@@ -133,7 +142,12 @@ export async function resolveReimbursement(
       },
       {
         template: "reimbursement_approved",
-        vars: { folio: req.folio, petName, amount: formatMxn(amount) },
+        vars: {
+          folio: req.folio,
+          petName,
+          amount: formatMxn(amount),
+          reintegroUrl: `${SITE_URL}/app/reintegros/${id}`,
+        },
       },
     );
   }
@@ -221,7 +235,14 @@ export async function resolvePet(
         },
     decision.approve
       ? { template: "pet_approved", vars: { petName: pet.name } }
-      : { template: "pet_rejected", vars: { petName: pet.name, notes } },
+      : {
+          template: "pet_rejected",
+          vars: {
+            petName: pet.name,
+            notes,
+            perfilUrl: `${SITE_URL}/app/peludos/${petId}`,
+          },
+        },
   );
 
   revalidatePath("/admin");
@@ -468,7 +489,7 @@ export async function registerCenterPayment(input: {
   if (error) return { error: "No pudimos registrar el pago." };
 
   revalidatePath("/admin/centros/pagos");
-  revalidatePath("/centro");
+  revalidatePath("/centro", "layout");
   return { ok: true as const };
 }
 
@@ -887,6 +908,14 @@ export async function resolveAppeal(
     }
   }
 
+  // A dónde manda el botón del correo: al detalle de lo apelado, porque
+  // /app/apelaciones no existe — la apelación se ve dentro de su sujeto.
+  const asuntoUrl = appeal.reimbursement_id
+    ? `${SITE_URL}/app/reintegros/${appeal.reimbursement_id}`
+    : appeal.pet_id
+      ? `${SITE_URL}/app/peludos/${appeal.pet_id}`
+      : `${SITE_URL}/centro`;
+
   const subjectLabel = appeal.reimbursement_id
     ? `tu reintegro ${reimbursement?.folio ?? ""}`
     : appeal.pet_id
@@ -920,11 +949,11 @@ export async function resolveAppeal(
     decision.accept
       ? {
           template: "appeal_accepted",
-          vars: { folio: appeal.folio, outcome },
+          vars: { folio: appeal.folio, outcome, asuntoUrl },
         }
       : {
           template: "appeal_rejected",
-          vars: { folio: appeal.folio, notes: decision.notes },
+          vars: { folio: appeal.folio, notes: decision.notes, asuntoUrl },
         },
   );
 
@@ -943,6 +972,7 @@ export async function requestPetInfo(
   petId: string,
   items: string[],
   message: string,
+  documents?: AdjuntoConversacion[],
 ) {
   const { admin, adminId } = await requireAdmin();
   const { data: pet } = await admin
@@ -952,8 +982,9 @@ export async function requestPetInfo(
     .single();
   if (!pet) throw new Error("Peludo no encontrado");
   const text = message?.trim();
-  if (!text && items.length === 0)
-    return { error: "Elige qué solicitar o escribe un mensaje." };
+  const adjuntos = sanearAdjuntos(documents);
+  if (!text && items.length === 0 && !adjuntos.length)
+    return { error: "Elige qué solicitar, escribe un mensaje o adjunta algo." };
 
   const ITEM_LABELS: Record<string, string> = {
     foto_principal: "📸 Foto principal",
@@ -968,6 +999,7 @@ export async function requestPetInfo(
     author_id: adminId,
     message: text || "Por favor envíanos lo solicitado. ¡Gracias!",
     requested_items: validItems,
+    documents: adjuntos,
   });
   await admin.from("pets").update({ info_requested: true }).eq("id", petId);
 
@@ -985,7 +1017,7 @@ export async function requestPetInfo(
         petName: pet.name,
         itemsList: validItems.map((i) => `<li>${ITEM_LABELS[i]}</li>`).join(""),
         message: text || "Por favor envíanos lo solicitado. ¡Gracias!",
-        fichaUrl: `${SITE_URL}/app/peludos/${petId}`,
+        perfilUrl: `${SITE_URL}/app/peludos/${petId}`,
       },
     },
   );
@@ -995,7 +1027,11 @@ export async function requestPetInfo(
 }
 
 /** Mensaje directo del comité en el hilo de una mascota (sin correo). */
-export async function sendPetMessage(petId: string, message: string) {
+export async function sendPetMessage(
+  petId: string,
+  message: string,
+  documents?: AdjuntoConversacion[],
+) {
   const { admin, adminId } = await requireAdmin();
   const { data: pet } = await admin
     .from("pets")
@@ -1003,19 +1039,22 @@ export async function sendPetMessage(petId: string, message: string) {
     .eq("id", petId)
     .single();
   if (!pet) throw new Error("Peludo no encontrado");
-  const text = message?.trim();
-  if (!text) return { error: "Escribe el mensaje." };
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  if (!text && !adjuntos.length)
+    return { error: "Escribe el mensaje o adjunta un archivo." };
 
   await admin.from("pet_messages").insert({
     pet_id: petId,
     sender: "admin",
     author_id: adminId,
-    message: text,
+    message: text || "(el comité envió archivos)",
+    documents: adjuntos,
   });
   await notifyMember(admin, pet.user_id, {
     type: "pet_message",
     title: `Mensaje del comité sobre ${pet.name}`,
-    message: text,
+    message: text || "El comité te envió archivos.",
   });
 
   revalidatePath(`/admin/miembros/${pet.user_id}`);
@@ -1029,6 +1068,7 @@ export async function sendPetMessage(petId: string, message: string) {
 export async function sendReimbursementMessage(
   reimbursementId: string,
   message: string,
+  documents?: AdjuntoConversacion[],
 ) {
   const { admin, adminId } = await requireAdmin();
   const { data: req } = await admin
@@ -1037,22 +1077,64 @@ export async function sendReimbursementMessage(
     .eq("id", reimbursementId)
     .single();
   if (!req) throw new Error("Reintegro no encontrado");
-  const text = message?.trim();
-  if (!text) return { error: "Escribe el mensaje." };
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  if (!text && !adjuntos.length)
+    return { error: "Escribe el mensaje o adjunta un archivo." };
 
   await admin.from("reimbursement_messages").insert({
     reimbursement_id: reimbursementId,
     sender: "admin",
     author_id: adminId,
-    message: text,
+    message: text || "(el comité envió archivos)",
+    documents: adjuntos,
   });
   await notifyMember(admin, req.user_id, {
     type: "reimbursement_message",
     title: `Mensaje del comité sobre tu reintegro ${req.folio}`,
-    message: text,
+    message: text || "El comité te envió archivos.",
   });
 
   revalidatePath(`/admin/reintegros/${reimbursementId}`);
+  return { ok: true as const };
+}
+
+/**
+ * Resolver UN documento del expediente de una solicitud (equipo, 19-ago —
+ * decisión 1.5).
+ *
+ * Antes aprobar era UNA decisión sobre toda la solicitud. Con persona moral
+ * eso ya no alcanza: el comité tiene que poder dar por bueno el RFC y dejar
+ * pendiente la INE del representante, o al revés, sin resolver la solicitud
+ * entera. Esto NO cambia el estado de la solicitud: aprobar sus documentos y
+ * aprobar al embajador o al centro siguen siendo dos decisiones distintas.
+ */
+export async function reviewDocument(
+  documentId: string,
+  status: "pendiente" | "aprobado" | "denegado",
+  notes?: string,
+) {
+  const { admin, adminId } = await requireAdmin();
+  if (!["pendiente", "aprobado", "denegado"].includes(status))
+    return { error: "Estado inválido." };
+  const nota = notes?.trim() || null;
+  if (status === "denegado" && !nota)
+    return { error: "Escribe por qué se deniega — la persona tiene que saber qué corregir." };
+
+  const { error } = await admin
+    .from("documents")
+    .update({
+      status,
+      review_notes: nota,
+      reviewed_by: adminId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", documentId);
+  if (error) return { error: "No pudimos guardar la revisión." };
+
+  revalidatePath("/admin/embajadores");
+  revalidatePath("/admin/centros");
+  revalidatePath("/admin/miembros");
   return { ok: true as const };
 }
 

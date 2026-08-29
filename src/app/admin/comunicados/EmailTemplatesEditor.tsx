@@ -1,5 +1,8 @@
 "use client";
 
+const SITIO =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.pataamiga.mx";
+
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -66,9 +69,12 @@ export function EmailTemplatesEditor({
 
   const preview = useMemo(() => {
     if (!selected || !draft) return { subject: "", html: "" };
+    // `siteUrl` la inyecta el envío en TODOS los correos; aquí se repite para
+    // que los botones de la vista previa no salgan con la liga vacía.
+    const vars = { siteUrl: SITIO, ...selected.sample };
     return {
-      subject: renderTemplate(draft.subject, selected.sample),
-      html: renderTemplate(draft.html, selected.sample),
+      subject: renderTemplate(draft.subject, vars),
+      html: renderTemplate(draft.html, vars),
     };
   }, [selected, draft]);
 
@@ -209,6 +215,10 @@ export function EmailTemplatesEditor({
 
           <div className="rounded-[12px] bg-cream px-4 py-3 text-xs leading-relaxed text-ink-secondary">
             <strong className="text-ink-title">Variables disponibles: </strong>
+            <span>
+              <code className="font-bold text-teal-deep">{"{{siteUrl}}"}</code>{" "}
+              dirección del sitio, disponible en todas las plantillas ·{" "}
+            </span>
             {Object.entries(selected.variables).map(([name, desc], i) => (
               <span key={name}>
                 {i > 0 && " · "}

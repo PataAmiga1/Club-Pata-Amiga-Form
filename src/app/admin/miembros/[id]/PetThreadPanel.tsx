@@ -3,6 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { requestPetInfo, sendPetMessage } from "@/app/admin/actions";
+import { AdjuntosPicker } from "@/components/app/AdjuntosPicker";
+import { AdjuntosLista } from "@/components/app/AdjuntosLista";
+import type {
+  AdjuntoConversacion,
+  AdjuntoFirmado,
+} from "@/lib/documentos-conversacion";
 
 type Msg = {
   id: string;
@@ -27,11 +33,14 @@ export function PetThreadPanel({
   petName,
   infoRequested,
   thread,
+  adjuntos,
 }: {
   petId: string;
   petName: string;
   infoRequested: boolean;
   thread: Msg[];
+  /** Adjuntos ya firmados por la página, por id de mensaje. */
+  adjuntos: Record<string, AdjuntoFirmado[]>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(infoRequested || thread.length > 0);
@@ -39,6 +48,14 @@ export function PetThreadPanel({
   const [items, setItems] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState("");
+  // Dos juegos de adjuntos a propósito: "solicitar" y "mensaje directo" son
+  // formularios distintos, y compartir el estado haría que un archivo elegido
+  // para uno se fuera con el otro.
+  const [adjuntosSolicitud, setAdjuntosSolicitud] = useState<
+    AdjuntoConversacion[]
+  >([]);
+  const [adjuntosChat, setAdjuntosChat] = useState<AdjuntoConversacion[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -92,6 +109,7 @@ export function PetThreadPanel({
                   </span>
                 )}
                 {m.message}
+                <AdjuntosLista adjuntos={adjuntos[m.id] ?? []} />
               </div>
             ))}
             {thread.length === 0 && (
@@ -130,19 +148,34 @@ export function PetThreadPanel({
                 placeholder="Mensaje para el miembro (opcional)…"
                 className="rounded-[10px] border-[1.5px] border-border-input bg-white p-2.5 text-[12.5px] outline-none focus:border-teal"
               />
+              <AdjuntosPicker
+                adjuntos={adjuntosSolicitud}
+                onChange={setAdjuntosSolicitud}
+                onError={setError}
+                disabled={pending}
+                subiendo={subiendo}
+                onSubiendo={setSubiendo}
+                ayuda="Puedes adjuntar un formato o un ejemplo de lo que pides."
+              />
               <div className="flex gap-2">
                 <button
                   type="button"
-                  disabled={pending}
+                  disabled={pending || subiendo}
                   onClick={() =>
                     startTransition(async () => {
                       setError(null);
-                      const r = await requestPetInfo(petId, items, message);
+                      const r = await requestPetInfo(
+                        petId,
+                        items,
+                        message,
+                        adjuntosSolicitud,
+                      );
                       if (r?.error) setError(r.error);
                       else {
                         setRequesting(false);
                         setItems([]);
                         setMessage("");
+                        setAdjuntosSolicitud([]);
                         router.refresh();
                       }
                     })
@@ -172,21 +205,23 @@ export function PetThreadPanel({
 
           {/* Mensaje directo */}
           <form
-            className="flex items-end gap-2"
+            className="flex flex-col gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!chat.trim()) return;
+              if (!chat.trim() && !adjuntosChat.length) return;
               startTransition(async () => {
                 setError(null);
-                const r = await sendPetMessage(petId, chat);
+                const r = await sendPetMessage(petId, chat, adjuntosChat);
                 if (r?.error) setError(r.error);
                 else {
                   setChat("");
+                  setAdjuntosChat([]);
                   router.refresh();
                 }
               });
             }}
           >
+            <div className="flex items-end gap-2">
             <textarea
               value={chat}
               onChange={(e) => setChat(e.target.value)}
@@ -196,11 +231,22 @@ export function PetThreadPanel({
             />
             <button
               type="submit"
-              disabled={pending || !chat.trim()}
+              disabled={pending || subiendo || (!chat.trim() && !adjuntosChat.length)}
               className="grid h-9 flex-none place-items-center rounded-full bg-teal px-4 text-[12px] font-bold text-white disabled:opacity-50"
             >
               Enviar
             </button>
+            </div>
+            {/* El comité también adjunta (decisión 4.2) */}
+            <AdjuntosPicker
+              adjuntos={adjuntosChat}
+              onChange={setAdjuntosChat}
+              onError={setError}
+              disabled={pending}
+              subiendo={subiendo}
+              onSubiendo={setSubiendo}
+              ayuda="Puedes mandarle un archivo al miembro."
+            />
           </form>
           {error && (
             <span className="text-[12px] font-semibold text-error-text">

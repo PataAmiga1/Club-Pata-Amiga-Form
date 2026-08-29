@@ -5,11 +5,12 @@ import { waitingProgress } from "@/lib/dates";
 import { isMixedBreedName } from "@/lib/waiting-period";
 import { AppealButton } from "@/components/app/AppealButton";
 import { PetFichaEditor, type ThreadMessage } from "./PetFichaEditor";
+import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   approved: { text: "✓ APROBADO", cls: "bg-success-bg text-success-text" },
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
-  rejected: { text: "RECHAZADO", cls: "bg-error-bg text-error-text" },
+  rejected: { text: "DENEGADO", cls: "bg-error-bg text-error-text" },
 };
 
 /** Perfil completo de la mascota: fotos, datos e hilo con el comité. */
@@ -36,11 +37,19 @@ export default async function PetFichaPage({
       .maybeSingle(),
     supabase
       .from("pet_messages")
-      .select("id, sender, message, requested_items, created_at")
+      .select("id, sender, message, requested_items, documents, created_at")
       .eq("pet_id", id)
       .order("created_at", { ascending: true }),
   ]);
   if (!pet) notFound();
+
+  // Los adjuntos del hilo se firman aquí: el bucket es privado y el miembro no
+  // puede leer directo lo que subió el comité (vive en la carpeta del admin).
+  const adjuntosDelHilo = Object.fromEntries(
+    await firmarAdjuntosDeHilo(
+      (messages ?? []) as { id: string; documents?: unknown }[],
+    ),
+  );
 
   const wait = waitingProgress(
     pet.created_at,
@@ -161,6 +170,7 @@ export default async function PetFichaPage({
           active: pet.is_active !== false,
         }}
         thread={(messages ?? []) as ThreadMessage[]}
+        adjuntosDelHilo={adjuntosDelHilo}
       />
     </div>
   );

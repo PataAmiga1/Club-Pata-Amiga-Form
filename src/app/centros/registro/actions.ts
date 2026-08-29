@@ -5,6 +5,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
 import { WELLNESS_SERVICES } from "@/lib/constants";
+import { validateCurp } from "@/lib/curp";
+import { EDAD_MINIMA, esMayorDeEdad, fechaDeNacimientoDeCurp } from "@/lib/edad";
+import { esRfcDeMoral } from "@/lib/rfc";
+import { esDocumentoValido, guardarFotoIne } from "@/lib/documentos-ine";
+import {
+  guardarDocumentoDeSolicitud,
+  type TipoPersona,
+} from "@/lib/documentos-solicitud";
 
 export type CenterLocationInput = {
   address: string;
@@ -34,6 +42,25 @@ export type CenterRegistrationInput = {
    * hay sesión iniciada.
    */
   password?: string;
+  /**
+   * Persona física o moral (equipo, 19-ago — decisiones 1.1 a 1.3).
+   *
+   * En una persona MORAL, `contactName`, `curp` e `ineFront/Back` son los del
+   * REPRESENTANTE LEGAL; la entidad viaja en `razonSocial` y `rfc`.
+   */
+  tipoPersona?: TipoPersona;
+  razonSocial?: string;
+  rfc?: string;
+  /** Constancia de situación fiscal, como data URL. NO se pide acta constitutiva. */
+  rfcConstancia?: string;
+  /**
+   * CURP e INE de quien registra. NUEVOS en el alta de centro: hasta el 19-ago
+   * no se pedía ningún documento, así que se validaba a quien comparte un
+   * código y no al negocio que publicamos y al que mandamos miembros.
+   */
+  curp?: string;
+  ineFront?: string;
+  ineBack?: string;
 };
 
 const VALID_SERVICES = new Set(Object.keys(WELLNESS_SERVICES));
@@ -67,6 +94,48 @@ export async function registerCenter(input: CenterRegistrationInput) {
     return { error: "Cuéntanos el beneficio que ofrecerás a los miembros." };
   if (locations.length === 0)
     return { error: "Agrega al menos una ubicación con dirección." };
+
+  // ===== Identidad de quien registra (equipo, 19-ago) =====
+  // Se comprueba en el servidor y no solo en el formulario: basta con alterar
+  // la petición para saltarse cualquier regla del navegador.
+  const esMoral = input.tipoPersona === "moral";
+  const curp = input.curp?.trim().toUpperCase() ?? "";
+  const curpCheck = validateCurp(curp);
+  if (!curpCheck.isValid)
+    return {
+      error:
+        curpCheck.error ?? "Revisa la CURP (18 caracteres, formato oficial).",
+    };
+
+  const birthDate = fechaDeNacimientoDeCurp(curp);
+  if (!birthDate)
+    return { error: "No pudimos leer la fecha de nacimiento de la CURP." };
+  if (!esMayorDeEdad(birthDate))
+    return {
+      error: esMoral
+        ? `La CURP del representante legal indica que aún no cumple ${EDAD_MINIMA} años.`
+        : `La CURP indica que aún no cumples ${EDAD_MINIMA} años. Quien registra el centro tiene que ser mayor de edad.`,
+    };
+
+  if (!esDocumentoValido(input.ineFront) || !esDocumentoValido(input.ineBack))
+    return {
+      error: esMoral
+        ? "Falta la INE del representante legal. Necesitamos los dos lados —frente y reverso— en foto o PDF."
+        : "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
+    };
+
+  const razonSocial = input.razonSocial?.trim() ?? "";
+  const rfc = input.rfc?.trim().toUpperCase() ?? "";
+  if (esMoral) {
+    if (!razonSocial) return { error: "Escribe la razón social de la empresa." };
+    if (!esRfcDeMoral(rfc))
+      return {
+        error:
+          "Revisa el RFC de la empresa: son 12 caracteres. Uno de 13 es el de una persona física.",
+      };
+    if (!esDocumentoValido(input.rfcConstancia))
+      return { error: "Falta la constancia de situación fiscal de la empresa." };
+  }
 
   const admin = createAdminClient();
 
@@ -174,10 +243,22 @@ export async function registerCenter(input: CenterRegistrationInput) {
     if (!user && centerUserId) await admin.auth.admin.deleteUser(centerUserId);
   };
 
+  // La INE se sube AHORA, con la cuenta ya creada: el bucket es privado y su
+  // ruta arranca con el id del usuario, que hasta este punto no existía.
+  const [ineFrontPath, ineBackPath] = await Promise.all([
+    guardarFotoIne(centerUserId, "ine_front", input.ineFront ?? ""),
+    guardarFotoIne(centerUserId, "ine_back", input.ineBack ?? ""),
+  ]);
+
   const { data: center, error } = await admin
     .from("wellness_centers")
     .insert({
       user_id: centerUserId,
+      tipo_persona: esMoral ? "moral" : "fisica",
+      razon_social: esMoral ? razonSocial : null,
+      rfc: esMoral ? rfc : null,
+      curp,
+      birth_date: birthDate,
       name,
       contact_name: contactName,
       email,
@@ -209,6 +290,43 @@ export async function registerCenter(input: CenterRegistrationInput) {
     await admin.from("wellness_centers").delete().eq("id", center.id);
     await rollbackAccount();
     return { error: "No pudimos guardar las ubicaciones. Intenta de nuevo." };
+  }
+
+  // El expediente: cada documento como su renglón, para la revisión documento
+  // por documento del panel (decisión 1.5).
+  const anotar = async (
+    tipo: "ine_front" | "ine_back",
+    ruta: string | null,
+  ) => {
+    if (!ruta) return;
+    await admin.from("documents").insert({
+      user_id: centerUserId,
+      center_id: center.id,
+      document_type: tipo,
+      file_path: ruta,
+      file_name: tipo === "ine_front" ? "INE (frente)" : "INE (reverso)",
+      status: "pendiente",
+    });
+  };
+  await anotar("ine_front", ineFrontPath);
+  await anotar("ine_back", ineBackPath);
+
+  if (esMoral) {
+    const constancia = await guardarDocumentoDeSolicitud({
+      userId: centerUserId,
+      tipo: "rfc_constancia",
+      dataUrl: input.rfcConstancia ?? "",
+      centerId: center.id,
+    });
+    // No se tumba el alta por esto: la solicitud ya está guardada y perderla
+    // sería peor. Se avisa al equipo para que la pida por la conversación.
+    if (!constancia)
+      await notifyTeam(
+        "notify_centers",
+        "No se guardó la constancia fiscal de un centro ⚠️",
+        `<p>La solicitud de <strong>${razonSocial}</strong> (${email}) se guardó, pero su constancia de situación fiscal no.</p>
+         <p>Hay que pedírsela desde el panel.</p>`,
+      );
   }
 
   await sendTemplatedEmail("center_received", email, {

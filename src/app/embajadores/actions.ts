@@ -11,6 +11,11 @@ import {
   fechaDeNacimientoDeCurp,
 } from "@/lib/edad";
 import { esDocumentoValido, guardarFotoIne } from "@/lib/documentos-ine";
+import { esRfcDeMoral } from "@/lib/rfc";
+import {
+  guardarDocumentoDeSolicitud,
+  type TipoPersona,
+} from "@/lib/documentos-solicitud";
 
 export type AmbassadorApplicationInput = {
   firstName: string;
@@ -24,16 +29,17 @@ export type AmbassadorApplicationInput = {
   isAdult: boolean;
   /** Apellido materno (equipo, 11-ago). */
   secondLastName?: string;
-  /** CP de 5 dígitos: autocompleta colonia y alcaldía/municipio. */
+  /**
+   * CP de 5 dígitos — lo ÚNICO que se pide del domicilio (Pablo, 19-ago).
+   * Sirve para saber en qué zonas está la manada; ciudad y estado llegan
+   * derivados de él, no tecleados.
+   */
   postalCode?: string;
-  colony?: string;
   /**
    * Redes sociales: al menos una es OBLIGATORIA (equipo, 11-ago) — es como el
    * comité valora el alcance real de quien solicita.
    */
   socialLinks?: Record<string, string>;
-  /** yyyy-mm-dd — lo captura el propio solicitante (equipo, 5-ago) */
-  birthDate?: string;
   /** Por qué quiere ser embajador (equipo, 5-ago) */
   motivation?: string;
   /**
@@ -51,6 +57,19 @@ export type AmbassadorApplicationInput = {
    * sesión iniciada, porque entonces la cuenta ya existe.
    */
   password?: string;
+  /**
+   * Persona física o moral (equipo, 19-ago — decisiones 1.1 a 1.3).
+   *
+   * En una persona MORAL, `firstName`, `lastName`, `curp` e `ineFront/Back` son
+   * los del REPRESENTANTE LEGAL, no los de la entidad: la entidad viaja en
+   * `razonSocial` y `rfc`. Es la misma información que el formulario ya pedía,
+   * así que se reusan los mismos campos en vez de duplicar media solicitud.
+   */
+  tipoPersona?: TipoPersona;
+  razonSocial?: string;
+  rfc?: string;
+  /** Constancia de situación fiscal, como data URL. NO se pide acta constitutiva. */
+  rfcConstancia?: string;
 };
 
 /** Solicitud pública de embajador → cola de revisión del comité (CURP, 18+). */
@@ -60,6 +79,8 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
   const email = input.email?.trim().toLowerCase();
   const phone = input.phone?.trim();
   const curp = input.curp?.trim().toUpperCase();
+
+  const esMoral = input.tipoPersona === "moral";
 
   if (!firstName || !email || !phone)
     return { error: "Completa tu nombre, correo y teléfono." };
@@ -72,30 +93,57 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
   if (!curpCheck.isValid)
     return { error: curpCheck.error ?? "Revisa tu CURP (18 caracteres, formato oficial)." };
 
-  // 18+ DE VERDAD (equipo, 13-ago). Hasta hoy la única barrera era la casilla
-  // "confirmo que soy mayor de edad", que cualquiera palomea. Ahora se calcula
-  // la edad con la fecha capturada y, además, con la que trae la propia CURP:
-  // si la CURP dice que es menor, no hay fecha que valga.
-  const birthDate = input.birthDate?.trim();
+  // 18+ DE VERDAD (equipo, 13-ago), ahora SOLO desde la CURP (Pablo, 19-ago).
+  //
+  // Antes se pedían las dos cosas —la fecha tecleada y la CURP— y se validaban
+  // ambas. Sobraba: la CURP es obligatoria aquí y su formato ya se comprobó
+  // arriba, así que la fecha va dentro. Quien escribía una fecha falsa de
+  // adulto quedaba fuera igual por la CURP, o sea que el campo tecleado no
+  // aportaba seguridad, solo un paso más. Mismo criterio que el alta de
+  // miembro del 16-ago.
+  //
+  // Se calcula en el servidor a propósito: si viniera del navegador, bastaría
+  // con alterar la petición para saltarse la regla.
+  const birthDate = fechaDeNacimientoDeCurp(curp ?? "");
   if (!birthDate)
-    return { error: "Necesitamos tu fecha de nacimiento." };
+    return {
+      error: "No pudimos leer tu fecha de nacimiento de la CURP. Revísala.",
+    };
   if (!esMayorDeEdad(birthDate))
     return {
-      error: `El programa de embajadores es para mayores de ${EDAD_MINIMA} años.`,
-    };
-  const fechaCurp = fechaDeNacimientoDeCurp(curp ?? "");
-  if (fechaCurp && !esMayorDeEdad(fechaCurp))
-    return {
-      error: `Tu CURP indica que aún no cumples ${EDAD_MINIMA} años. El programa de embajadores es para mayores de edad.`,
+      error: esMoral
+        ? `La CURP del representante legal indica que aún no cumple ${EDAD_MINIMA} años. Tiene que ser mayor de edad.`
+        : `Tu CURP indica que aún no cumples ${EDAD_MINIMA} años. El programa de embajadores es para mayores de edad.`,
     };
 
   // INE por los dos lados, obligatoria (equipo, 13-ago). Se valida aquí y no
-  // solo en el formulario: sin ella el comité no puede aprobar a nadie.
+  // solo en el formulario: sin ella el comité no puede aprobar a nadie. En una
+  // persona moral es la del representante legal (decisión 1.2).
   if (!esDocumentoValido(input.ineFront) || !esDocumentoValido(input.ineBack))
     return {
-      error:
-        "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
+      error: esMoral
+        ? "Falta la INE del representante legal. Necesitamos los dos lados —frente y reverso— en foto o PDF."
+        : "Falta tu INE. Necesitamos los dos lados —frente y reverso— en foto o PDF.",
     };
+
+  // Persona moral: razón social + RFC de la ENTIDAD + su constancia. Se
+  // comprueba en el servidor y no solo en el formulario, porque basta con
+  // alterar la petición para saltarse cualquier regla del navegador.
+  const razonSocial = input.razonSocial?.trim() ?? "";
+  const rfc = input.rfc?.trim().toUpperCase() ?? "";
+  if (esMoral) {
+    if (!razonSocial)
+      return { error: "Escribe la razón social de la empresa." };
+    if (!esRfcDeMoral(rfc))
+      return {
+        error:
+          "Revisa el RFC de la empresa: son 12 caracteres. Uno de 13 es el de una persona física.",
+      };
+    if (!esDocumentoValido(input.rfcConstancia))
+      return {
+        error: "Falta la constancia de situación fiscal de la empresa.",
+      };
+  }
 
   // Al menos una red social. Se limpia antes de validar para que un campo con
   // espacios no cuente como red llenada.
@@ -216,33 +264,88 @@ export async function registerAmbassador(input: AmbassadorApplicationInput) {
     guardarFotoIne(ambassadorUserId, "ine_back", input.ineBack ?? ""),
   ]);
 
-  const { error } = await admin.from("ambassadors").insert({
-    user_id: ambassadorUserId,
-    first_name: firstName,
-    last_name: lastName || null,
-    second_last_name: input.secondLastName?.trim() || null,
-    email,
-    phone,
-    curp,
-    state: input.state?.trim() || null,
-    city: input.city?.trim() || null,
-    postal_code: input.postalCode?.trim() || null,
-    colony: input.colony?.trim() || null,
-    social_links: socialLinks,
-    birth_date:
-      birthDate && /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null,
-    motivation: input.motivation?.trim() || null,
-    ine_front_url: ineFrontPath,
-    ine_back_url: ineBackPath,
-    status: "pending",
-  });
-  if (error) {
+  const { data: solicitud, error } = await admin
+    .from("ambassadors")
+    .insert({
+      user_id: ambassadorUserId,
+      first_name: firstName,
+      last_name: lastName || null,
+      second_last_name: input.secondLastName?.trim() || null,
+      email,
+      phone,
+      curp,
+      state: input.state?.trim() || null,
+      city: input.city?.trim() || null,
+      postal_code: input.postalCode?.trim() || null,
+      social_links: socialLinks,
+      // Derivada de la CURP, no tecleada. La columna se conserva porque el panel
+      // la muestra y el corte de comisiones puede necesitar la edad.
+      birth_date: birthDate,
+      motivation: input.motivation?.trim() || null,
+      ine_front_url: ineFrontPath,
+      ine_back_url: ineBackPath,
+      tipo_persona: esMoral ? "moral" : "fisica",
+      razon_social: esMoral ? razonSocial : null,
+      ...(esMoral ? { rfc } : {}),
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (error || !solicitud) {
     // Si la cuenta se creó en esta misma llamada y la solicitud no se guardó,
     // la borramos: si no, ese correo queda "ocupado" por una cuenta huérfana y
     // la persona no puede volver a aplicar.
     if (!user && ambassadorUserId)
       await admin.auth.admin.deleteUser(ambassadorUserId);
     return { error: "No pudimos guardar tu solicitud. Intenta de nuevo." };
+  }
+
+  // El expediente: cada documento como su propio renglón, para que el comité
+  // los revise uno por uno (decisión 1.5). La INE además se queda en sus dos
+  // columnas de siempre, que es de donde la leen el panel y el portal.
+  const enExpediente = async (
+    tipo: "ine_front" | "ine_back" | "rfc_constancia",
+    ruta: string | null,
+    dataUrl?: string,
+  ) => {
+    if (tipo === "rfc_constancia") {
+      return guardarDocumentoDeSolicitud({
+        userId: ambassadorUserId!,
+        tipo,
+        dataUrl: dataUrl ?? "",
+        ambassadorId: solicitud.id,
+      });
+    }
+    // La INE ya está en Storage: aquí solo se anota en el expediente.
+    if (!ruta) return null;
+    await admin.from("documents").insert({
+      user_id: ambassadorUserId,
+      ambassador_id: solicitud.id,
+      document_type: tipo,
+      file_path: ruta,
+      file_name: tipo === "ine_front" ? "INE (frente)" : "INE (reverso)",
+      status: "pendiente",
+    });
+    return ruta;
+  };
+
+  await enExpediente("ine_front", ineFrontPath);
+  await enExpediente("ine_back", ineBackPath);
+  if (esMoral) {
+    const constancia = await enExpediente(
+      "rfc_constancia",
+      null,
+      input.rfcConstancia,
+    );
+    // No se tumba el alta por esto: la solicitud ya está guardada y perderla
+    // sería peor. Se avisa al equipo para que la pida por la conversación.
+    if (!constancia)
+      await notifyTeam(
+        "notify_ambassadors",
+        "No se guardó la constancia fiscal de un embajador ⚠️",
+        `<p>La solicitud de <strong>${razonSocial}</strong> (${email}) se guardó, pero su constancia de situación fiscal no.</p>
+         <p>Hay que pedírsela desde el panel.</p>`,
+      );
   }
 
   await sendTemplatedEmail("ambassador_received", email, { firstName });

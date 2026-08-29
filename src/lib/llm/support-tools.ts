@@ -25,7 +25,7 @@ export const SUPPORT_TOOLS: AgentTool[] = [
   {
     name: "mis_reintegros",
     description:
-      "Devuelve los reintegros recientes del miembro: folio, categoría, monto solicitado/aprobado, estatus y motivo de rechazo si aplica.",
+      "Devuelve los reintegros recientes del miembro: folio, categoría, monto solicitado/aprobado, estatus y motivo de la denegación si aplica.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
