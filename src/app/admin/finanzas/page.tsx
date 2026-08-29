@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { formatMxn } from "@/lib/format";
-import { inicioDelMes, ZONA_MX } from "@/lib/zona-horaria";
+import { inicioDelMes, ZONA_MX, hoyEnMexico, diaEnMexico } from "@/lib/zona-horaria";
+import { mesDe, ultimosMeses, etiquetaMes } from "@/lib/costos";
+import { MiniBarChart } from "@/components/panel/MiniBarChart";
+import { sexoDeMiembro } from "@/lib/sexo";
 import { DetailModal, DetailItem } from "@/components/panel/DetailModal";
 
 type PaymentRow = {
@@ -84,6 +87,54 @@ export default async function AdminFinanzasPage() {
       .eq("role", "member")
       .eq("cfdi_requested", true),
   ]);
+
+  // Altas y bajas por mes (equipo, 26-ago). Van en consultas aparte de las de
+  // arriba porque necesitan TODAS las filas, no un conteo ni las 15 últimas.
+  const [{ data: altasRaw }, { data: bajasRaw }] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("member_since, gender, curp")
+      .eq("role", "member")
+      .not("member_since", "is", null),
+    admin.from("cancellations").select("created_at, reason"),
+  ]);
+
+  // Doce meses de altas y bajas, anclados en `hoyEnMexico()`: con `new Date()`
+  // el mes en curso cambiaría seis horas antes de tiempo en Vercel, que corre
+  // en UTC, y el último mes de la gráfica saldría vacío.
+  const meses12 = ultimosMeses(mesDe(hoyEnMexico()), 12);
+  const altasPorMes = new Map(meses12.map((m) => [m, 0]));
+  const bajasPorMes = new Map(meses12.map((m) => [m, 0]));
+  const motivos = new Map<string, number>();
+  let bajasSinMotivo = 0;
+  const sexos = { Hombre: 0, Mujer: 0, otro: 0 };
+
+  for (const a of altasRaw ?? []) {
+    const m = mesDe(diaEnMexico(new Date(a.member_since as string)));
+    if (altasPorMes.has(m)) altasPorMes.set(m, altasPorMes.get(m)! + 1);
+    const { sexo } = sexoDeMiembro(a.gender, a.curp);
+    if (sexo === "Hombre") sexos.Hombre++;
+    else if (sexo === "Mujer") sexos.Mujer++;
+    else sexos.otro++;
+  }
+  for (const b of bajasRaw ?? []) {
+    const m = mesDe(diaEnMexico(new Date(b.created_at as string)));
+    if (bajasPorMes.has(m)) bajasPorMes.set(m, bajasPorMes.get(m)! + 1);
+    const motivo = (b.reason ?? "").trim();
+    if (motivo) motivos.set(motivo, (motivos.get(motivo) ?? 0) + 1);
+    else bajasSinMotivo++;
+  }
+
+  const serieAltas = meses12.map((m) => ({
+    label: etiquetaMes(m, true),
+    value: altasPorMes.get(m) ?? 0,
+  }));
+  const serieBajas = meses12.map((m) => ({
+    label: etiquetaMes(m, true),
+    value: bajasPorMes.get(m) ?? 0,
+  }));
+  const motivosOrdenados = [...motivos.entries()].sort((a, b) => b[1] - a[1]);
+  const totalBajas = (bajasRaw ?? []).length;
 
   const subs = subsQ.data ?? [];
   type Baja = {
@@ -300,6 +351,14 @@ export default async function AdminFinanzasPage() {
           >
             🧾 Solicitan factura ({cfdiQ.count ?? 0}) →
           </Link>
+          {/* Exportación configurable (equipo, 26-ago): el admin elige qué
+              baja y con qué columnas, en vez de un layout fijo. */}
+          <Link
+            href="/admin/finanzas/exportar"
+            className="grid h-9 place-items-center rounded-full bg-teal px-4 text-xs font-bold text-white transition-colors hover:bg-teal-deep"
+          >
+            ⬇ Exportar datos →
+          </Link>
           <a
             href="/api/admin/layouts/reintegros"
             className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
@@ -345,6 +404,89 @@ export default async function AdminFinanzasPage() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Altas y bajas por mes (equipo, 26-ago) */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <MiniBarChart
+          title="Altas por mes (últimos 12)"
+          data={serieAltas}
+          color="#1CBCAD"
+        />
+        <MiniBarChart
+          title="Bajas por mes (últimos 12)"
+          data={serieBajas}
+          color="#E4739B"
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Por qué cancelaron */}
+        <div className="flex flex-col gap-2.5 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+          <span className="font-display text-lg text-ink-title">
+            Por qué cancelaron
+          </span>
+          {/* Se dice de dónde sale el número ANTES de la lista: quien lo lea
+              tiene que saber que este corte es un piso y no el total. */}
+          <span className="text-[12px] leading-relaxed text-ink-tertiary">
+            Solo cuenta las bajas hechas EN LA PLATAFORMA. Quien se fue por
+            Stripe, por la plataforma anterior o por un cobro fallido no dejó
+            motivo, así que esta cifra es un piso, no el total.
+          </span>
+          {motivosOrdenados.length > 0 ? (
+            <>
+              {motivosOrdenados.map(([motivo, n]) => {
+                const pct = Math.round((n / Math.max(totalBajas, 1)) * 100);
+                return (
+                  <div key={motivo} className="flex flex-col gap-1 py-1">
+                    <div className="flex items-baseline justify-between gap-2 text-[12.5px]">
+                      <span className="text-ink-body">{motivo}</span>
+                      <span className="flex-none font-bold text-ink-title">
+                        {n} · {pct}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-cream">
+                      <div
+                        className="h-1.5 rounded-full bg-teal"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {bajasSinMotivo > 0 && (
+                <span className="mt-1 rounded-[10px] bg-warning-bg px-3 py-2 text-[11.5px] font-semibold text-warning-text">
+                  {bajasSinMotivo} de {totalBajas} bajas no traen motivo.
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-[12.5px] text-ink-secondary">
+              Sin cancelaciones con motivo registradas todavía.
+            </span>
+          )}
+        </div>
+
+        {/* Padrón por sexo */}
+        <div className="flex flex-col gap-2.5 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+          <span className="font-display text-lg text-ink-title">
+            Padrón por sexo
+          </span>
+          <span className="text-[12px] leading-relaxed text-ink-tertiary">
+            Del dato capturado en el perfil y, cuando no está, del que trae la
+            CURP. Los &laquo;sin dato&raquo; son quienes no tienen ninguno de
+            los dos.
+          </span>
+          <MiniBarChart
+            title=""
+            data={[
+              { label: "Mujeres", value: sexos.Mujer },
+              { label: "Hombres", value: sexos.Hombre },
+              { label: "Sin dato", value: sexos.otro },
+            ]}
+            color="#F2A65A"
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
