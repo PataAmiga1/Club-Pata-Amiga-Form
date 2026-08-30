@@ -36,17 +36,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
 
-  // Guard against double-subscribing (e.g. re-visiting /registro/plan after paying)
+  // ===== Candado contra la doble suscripción (caso real, 29-ago) =====
+  //
+  // Antes este candado solo miraba `status = 'active'`, y ahí estaba el hueco:
+  // a quien le fallaba la renovación le quedaba la suscripción en `past_due`
+  // —viva en Stripe, con reintentos automáticos programados— pero el checkout
+  // lo dejaba contratar OTRA. Si el reintento de Stripe después cobraba la
+  // vieja, la persona terminaba con dos suscripciones y pagando doble.
+  // Pasó: un miembro con cobros fallidos el 24 y 27 de agosto se registró de
+  // nuevo el 26, y el 29 Stripe le cobró también la anterior.
+  //
+  // SE BLOQUEA TODO LO QUE NO ESTÉ CANCELADO, no una lista de estados malos.
+  // `past_due` era el que faltaba, pero `unpaid`, `trialing`, `paused` e
+  // `incomplete` fallan igual: la suscripción sigue existiendo en Stripe y
+  // puede volver a cobrar. Con una lista de estados bloqueados, cualquier
+  // estado nuevo de Stripe se colaría; con esta, se frena por omisión.
   const guard = createAdminClient();
   const { data: existingSub } = await guard
     .from("subscriptions")
-    .select("id")
+    .select("id, status")
     .eq("user_id", user.id)
-    .eq("status", "active")
+    .neq("status", "canceled")
     .maybeSingle();
   if (existingSub) {
+    // El mensaje distingue los dos casos porque la salida es distinta: quien
+    // ya está al corriente cambia de plan; a quien le falló el cobro hay que
+    // mandarlo a actualizar su tarjeta, no a contratar otra vez.
+    const enMora =
+      existingSub.status === "past_due" || existingSub.status === "unpaid";
     return NextResponse.json(
-      { error: "Ya tienes una membresía activa. Cambia de plan desde Mi cuenta." },
+      {
+        error: enMora
+          ? "Tu membresía tiene un pago pendiente, no hace falta contratar de nuevo. Actualiza tu método de pago desde Mi cuenta y el cobro se reintenta solo."
+          : "Ya tienes una membresía activa. Cambia de plan desde Mi cuenta.",
+        motivo: enMora ? "pago_pendiente" : "ya_activa",
+      },
       { status: 409 },
     );
   }
