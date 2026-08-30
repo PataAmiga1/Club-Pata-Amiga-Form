@@ -17,7 +17,7 @@ export default async function CuentaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/iniciar-sesion?next=/app/cuenta");
 
-  const [{ data: profile }, { data: sub }] = await Promise.all([
+  const [{ data: profile }, { data: subs }] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -34,10 +34,14 @@ export default async function CuentaPage() {
       .select("plan, amount, status, cancel_at_period_end, current_period_end")
       .eq("user_id", user.id)
       .neq("status", "canceled")
-      .maybeSingle(),
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
 
   const settings = await fetchSiteSettings();
+  // `.limit(1)` devuelve arreglo. Con `maybeSingle()`, un miembro con dos
+  // suscripciones vivas veía otra vez su cuenta como si no tuviera membresía.
+  const sub = subs?.[0] ?? null;
   const enMora = sub?.status === "past_due" || sub?.status === "unpaid";
   // A `situacionDeCobro` se le sigue pasando solo la activa: lo que pinta para
   // una membresía sana no cambia. La mora se resuelve con su propia tarjeta.
