@@ -52,12 +52,18 @@ export async function POST(request: Request) {
   // puede volver a cobrar. Con una lista de estados bloqueados, cualquier
   // estado nuevo de Stripe se colaría; con esta, se frena por omisión.
   const guard = createAdminClient();
-  const { data: existingSub } = await guard
+  // `.limit(1)` y NO `.maybeSingle()`: quien ya arrastra dos suscripciones vivas
+  // —el caso que este candado existe para evitar— haría que `maybeSingle()`
+  // devolviera error, y con error `data` viene null y el candado FALLA ABIERTO,
+  // dejando pasar justo a quien más hay que frenar.
+  const { data: existentes } = await guard
     .from("subscriptions")
     .select("id, status")
     .eq("user_id", user.id)
     .neq("status", "canceled")
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const existingSub = existentes?.[0];
   if (existingSub) {
     // El mensaje distingue los dos casos porque la salida es distinta: quien
     // ya está al corriente cambia de plan; a quien le falló el cobro hay que

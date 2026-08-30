@@ -27,13 +27,18 @@ export async function POST() {
   const admin = createAdminClient();
   // Cualquier suscripción que no esté cancelada sirve para llegar al cliente
   // de Stripe: lo que se necesita es el `customer`, no una suscripción sana.
-  const { data: sub } = await admin
+  // La MÁS RECIENTE, con `.limit(1)`: una duplicación deja al miembro con dos
+  // clientes de Stripe distintos, y `maybeSingle()` daría error sin abrir
+  // ninguno. Se toma la última, que es la tarjeta que la persona usó al final.
+  const { data: subs } = await admin
     .from("subscriptions")
     .select("stripe_customer_id")
     .eq("user_id", user.id)
     .neq("status", "canceled")
     .not("stripe_customer_id", "is", null)
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const sub = subs?.[0];
 
   if (!sub?.stripe_customer_id)
     return NextResponse.json(
