@@ -309,6 +309,23 @@ ${BOTON("{{siteUrl}}/embajador", "Ver mi solicitud")}`),
 ${BOTON("{{siteUrl}}/embajador", "Ir a mi perfil de embajador")}`),
   },
   {
+    key: "pago_fallido",
+    name: "Pago rechazado (renovación)",
+    description:
+      "Cuando la pasarela no pudo cobrar la renovación. Sale UNA vez, en el primer fallo, no en cada reintento.",
+    variables: {
+      firstName: "Nombre del miembro",
+    },
+    sample: { firstName: "Cipatli" },
+    subject: "No pudimos cobrar tu renovación 🐾",
+    html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
+<p>Tu banco no autorizó el cobro de tu renovación. Puede ser una tarjeta vencida, un límite o algo tan simple como un dato que cambió.</p>
+<p><strong>Tu membresía sigue siendo tuya y tus peludos siguen registrados.</strong> No pierdes tu antigüedad ni tienes que empezar de nuevo.</p>
+<p style="background:#FDF3E0;border-radius:12px;padding:12px 16px"><strong>No hace falta que contrates otra vez.</strong> Si vuelves a registrarte se te abriría una segunda membresía y podrían cobrarte dos veces. Solo actualiza tu método de pago y el cobro se reintenta solo.</p>
+${BOTON("{{siteUrl}}/app/cuenta", "Actualizar mi método de pago")}
+<p style="font-size:13px;color:#6B7C79">¿Algo no cuadra? Respóndenos este correo y lo vemos contigo.</p>`),
+  },
+  {
     key: "account_deactivated",
     name: "Baja de cuenta (por el comité)",
     description:
@@ -617,6 +634,10 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   cancellation: "membresia",
   account_deactivated: "membresia",
   profile_incomplete_reminder: "membresia",
+  pago_fallido: "membresia",
+  // `plan_migrado` faltaba en este mapa desde que se creó, así que el editor
+  // de /admin/comunicados nunca la listó y el comité no podía tocarla.
+  plan_migrado: "membresia",
   reimbursement_approved: "reintegros",
   reimbursement_rejected: "reintegros",
   pet_approved: "mascotas",
