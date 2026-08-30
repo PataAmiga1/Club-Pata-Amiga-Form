@@ -247,6 +247,17 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
       : null;
   if (!subId) return;
   const supabase = createAdminClient();
+  // Se lee el estado ANTES de escribirlo: Stripe manda `payment_failed` en
+  // CADA reintento, y sin esto la persona recibiría el mismo correo tres o
+  // cuatro veces por el mismo cobro. Solo avisa el primer fallo, cuando la
+  // suscripción todavía no estaba en mora.
+  const { data: previa } = await supabase
+    .from("subscriptions")
+    .select("status")
+    .eq("stripe_subscription_id", subId)
+    .maybeSingle();
+  const primerFallo = previa?.status !== "past_due" && previa?.status !== "unpaid";
+
   const { data: subRow } = await supabase
     .from("subscriptions")
     .update({ status: "past_due" })
@@ -267,6 +278,23 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
       stageKey: "miembro_inactivo",
       payload: { invoiceId: invoice.id },
     });
+
+    // AVISARLE A LA PERSONA (29-ago). Hasta hoy un cobro fallido se le
+    // notificaba a ventas y al miembro no se le decía nada: se enteraba solo
+    // si entraba a su cuenta, que además le aparecía como si no tuviera
+    // membresía. Sin aviso y sin forma de cambiar la tarjeta, el único camino
+    // visible era volver a contratar — y eso produjo un cobro duplicado real.
+    if (primerFallo) {
+      const { data: perfil } = await supabase
+        .from("profiles")
+        .select("email, first_name")
+        .eq("id", subRow.user_id)
+        .maybeSingle();
+      if (perfil?.email)
+        await sendTemplatedEmail("pago_fallido", perfil.email, {
+          firstName: perfil.first_name ?? "",
+        });
+    }
   }
 }
 

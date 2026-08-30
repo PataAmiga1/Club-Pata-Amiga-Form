@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { renewalDate, formatDateEs } from "@/lib/dates";
 import { situacionDeCobro } from "@/lib/membresia";
+import { PagoPendienteCard } from "./PagoPendienteCard";
 import { MembershipManager } from "./MembershipManager";
 import { BillingCard } from "./BillingCard";
 import { BankingCard } from "./BankingCard";
@@ -24,16 +25,26 @@ export default async function CuentaPage() {
       )
       .eq("id", user.id)
       .single(),
+    // Se piden TODAS las no canceladas, no solo las activas (29-ago): con
+    // `.eq("status","active")` quien tenía la renovación fallida veía su
+    // cuenta como si no tuviera membresía, y eso lo empujaba a contratar de
+    // nuevo — que fue lo que produjo un cobro duplicado real.
     supabase
       .from("subscriptions")
       .select("plan, amount, status, cancel_at_period_end, current_period_end")
       .eq("user_id", user.id)
-      .eq("status", "active")
+      .neq("status", "canceled")
       .maybeSingle(),
   ]);
 
   const settings = await fetchSiteSettings();
-  const situacion = situacionDeCobro(profile?.membership_status, sub);
+  const enMora = sub?.status === "past_due" || sub?.status === "unpaid";
+  // A `situacionDeCobro` se le sigue pasando solo la activa: lo que pinta para
+  // una membresía sana no cambia. La mora se resuelve con su propia tarjeta.
+  const situacion = situacionDeCobro(
+    profile?.membership_status,
+    sub?.status === "active" ? sub : null,
+  );
   // La fecha de renovación SOLO se calcula cuando el cobro vive aquí. Para un
   // heredado, `member_since + 1 mes` daba una fecha ya pasada (auditoría 11-ago).
   const renews =
@@ -64,6 +75,10 @@ export default async function CuentaPage() {
           Tu membresía, tu plan y tus datos de contacto.
         </p>
       </div>
+
+      {/* Lo primero que tiene que ver quien trae un cobro fallido: qué pasó y
+          cómo se arregla, antes que cualquier otra cosa de la pantalla. */}
+      {enMora && <PagoPendienteCard />}
 
       {/* Contact info */}
       <section className="flex flex-col gap-3 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
