@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { DatosConocidos } from "@/lib/datos-conocidos";
 import type { TipoPersona } from "@/lib/documentos-solicitud";
 import { esRfcDeMoral } from "@/lib/rfc";
+import { revisarPeso } from "@/lib/peso-adjuntos";
 import { EDAD_MINIMA, esMayorDeEdad, fechaDeNacimientoDeCurp } from "@/lib/edad";
 import { registerCenter, type CenterLocationInput } from "./actions";
 
@@ -140,6 +141,13 @@ export function CenterForm({
         return;
       }
     }
+    // Igual que en el alta de embajador: el 413 de Vercel es mudo, así que el
+    // peso se revisa aquí y se dice qué hacer (1-sep).
+    const peso = revisarPeso([ineFront, ineBack, rfcConstancia]);
+    if (!peso.ok) {
+      setError(peso.mensaje);
+      return;
+    }
     setBusy(true);
     try {
       const result = await registerCenter({
@@ -183,7 +191,13 @@ export function CenterForm({
       window.location.assign("/centro");
       return;
     } catch {
-      setError("Algo salió mal. Intenta de nuevo.");
+      // Si truena con documentos adjuntos, lo más probable sigue siendo el
+      // peso: la petición muere en el borde y aquí no llega ni el código.
+      setError(
+        ineFront || ineBack || rfcConstancia
+          ? "No pudimos enviar tu solicitud. Si subiste documentos pesados, prueba con una foto en vez de un PDF."
+          : "Algo salió mal. Intenta de nuevo.",
+      );
     } finally {
       setBusy(false);
     }
