@@ -11,6 +11,11 @@ import {
 import { BANCO_OTRO, bankFromClabe, isValidClabe } from "@/lib/banks";
 import { RFC_REGEX } from "@/lib/rfc";
 import { esDocumentoValido, guardarFotoIne } from "@/lib/documentos-ine";
+import { notifyTeam } from "@/lib/alerts";
+import {
+  sanearAdjuntos,
+  type AdjuntoConversacion,
+} from "@/lib/documentos-conversacion";
 
 /**
  * Datos de pago del embajador (banco + CLABE + RFC) para recibir el corte
@@ -314,4 +319,70 @@ export async function customizeCode(entrada: string) {
   revalidatePath("/embajador");
   revalidatePath("/embajador/cuenta");
   return { ok: true as const, code };
+}
+
+/**
+ * RESPUESTA DEL EMBAJADOR EN EL HILO CON EL COMITÉ (Cipatli, 1-sep).
+ *
+ * OJO CON EL ESTADO: las demás acciones de este archivo exigen `approved`,
+ * porque tocan datos de alguien que ya es embajador. Esta NO puede: el hilo
+ * existe justamente para resolver una solicitud PENDIENTE —una INE borrosa,
+ * una constancia vencida—. Exigir aprobación dejaría mudo a quien más
+ * necesita contestar.
+ *
+ * Un mensaje puede ser SOLO adjuntos: mandar la foto que le pidieron es una
+ * respuesta completa, y pedirle además dos palabras sería un trámite.
+ */
+export async function replySolicitudEmbajador(
+  message: string,
+  documents?: AdjuntoConversacion[],
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Inicia sesión de nuevo." };
+
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  if (text.length < 2 && !adjuntos.length)
+    return { error: "Escribe tu mensaje o adjunta un archivo." };
+
+  const admin = createAdminClient();
+  const { data: filas } = await admin
+    .from("ambassadors")
+    .select("id, first_name, status")
+    .eq("user_id", user.id)
+    .in("status", ["pending", "approved"])
+    .order("created_at", { ascending: false });
+  // Un perfil aprobado siempre gana sobre solicitudes más nuevas, igual que en
+  // `getAmbassadorContext`.
+  const amb = filas?.find((a) => a.status === "approved") ?? filas?.[0];
+  if (!amb) return { error: "No encontramos tu solicitud de embajador." };
+
+  await admin.from("solicitud_messages").insert({
+    ambassador_id: amb.id,
+    sender: "solicitante",
+    author_id: user.id,
+    message: text || "(envió archivos)",
+    documents: adjuntos,
+  });
+  // Ya contestó: se apaga la bandera de "te pedimos algo".
+  await admin
+    .from("ambassadors")
+    .update({ info_requested: false })
+    .eq("id", amb.id);
+
+  await notifyTeam(
+    "notify_ambassadors",
+    `Respuesta de ${amb.first_name} sobre su solicitud de embajador`,
+    `<h2 style="color:#1E5350">${amb.first_name} respondió al comité</h2>
+     <p>${text || "(sin texto)"}</p>
+     ${adjuntos.length ? `<p>Adjuntó ${adjuntos.length} archivo(s).</p>` : ""}
+     <p>Revisa el hilo en el panel → Embajadores.</p>`,
+  );
+
+  revalidatePath("/embajador");
+  revalidatePath("/admin/embajadores");
+  return { ok: true as const };
 }

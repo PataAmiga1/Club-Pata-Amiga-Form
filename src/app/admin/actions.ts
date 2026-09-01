@@ -9,6 +9,12 @@ import {
   type AdjuntoConversacion,
 } from "@/lib/documentos-conversacion";
 import {
+  SUJETO,
+  itemsValidos,
+  listaDeItemsHtml,
+  type SujetoSolicitud,
+} from "@/lib/hilo-solicitud";
+import {
   hoyEnMexico,
   ZONA_MX,
   inicioDelMes,
@@ -298,7 +304,15 @@ export async function resolveAmbassador(
     }
     await admin
       .from("ambassadors")
-      .update({ status: "approved", referral_code: code, rejection_reason: null })
+      // `info_requested` se apaga al resolver: si el comite le pidio algo y
+      // termino resolviendo sin esperar, la bandera se quedaria encendida para
+      // siempre porque solo la apaga una respuesta suya.
+      .update({
+        status: "approved",
+        referral_code: code,
+        rejection_reason: null,
+        info_requested: false,
+      })
       .eq("id", id);
     await sendTemplatedEmail("ambassador_approved", amb.email, {
       firstName: amb.first_name,
@@ -310,7 +324,11 @@ export async function resolveAmbassador(
   } else {
     await admin
       .from("ambassadors")
-      .update({ status: "rejected", rejection_reason: decision.reason })
+      .update({
+        status: "rejected",
+        rejection_reason: decision.reason,
+        info_requested: false,
+      })
       .eq("id", id);
     await sendTemplatedEmail("ambassador_rejected", amb.email, {
       firstName: amb.first_name,
@@ -682,9 +700,15 @@ export async function resolveCenter(
   await admin
     .from("wellness_centers")
     .update(
+      // `info_requested` se apaga al resolver, por lo mismo que en el
+      // embajador: solo la apaga una respuesta del centro.
       decision.approve
-        ? { status: "approved", rejection_reason: null }
-        : { status: "rejected", rejection_reason: decision.reason },
+        ? { status: "approved", rejection_reason: null, info_requested: false }
+        : {
+            status: "rejected",
+            rejection_reason: decision.reason,
+            info_requested: false,
+          },
     )
     .eq("id", id);
 
@@ -709,6 +733,102 @@ export async function resolveCenter(
   revalidatePath("/admin/centros");
   revalidatePath("/centros");
   revalidatePath("/app/centros");
+}
+
+/**
+ * EL COMITÉ LE PIDE ALGO A UN EMBAJADOR O A UN CENTRO (Cipatli, 1-sep).
+ *
+ * Es el equivalente de `requestPetInfo`, pero para los dos trámites que no
+ * tenían conversación. Antes, con una INE borrosa, solo quedaba aprobar a
+ * ciegas o denegar sin explicar.
+ *
+ * UNA SOLA ACCIÓN PARA LOS DOS. Lo único que cambia entre un embajador y un
+ * centro es de qué tabla sale el nombre y qué plantilla se manda; todo lo
+ * demás —el hilo, los adjuntos, la bandera— es idéntico, y partirlo en dos
+ * garantizaría que un arreglo se le haga a uno y al otro no.
+ *
+ * EL CORREO ES EL AVISO QUE CUENTA, y aquí está la diferencia real con el hilo
+ * de un peludo: un miembro siempre tiene cuenta, pero un embajador o un centro
+ * puede no tenerla todavía —mandó su solicitud sin sesión y se liga por correo
+ * al entrar (arreglo del 11-ago)—. La campana dentro de la plataforma solo se
+ * agrega si ya hay a quién notificar; el correo va siempre, y va al correo de
+ * LA SOLICITUD, no al del perfil, que puede ser otro.
+ */
+export async function requestSolicitudInfo(
+  sujeto: SujetoSolicitud,
+  id: string,
+  items: string[],
+  message: string,
+  documents?: AdjuntoConversacion[],
+) {
+  const { admin, adminId } = await requireAdmin();
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  const validItems = itemsValidos(items);
+  if (!text && !validItems.length && !adjuntos.length)
+    return { error: "Elige qué solicitar, escribe un mensaje o adjunta algo." };
+
+  const cfg = SUJETO[sujeto];
+  const { data: fila } = await admin
+    .from(cfg.tabla)
+    .select(
+      sujeto === "embajador"
+        ? "id, first_name, email, user_id"
+        : "id, name, contact_name, email, user_id",
+    )
+    .eq("id", id)
+    .single();
+  if (!fila) return { error: `No encontramos a este ${cfg.queEs}.` };
+
+  const destinatario = (fila as { email?: string | null }).email;
+  if (!destinatario)
+    return { error: `Este ${cfg.queEs} no tiene un correo al cual escribirle.` };
+
+  const texto = text || "Por favor mándanos lo que te pedimos. ¡Gracias!";
+
+  await admin.from("solicitud_messages").insert({
+    [cfg.columna]: id,
+    sender: "admin",
+    author_id: adminId,
+    message: texto,
+    requested_items: validItems,
+    documents: adjuntos,
+  });
+  await admin.from(cfg.tabla).update({ info_requested: true }).eq("id", id);
+
+  if (sujeto === "embajador") {
+    const amb = fila as { first_name?: string | null };
+    await sendTemplatedEmail("ambassador_info_request", destinatario, {
+      firstName: amb.first_name ?? "",
+      itemsList: listaDeItemsHtml(validItems),
+      message: texto,
+      portalUrl: `${SITE_URL}${cfg.portal}`,
+    });
+  } else {
+    const c = fila as { name?: string | null; contact_name?: string | null };
+    await sendTemplatedEmail("center_info_request", destinatario, {
+      contactName: c.contact_name ?? c.name ?? "",
+      centerName: c.name ?? "",
+      itemsList: listaDeItemsHtml(validItems),
+      message: texto,
+      portalUrl: `${SITE_URL}${cfg.portal}`,
+    });
+  }
+
+  const userId = (fila as { user_id?: string | null }).user_id;
+  if (userId) {
+    await admin.from("notifications").insert({
+      user_id: userId,
+      type: "solicitud_info_request",
+      title: "El comité necesita información",
+      message: texto,
+    });
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(sujeto === "embajador" ? "/admin/embajadores" : "/admin/centros");
+  revalidatePath(cfg.portal);
+  return { ok: true as const };
 }
 
 /**
