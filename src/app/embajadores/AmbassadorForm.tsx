@@ -17,6 +17,7 @@ import {
 import type { DatosConocidos } from "@/lib/datos-conocidos";
 import type { TipoPersona } from "@/lib/documentos-solicitud";
 import { esRfcDeMoral } from "@/lib/rfc";
+import { revisarPeso } from "@/lib/peso-adjuntos";
 import { registerAmbassador } from "./actions";
 
 // Los textos legales pesan miles de líneas: el popup se carga SOLO cuando
@@ -147,6 +148,14 @@ export function AmbassadorForm({
         return;
       }
     }
+    // El peso se revisa ANTES de enviar: si se pasa, Vercel corta la petición
+    // con un 413 que el navegador no puede leer y el formulario solo alcanzaría
+    // a decir "algo salió mal" (1-sep).
+    const peso = revisarPeso([ineFront, ineBack, rfcConstancia]);
+    if (!peso.ok) {
+      setError(peso.mensaje);
+      return;
+    }
     setBusy(true);
     try {
       const result = await registerAmbassador({
@@ -192,7 +201,13 @@ export function AmbassadorForm({
       window.location.assign("/embajador");
       return;
     } catch {
-      setError("Algo salió mal. Intenta de nuevo.");
+      // Si truena con documentos adjuntos, lo más probable sigue siendo el
+      // peso: la petición muere en el borde y aquí no llega ni el código.
+      setError(
+        ineFront || ineBack || rfcConstancia
+          ? "No pudimos enviar tu solicitud. Si subiste documentos pesados, prueba con una foto en vez de un PDF."
+          : "Algo salió mal. Intenta de nuevo.",
+      );
     } finally {
       setBusy(false);
     }
