@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PetCard, type PetRow } from "@/components/app/PetCard";
 import { WelcomeOnce } from "@/components/app/WelcomeOnce";
 import { CompleteProfileNudge } from "@/components/app/CompleteProfileNudge";
+import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { markWelcomeShown } from "./actions";
 import { NotificationsBell } from "@/components/app/NotificationsBell";
 import { MAX_ACTIVE_PETS } from "@/lib/constants";
@@ -17,11 +18,17 @@ export default async function AppHome() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/iniciar-sesion");
 
-  const [{ data: profile }, { data: sub }, { data: pets }, { data: notifications }] = await Promise.all([
+  const [
+    { data: profile },
+    { data: sub },
+    { data: pets },
+    { data: notifications },
+    { data: docs },
+  ] = await Promise.all([
     supabase
       .from("profiles")
       .select(
-        "first_name, email, membership_status, member_since, profile_completed, welcome_shown, curp, birth_date, nationality, street, postal_code, phone",
+        "first_name, last_name, email, membership_status, member_since, profile_completed, welcome_shown, curp, birth_date, nationality, postal_code, phone",
       )
       .eq("id", user.id)
       .single(),
@@ -45,10 +52,18 @@ export default async function AppHome() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(10),
+    // El pasaporte: para un extranjero SUSTITUYE a la CURP, asi que sin esto
+    // el aviso le pediria una CURP que no puede tener.
+    supabase.from("documents").select("document_type").eq("user_id", user.id),
   ]);
 
   const active = profile?.membership_status === "active";
-  const name = profile?.first_name || profile?.email?.split("@")[0] || "";
+  // NO se cae al correo. Desde que el registro se acorto (16-ago) el nombre se
+  // captura al completar el perfil, ya pagado, asi que entre el pago y ese
+  // momento `first_name` viene vacio: el saludo decia "!Hola, cipatli.martinez!"
+  // —el correo de la persona— y asi lo reporto el equipo. Sin nombre se saluda
+  // sin nombre, que es lo que hace el JSX de abajo.
+  const name = profile?.first_name || "";
   const petList = (pets ?? []) as (PetRow & {
     created_at: string;
     sex: string | null;
@@ -147,12 +162,20 @@ export default async function AppHome() {
         !(profile.membership_status === "active" && !profile.welcome_shown) && (
           <CompleteProfileNudge
             userId={user.id}
+            /* La lista sale de `datosFaltantesDelPerfil`, la MISMA que usan el
+               panel y el correo recordatorio. Antes se armaba aqui a mano y ya
+               no coincidia: omitia el nombre, exigia la calle —que desde el
+               1-sep ya ni se pregunta, asi que el aviso habria pedido para
+               siempre un domicilio imposible de completar— y contaba el
+               telefono, que no bloquea el 100%. Por eso el telefono se
+               menciona aparte, como en el panel. */
             missing={[
-              !profile.curp && "CURP",
-              !profile.birth_date && "fecha de nacimiento",
-              !profile.nationality && "nacionalidad",
-              !(profile.street && profile.postal_code) && "domicilio",
-              !profile.phone && "teléfono",
+              ...datosFaltantesDelPerfil(profile, {
+                tienePasaporte: (docs ?? []).some(
+                  (d) => d.document_type === "passport",
+                ),
+              }),
+              !profile.phone && "teléfono (no bloquea el 100%)",
             ].filter((x): x is string => Boolean(x))}
           />
         )}
