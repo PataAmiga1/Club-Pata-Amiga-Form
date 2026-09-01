@@ -46,6 +46,28 @@ export const REJECTION_REASONS = [
   "Tope excedido",
 ] as const;
 
+/**
+ * Motivos predeterminados al devolver el perfil de un peludo (equipo, 1-sep).
+ *
+ * SE USAN DISTINTO que los del reintegro. Allá el motivo ES la resolución y se
+ * elige uno de la lista, cerrada. Aquí el motivo solo PRELLENA el texto, que
+ * sigue siendo libre: la observación de un peludo tiene que decir cuál foto o
+ * cuál dato hay que corregir, y una lista cerrada mandaría al miembro un aviso
+ * que no le dice qué arreglar. Con esto lo común es un clic y lo específico se
+ * escribe encima.
+ *
+ * Están redactados como lo que hay que HACER, no como un veredicto: el perfil
+ * no se rechaza, se devuelve para corregirse (y por eso el aviso al miembro se
+ * titula "necesita atención").
+ */
+export const PET_REJECTION_REASONS = [
+  "La foto no deja ver bien al peludo. ¿Nos mandas otra?",
+  "Los datos no coinciden con la foto. ¿Los revisas?",
+  "Falta el certificado veterinario.",
+  "La raza o la especie no coinciden con la foto.",
+  "La edad registrada no coincide con la foto.",
+] as const;
+
 export const MAX_ACTIVE_PETS = 3;
 /** Fotos adicionales por mascota (además de la foto principal). */
 export const PET_GALLERY_MAX = 5;
