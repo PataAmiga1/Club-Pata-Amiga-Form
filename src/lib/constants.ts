@@ -181,6 +181,20 @@ export const WELLNESS_SERVICES = {
     plural: "Fotografía y experiencias",
     emoji: "📸",
   },
+  // DOS CATEGORÍAS NUEVAS (equipo, 2-sep), y van SEPARADAS a petición suya:
+  // acompañar una pérdida y atender la conducta o el ánimo son dos oficios
+  // distintos y rara vez los da el mismo lugar.
+  //
+  // Las dos cubren A PERSONAS Y A ANIMALES (Pablo, 2-sep), pero la etiqueta no
+  // lo dice: un centro puede ofrecer solo una de las dos mitades —tanatología
+  // para el tutor que perdió a su peludo, o etología para el peludo— y una
+  // etiqueta que prometiera ambas lo haría quedar mal. Quién es el paciente lo
+  // explica cada centro en su beneficio.
+  //
+  // No lleva migración: `services` es un arreglo de texto sin restricción, y
+  // las llaves de los nueve anteriores no se tocan.
+  thanatology: { label: "Tanatología", plural: "Tanatología", emoji: "🤍" },
+  psychology: { label: "Psicología", plural: "Psicología", emoji: "🧠" },
 } as const;
 
 export type WellnessService = keyof typeof WELLNESS_SERVICES;

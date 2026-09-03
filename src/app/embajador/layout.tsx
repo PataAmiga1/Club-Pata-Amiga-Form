@@ -95,12 +95,15 @@ export default async function EmbajadorLayout({
     .eq("status", "approved")
     .limit(1);
 
+  // Una sola lista para el menú del avatar Y para la barra (equipo, 2-sep):
+  // si cada uno armara la suya, volverían a ofrecer cosas distintas, que es
+  // justo lo que pidieron arreglar.
   const entries: DashboardEntry[] = [
     ...(isMember
-      ? [{ href: "/app", icon: "🐾", label: "Panel de miembro" }]
+      ? [{ href: "/app", icon: "🐾", label: "Panel de miembro", short: "Miembro" }]
       : []),
     ...(centerRows?.length
-      ? [{ href: "/centro", icon: "🏪", label: "Mi centro aliado" }]
+      ? [{ href: "/centro", icon: "🏪", label: "Mi centro aliado", short: "Mi centro" }]
       : []),
   ];
 
@@ -195,7 +198,7 @@ export default async function EmbajadorLayout({
   return (
     <div className="min-h-dvh bg-cream pb-24 sm:pb-0">
       {header}
-      <AmbassadorNav />
+      <AmbassadorNav extra={entries} />
       {/* Embajador sin plan activo: invitación a unirse (o reactivar) como miembro */}
       {!isMember && (
         <div className="mx-auto w-full max-w-[980px] px-5 pt-5 sm:px-8">

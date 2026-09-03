@@ -194,7 +194,7 @@ export default async function CentroLayout({
   return (
     <div className="min-h-dvh bg-cream pb-24 sm:pb-0">
       {header}
-      <CenterNav />
+      <CenterNav extra={menuEntries} />
       {/* Dueño sin plan activo: invitación a unirse (o reactivar) como miembro */}
       {!isMember && (
         <div className="mx-auto w-full max-w-[980px] px-5 pt-5 sm:px-8">

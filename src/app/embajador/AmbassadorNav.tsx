@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { DashboardEntry } from "@/components/app/ProfileMenu";
 
 /**
  * Menú del portal del embajador — como el del área de miembros:
@@ -18,13 +19,27 @@ function isActive(pathname: string, href: string) {
   return href === "/embajador" ? pathname === "/embajador" : pathname.startsWith(href);
 }
 
-export function AmbassadorNav() {
+/**
+ * CAMBIAR DE PANEL SALE TAMBIÉN EN LA BARRA (equipo, 2-sep). Antes solo estaba
+ * en el menú del avatar, mientras que el área de miembro sí traía el ícono en
+ * su barra: quien entraba aquí no tenía forma obvia de volver. Pidieron
+ * "homologar", y Pablo eligió que salga en las dos.
+ *
+ * Los destinos llegan como propiedad y son LOS MISMOS que pinta el menú
+ * —salen de una sola lista en el layout—, que es lo único que evita que
+ * vuelvan a decir cosas distintas.
+ */
+export function AmbassadorNav({ extra = [] }: { extra?: DashboardEntry[] }) {
   const pathname = usePathname();
+  const items = [
+    ...ITEMS,
+    ...extra.map((e) => ({ ...e, short: e.short ?? e.label })),
+  ];
   return (
     <>
       {/* Desktop: tabs bajo el header */}
       <nav className="mx-auto hidden w-full max-w-[980px] gap-2 px-5 pt-5 sm:flex sm:px-8">
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -40,7 +55,7 @@ export function AmbassadorNav() {
       </nav>
       {/* Móvil: barra fija abajo */}
       <nav className="fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-border-divider bg-white px-2 pb-[max(env(safe-area-inset-bottom),1rem)] pt-3 sm:hidden">
-        {ITEMS.map((item) => (
+        {items.map((item) => (
           <Link
             key={item.href}
             href={item.href}

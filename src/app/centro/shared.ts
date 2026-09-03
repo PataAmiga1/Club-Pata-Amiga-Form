@@ -115,12 +115,21 @@ export const getCenterContext = cache(async function getCenterContext(): Promise
     center: center as CenterRow,
     isMember,
     wasMember: Boolean(memberProfile?.member_since),
+    // Alimenta el menú del avatar Y la barra de abajo (equipo, 2-sep): una
+    // sola lista para que las dos ofrezcan lo mismo.
     menuEntries: [
       ...(isMember
-        ? [{ href: "/app", icon: "🐾", label: "Panel de miembro" }]
+        ? [{ href: "/app", icon: "🐾", label: "Panel de miembro", short: "Miembro" }]
         : []),
       ...(ambassadorRows?.length
-        ? [{ href: "/embajador", icon: "🤝", label: "Panel de embajador" }]
+        ? [
+            {
+              href: "/embajador",
+              icon: "🤝",
+              label: "Panel de embajador",
+              short: "Embajador",
+            },
+          ]
         : []),
     ],
   };
