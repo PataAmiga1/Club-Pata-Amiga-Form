@@ -47,20 +47,24 @@ export const REJECTION_REASONS = [
 ] as const;
 
 /**
- * Motivos predeterminados al devolver el perfil de un peludo (equipo, 1-sep).
+ * Mensajes predeterminados para PEDIRLE algo al miembro sobre su peludo
+ * (equipo, 2-sep).
  *
- * SE USAN DISTINTO que los del reintegro. Allá el motivo ES la resolución y se
- * elige uno de la lista, cerrada. Aquí el motivo solo PRELLENA el texto, que
- * sigue siendo libre: la observación de un peludo tiene que decir cuál foto o
- * cuál dato hay que corregir, y una lista cerrada mandaría al miembro un aviso
- * que no le dice qué arreglar. Con esto lo común es un clic y lo específico se
- * escribe encima.
+ * NACIERON EN EL LUGAR EQUIVOCADO. El 1-sep se pusieron colgando del botón
+ * "Denegar", y el equipo lo corrigió al verlos: no son razones para RECHAZAR
+ * un peludo —"la foto no se ve", "falta el certificado"— son razones para
+ * PEDIR algo. Denegar es la acción rara y terminal; pedir una mejor foto es la
+ * de todos los días. Así que viven en "Solicitar información", que es el
+ * botón que de verdad se usa, y el de denegar quedó en blanco para que el
+ * comité escriba lo que ocupe.
  *
- * Están redactados como lo que hay que HACER, no como un veredicto: el perfil
- * no se rechaza, se devuelve para corregirse (y por eso el aviso al miembro se
- * titula "necesita atención").
+ * PRELLENAN el mensaje y se pueden editar encima, a diferencia de los del
+ * reintegro, que son la resolución misma y no se tocan: el miembro recibe este
+ * texto tal cual, así que tiene que poder decir CUÁL foto o CUÁL dato.
+ *
+ * Están redactados como lo que hay que HACER, no como un veredicto.
  */
-export const PET_REJECTION_REASONS = [
+export const PET_REQUEST_MESSAGES = [
   "La foto no deja ver bien al peludo. ¿Nos mandas otra?",
   "Los datos no coinciden con la foto. ¿Los revisas?",
   "Falta el certificado veterinario.",

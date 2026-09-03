@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { resolvePet } from "@/app/admin/actions";
-import { PET_REJECTION_REASONS } from "@/lib/constants";
 
 /**
  * Aprobar / Denegar con notas. Vive suelto para poder usarse tanto en la fila
@@ -23,46 +22,29 @@ export function PetResolveButtons({ petId }: { petId: string }) {
     });
   }
 
+  // DENEGAR SE QUEDA EN BLANCO (equipo, 2-sep). Los motivos predeterminados
+  // que vivían aquí se mudaron a "Solicitar información", en el hilo: no eran
+  // razones para RECHAZAR —"la foto no se ve", "falta el certificado"— eran
+  // razones para PEDIR algo. Denegar es la acción rara y terminal, y para esos
+  // casos el comité necesita escribir lo que ocupe, no elegir de una lista.
   if (rejecting) {
     return (
-      <div className="flex w-full flex-col gap-2 sm:w-auto">
-        <div className="flex w-full gap-2 sm:w-auto">
-          <input
-            autoFocus
-            placeholder="Observaciones para el miembro"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="h-10 min-w-0 flex-1 rounded-full border-[1.5px] border-border-input px-4 text-[13px] text-ink-title outline-none focus:border-teal sm:w-80"
-          />
-          <button
-            type="button"
-            disabled={pending || notes.trim().length === 0}
-            onClick={() => run({ approve: false, notes: notes.trim() })}
-            className="grid h-10 flex-none place-items-center rounded-full bg-error-text px-4 text-[13px] font-bold text-white disabled:opacity-50"
-          >
-            Denegar
-          </button>
-        </div>
-        {/* Los motivos PRELLENAN el campo y se pueden editar — a diferencia de
-            los del reintegro, que son la resolución misma y no se tocan. Lo
-            que el miembro recibe es este texto tal cual, así que tiene que
-            poder decir CUÁL foto o CUÁL dato hay que corregir. */}
-        <div className="flex flex-wrap gap-1.5">
-          {PET_REJECTION_REASONS.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setNotes(r)}
-              className={`rounded-full border px-2.5 py-[5px] text-left text-[11px] font-semibold transition-colors ${
-                notes === r
-                  ? "border-error-text bg-error-bg text-error-text"
-                  : "border-border-input text-ink-secondary hover:border-error-text"
-              }`}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+      <div className="flex w-full gap-2 sm:w-auto">
+        <input
+          autoFocus
+          placeholder="Motivo de la denegación"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="h-10 min-w-0 flex-1 rounded-full border-[1.5px] border-border-input px-4 text-[13px] text-ink-title outline-none focus:border-teal sm:w-80"
+        />
+        <button
+          type="button"
+          disabled={pending || notes.trim().length === 0}
+          onClick={() => run({ approve: false, notes: notes.trim() })}
+          className="grid h-10 flex-none place-items-center rounded-full bg-error-text px-4 text-[13px] font-bold text-white disabled:opacity-50"
+        >
+          Denegar
+        </button>
       </div>
     );
   }

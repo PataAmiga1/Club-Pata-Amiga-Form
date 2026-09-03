@@ -2,6 +2,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
+/** PostgREST devuelve el embebido como objeto o como arreglo de uno. */
+const uno = <T,>(v: T | T[] | null | undefined): T | null =>
+  Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+
 export type EventoAdmin = {
   id: string;
   icon: string;
@@ -35,7 +39,7 @@ export async function fetchEventosAdmin(
   admin: Admin,
   porFuente: number,
 ): Promise<EventoAdmin[]> {
-  const [evReimb, evAppeals, evAmb, evCenters, evLeads, evErrors] =
+  const [evReimb, evAppeals, evAmb, evCenters, evLeads, evErrors, evRespuestas] =
     await Promise.all([
       admin
         .from("reimbursements")
@@ -67,6 +71,19 @@ export async function fetchEventosAdmin(
         .select("id, context, created_at")
         .order("created_at", { ascending: false })
         .limit(Math.min(porFuente, 10)),
+      // RESPUESTAS EN EL HILO (equipo, 2-sep). Faltaba: cuando el comité pide
+      // algo, al solicitante le llega correo y aviso; cuando el solicitante
+      // CONTESTA, solo salía un correo al buzón del equipo y aquí no aparecía
+      // nada. Con volumen, una respuesta se perdía y la solicitud se quedaba
+      // esperando a nadie.
+      admin
+        .from("solicitud_messages")
+        .select(
+          "id, ambassador_id, center_id, created_at, ambassadors(first_name), wellness_centers(name)",
+        )
+        .eq("sender", "solicitante")
+        .order("created_at", { ascending: false })
+        .limit(porFuente),
     ]);
 
   return [
@@ -120,5 +137,25 @@ export async function fetchEventosAdmin(
       created_at: e.created_at,
       fuente: "errores" as const,
     })),
+    // La respuesta cae en la MISMA fuente que su solicitud —embajadores o
+    // centros— para que los filtros de arriba sigan sirviendo: quien filtra
+    // por "Embajadores" quiere ver todo lo de esa cola, la solicitud y la
+    // respuesta.
+    ...(evRespuestas.data ?? []).map((m) => {
+      const esEmbajador = Boolean(m.ambassador_id);
+      const quien = esEmbajador
+        ? (uno(m.ambassadors)?.first_name ?? "Un embajador")
+        : (uno(m.wellness_centers)?.name ?? "Un centro aliado");
+      return {
+        id: `s-${m.id}`,
+        icon: "💬",
+        text: `${quien} respondió a la solicitud de información`,
+        href: esEmbajador
+          ? `/admin/embajadores/${m.ambassador_id}`
+          : "/admin/centros",
+        created_at: m.created_at,
+        fuente: (esEmbajador ? "embajadores" : "centros") as FuenteEvento,
+      };
+    }),
   ].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 }
