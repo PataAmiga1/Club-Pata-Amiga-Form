@@ -3,11 +3,15 @@
  * anterior (src/data/legal-terms.ts). NOTA: usan terminología previa a la
  * actualización de tono 2026 ("apoyo económico"); el despacho legal debe
  * emitir versiones actualizadas. No editar aquí sin visto bueno legal.
- * "convenio-asociado" no existía en el repo anterior — pendiente.
+ * SEPARACIÓN DEL 2-SEP: los siete documentos del despacho llegaron pegados de
+ * tres en tres. `reglamento-de-integridad` empezaba en su CAPÍTULO 3 (el
+ * equipo lo reportó como «cortado») y el CONVENIO ASOCIADO vivía escondido al
+ * final de la política de cookies, así que /legales/convenio-asociado decía
+ * «en preparación» y el popup del registro no lo mostraba. Se repartieron a su
+ * título correcto SIN TOCAR EL TEXTO: mismos caracteres, otra caja.
  */
 
-export const LEGAL_TEXTS: Record<string, string> = {
-  "terminos-y-condiciones": `Términos y Condiciones de Uso de la Plataforma Pata Amiga y Contratación de
+export const LEGAL_TEXTS: Record<string, string> = {  "terminos-y-condiciones": `Términos y Condiciones de Uso de la Plataforma Pata Amiga y Contratación de
 Membresía Operadora: GIRBAZ, S.A. de C.V.
 Sitio web: https://www.pataamiga.mx/
 Versión: 1.0 Fecha de entrada en vigor: 15 de febrero de 2026
@@ -1728,183 +1732,6 @@ digital, podrá adoptarse como referencia la NOM-151-SCFI-2016, en
 concordancia con el Código de Comercio.
 
 
-## CAPÍTULO 1. DISPOSICIONES GENERALES
-
-Artículo 1. Objeto del Reglamento
-El presente Reglamento de Integridad tiene por objeto establecer reglas, medidas y
-procedimientos de prevención, detección, verificación, investigación y reacción
-frente a:
-- Fraude y/o abuso relacionado con el uso de la Plataforma, la Membresía, el
-registro de información y/o la presentación de evidencias;
-- Operaciones con recursos de procedencia ilícita y controles básicos de licitud
-(PLD), en lo que resulte aplicable; y
-- Actos de corrupción, incluyendo soborno, colusión, conflicto de interés y
-cualquier conducta orientada a influir indebidamente en decisiones operativas o
-resoluciones vinculadas al Proyecto.
-
-Artículo 2. Ámbito de aplicación Este Reglamento es aplicable a:
-- todo uso de la Plataforma y de los Servicios prestados por GIRBAZ;
-- toda interacción relacionada con el Apoyo Económico, incluyendo Solicitudes,
-validaciones, determinaciones, auditorías y entrega de apoyos cuando
-proceda;
-
-
-
-- toda operación vinculada a pagos, cargos recurrentes, canalizaciones,
-conciliaciones y aclaraciones (y, en su caso, reembolsos cuando existan
-conforme a los instrumentos aplicables); y
-- actividades de soporte, atención, verificación, auditoría y control
-realizadas por GIRBAZ, CLUB PATA AMIGA, A.C., y/o terceros autorizados,
-dentro de los alcances de sus funciones.
-
-Artículo 3. Carácter público y aceptación
-- El Reglamento es de carácter público y se encuentra disponible para
-consulta en la Plataforma “Pata Amiga”.
-- Se entiende aceptado por el Titular y demás sujetos obligados:
-a) mediante aceptación electrónica (clic en “ACEPTO”) cuando el
-flujo de la Plataforma lo requiera; y/o
-b) por la continuidad de uso de la Plataforma y/o el pago o
-renovación de Membresía, conforme a los instrumentos vigentes
-aplicables.
-
-
-Artículo 4. Principios rectores
-La interpretación y aplicación de este Reglamento se regirá por los siguientes
-principios:
-- Cero tolerancia al fraude y a la corrupción;
-- Debida diligencia razonable, con verificaciones proporcionales al
-riesgo;
-- Proporcionalidad en medidas preventivas y sanciones;
-- Trazabilidad y registro razonable de operaciones y evidencias;
-- Cooperación con autoridades cuando proceda conforme a derecho; y
-- Protección de datos por diseño, minimizando datos y aplicando
-medidas razonables de seguridad, conforme a la normativa aplicable.
-
-
-
-
-## Artículo 5. Definiciones
-Para efectos del presente Reglamento, los términos que a continuación se indican
-tendrán el significado siguiente, en congruencia con los instrumentos vigentes del
-Proyecto (Términos y Condiciones, Convenio de Adhesión y Reglamento del Apoyo Económico),
-sin perjuicio de otras definiciones que en dichos instrumentos resulten aplicables:
-- Abuso: uso indebido o contrario a la finalidad del Proyecto y sus reglas,
-aun sin configurar fraude pleno, incluyendo intentos de eludir controles o
-aprovechar vacíos operativos.
-- Aliados / Proveedores: terceros vinculados al Proyecto para validación,
-prestación de servicios, confirmación de información o entrega de apoyos
-(cuando aplique).
-- Apoyo: entrega o aplicación de recursos del Apoyo Económico, cuando proceda,
-conforme a reglas vigentes y suficiencia.
-- Asociado Adherente: Titular que, adicionalmente, acepta el
-instrumento de adhesión correspondiente para participar en el mecanismo
-solidario administrado por la A.C.
-- Carencia: periodo mínimo de antigüedad o espera aplicable antes de
-poder solicitar apoyos, conforme al instrumento del Apoyo Económico.
-- Cuenta: perfil digital del Titular/Usuario dentro de la Plataforma.
-- Evidencia: documentos, imágenes, videos, comprobantes, reportes,
-facturas, constancias, registros digitales y demás elementos aportados o
-generados para acreditar hechos o requisitos.
-- Apoyo Económico: Apoyo Económico administrado por CLUB PATA AMIGA, A.C.,
-sujeto a reglas de suficiencia, carencias, límites, validación y demás criterios
-vigentes.
-- Fraude: conducta dolosa destinada a obtener un beneficio indebido o
-eludir reglas, mediante falsedad, simulación, suplantación, manipulación o
-abuso de sistemas o evidencias.
-- Operación inusual/sospechosa: patrón de pago o comportamiento
-atípico que, por su naturaleza, monto o frecuencia, amerite verificación
-reforzada para descartar riesgos de licitud o fraude.
-
-
-
-- Plataforma: el sitio y/o aplicación “Pata Amiga” y sus módulos,
-interfaces y funcionalidades.
-- Proveedor de pagos: tercero que procesa pagos, cargos recurrentes,
-confirmaciones o devoluciones cuando proceda.
-- Solicitud: trámite o petición presentada por el Titular/Asociado
-Adherente dentro de la Plataforma, en particular las relacionadas con el Apoyo Económico
-cuando aplique.
-- Suficiencia: disponibilidad real del Apoyo Económico para atender solicitudes, sin
-generar derecho automático o exigible.
-- Suspensión / Bloqueo / Cancelación: medidas operativas aplicadas a
-la Cuenta o Membresía, de manera temporal o definitiva, conforme a este
-Reglamento y a los instrumentos vigentes.
-- Titular / Usuario: persona física que crea una Cuenta, contrata
-Membresía y utiliza la Plataforma.
-- Validación: procedimiento de revisión y verificación de requisitos,
-datos y evidencias, incluyendo controles antifraude.
-
-
-## CAPÍTULO 2. GOBIERNO DE CUMPLIMIENTO
-
-Artículo 6. Roles y responsabilidades
-- GIRBAZ es responsable de la integridad operativa en el ámbito de la
-Plataforma, incluyendo:
-a) seguridad técnica, registros (logs) y trazabilidad operativa;
-b) verificación digital razonable, prevención de fraude y abuso de
-## Cuenta;
-c) cobros, cargos recurrentes, aclaraciones de pago y soporte; y
-d) adopción de medidas operativas de
-suspensión/bloqueo/cancelación conforme a instrumentos vigentes.
-
-
-
-- CLUB PATA AMIGA, A.C. es responsable de la integridad en el ámbito
-del Apoyo Económico, incluyendo:
-a) validación y resolución de Solicitudes con cargo al Apoyo Económico;
-b) criterios de control y auditoría aplicables a apoyos; y
-c) determinaciones relacionadas con elegibilidad, suficiencia y
-medidas vinculadas al Apoyo Económico, conforme al Convenio de Adhesión y
-Reglamento del Apoyo Económico.
-- La separación funcional anterior se establece para evitar confusión de
-responsabilidades, de manera que:
-a) controversias de Plataforma/cobros/soporte corresponden a
-GIRBAZ; y
-b) decisiones y medidas asociadas al Apoyo Económico corresponden a la
-A.C., sin perjuicio de la colaboración operativa permitida.
-
-Artículo 7. Responsable/Encargado de Cumplimiento
-- GIRBAZ designará un Responsable/Encargado de Cumplimiento
-interno con facultades para:
-- coordinar controles antifraude;
-- requerir información adicional razonable;
-- escalar casos al órgano interno correspondiente; y
-- emitir determinaciones operativas en materia de integridad
-dentro del ámbito de GIRBAZ.
-- CLUB PATA AMIGA, A.C. designará, cuando corresponda, una figura
-responsable  para coordinar las medidas de integridad en el ámbito del Apoyo Económico,
-incluyendo verificación y auditoría, y para canalizar medidas internas
-conforme a sus instrumentos.
-- Gancho LFPIORPI: En caso de que se actualicen supuestos legales
-aplicables (por ejemplo, Actividad Vulnerable por donativos conforme a
-LFPIORPI), la A.C. podrá requerir la adopción de medidas adicionales,
-designaciones y procedimientos necesarios para el cumplimiento normativo
-
-
-
-correspondiente, sin que ello implique modificar la naturaleza del Apoyo Económico ni
-convertirlo en un producto financiero.
-
-## Artículo 8. Comité
-- Para casos relevantes, podrá existir un Comité del Apoyo Económico y de
-Integridad, como órgano interno de revisión, con funciones de análisis,
-auditoría, validación reforzada y emisión de determinaciones internas en
-asuntos relacionados con: (i) el Apoyo Económico y sus Solicitudes; y/o (ii)
-incidentes de fraude, abuso, licitud de recursos (PLD) e
-integridad/anticorrupción vinculados con la Plataforma y/o el Apoyo Económico.
-- Integración y quórum: El Comité se integrará por tres (3) personas,
-designadas por CLUB PATA AMIGA, A.C. y/o por GIRBAZ, S.A. de C.V. según la
-materia del caso. Podrá sesionar de manera presencial o a distancia
-mediante medios electrónicos. Existirá quórum con la participación de al
-menos dos (2) integrantes, y las decisiones se adoptarán por mayoría simple
-de los integrantes presentes.
-- Conflicto de interés: Cualquier integrante que tenga un conflicto de
-interés real o potencial deberá revelarlo de inmediato y abstenerse de
-participar en la revisión, deliberación o decisión del asunto correspondiente.
-El incumplimiento de esta obligación podrá dar lugar a: (i) la revisión interna
-de la determinación adoptada; y (ii) la aplicación de medidas correctivas
-conforme a los instrumentos vigentes del Proyecto.
-
 ## ANEXO1 REGLAMENTO APOYO ECONÓMICO
 ## PERROS/CANINOS
 ## RAZA ENFERMEDADES CONGENITAS, GENÉTICAS Y HEREDITARIAS
@@ -2585,7 +2412,185 @@ Oriental de pelo
 largo
 Cardiomiopatía hipertrófica (HCM), Enfermedad poliquística renal (PKD),
 Atrofia progresiva de retina (PRA), Sordera congénita.`,
-  "reglamento-de-integridad": `## CAPÍTULO 3. REGLAMENTO ANTIFRAUDE (USUARIOS Y OPERACIÓN)
+  "reglamento-de-integridad": `## CAPÍTULO 1. DISPOSICIONES GENERALES
+
+Artículo 1. Objeto del Reglamento
+El presente Reglamento de Integridad tiene por objeto establecer reglas, medidas y
+procedimientos de prevención, detección, verificación, investigación y reacción
+frente a:
+- Fraude y/o abuso relacionado con el uso de la Plataforma, la Membresía, el
+registro de información y/o la presentación de evidencias;
+- Operaciones con recursos de procedencia ilícita y controles básicos de licitud
+(PLD), en lo que resulte aplicable; y
+- Actos de corrupción, incluyendo soborno, colusión, conflicto de interés y
+cualquier conducta orientada a influir indebidamente en decisiones operativas o
+resoluciones vinculadas al Proyecto.
+
+Artículo 2. Ámbito de aplicación Este Reglamento es aplicable a:
+- todo uso de la Plataforma y de los Servicios prestados por GIRBAZ;
+- toda interacción relacionada con el Apoyo Económico, incluyendo Solicitudes,
+validaciones, determinaciones, auditorías y entrega de apoyos cuando
+proceda;
+
+
+
+- toda operación vinculada a pagos, cargos recurrentes, canalizaciones,
+conciliaciones y aclaraciones (y, en su caso, reembolsos cuando existan
+conforme a los instrumentos aplicables); y
+- actividades de soporte, atención, verificación, auditoría y control
+realizadas por GIRBAZ, CLUB PATA AMIGA, A.C., y/o terceros autorizados,
+dentro de los alcances de sus funciones.
+
+Artículo 3. Carácter público y aceptación
+- El Reglamento es de carácter público y se encuentra disponible para
+consulta en la Plataforma “Pata Amiga”.
+- Se entiende aceptado por el Titular y demás sujetos obligados:
+a) mediante aceptación electrónica (clic en “ACEPTO”) cuando el
+flujo de la Plataforma lo requiera; y/o
+b) por la continuidad de uso de la Plataforma y/o el pago o
+renovación de Membresía, conforme a los instrumentos vigentes
+aplicables.
+
+
+Artículo 4. Principios rectores
+La interpretación y aplicación de este Reglamento se regirá por los siguientes
+principios:
+- Cero tolerancia al fraude y a la corrupción;
+- Debida diligencia razonable, con verificaciones proporcionales al
+riesgo;
+- Proporcionalidad en medidas preventivas y sanciones;
+- Trazabilidad y registro razonable de operaciones y evidencias;
+- Cooperación con autoridades cuando proceda conforme a derecho; y
+- Protección de datos por diseño, minimizando datos y aplicando
+medidas razonables de seguridad, conforme a la normativa aplicable.
+
+
+
+
+## Artículo 5. Definiciones
+Para efectos del presente Reglamento, los términos que a continuación se indican
+tendrán el significado siguiente, en congruencia con los instrumentos vigentes del
+Proyecto (Términos y Condiciones, Convenio de Adhesión y Reglamento del Apoyo Económico),
+sin perjuicio de otras definiciones que en dichos instrumentos resulten aplicables:
+- Abuso: uso indebido o contrario a la finalidad del Proyecto y sus reglas,
+aun sin configurar fraude pleno, incluyendo intentos de eludir controles o
+aprovechar vacíos operativos.
+- Aliados / Proveedores: terceros vinculados al Proyecto para validación,
+prestación de servicios, confirmación de información o entrega de apoyos
+(cuando aplique).
+- Apoyo: entrega o aplicación de recursos del Apoyo Económico, cuando proceda,
+conforme a reglas vigentes y suficiencia.
+- Asociado Adherente: Titular que, adicionalmente, acepta el
+instrumento de adhesión correspondiente para participar en el mecanismo
+solidario administrado por la A.C.
+- Carencia: periodo mínimo de antigüedad o espera aplicable antes de
+poder solicitar apoyos, conforme al instrumento del Apoyo Económico.
+- Cuenta: perfil digital del Titular/Usuario dentro de la Plataforma.
+- Evidencia: documentos, imágenes, videos, comprobantes, reportes,
+facturas, constancias, registros digitales y demás elementos aportados o
+generados para acreditar hechos o requisitos.
+- Apoyo Económico: Apoyo Económico administrado por CLUB PATA AMIGA, A.C.,
+sujeto a reglas de suficiencia, carencias, límites, validación y demás criterios
+vigentes.
+- Fraude: conducta dolosa destinada a obtener un beneficio indebido o
+eludir reglas, mediante falsedad, simulación, suplantación, manipulación o
+abuso de sistemas o evidencias.
+- Operación inusual/sospechosa: patrón de pago o comportamiento
+atípico que, por su naturaleza, monto o frecuencia, amerite verificación
+reforzada para descartar riesgos de licitud o fraude.
+
+
+
+- Plataforma: el sitio y/o aplicación “Pata Amiga” y sus módulos,
+interfaces y funcionalidades.
+- Proveedor de pagos: tercero que procesa pagos, cargos recurrentes,
+confirmaciones o devoluciones cuando proceda.
+- Solicitud: trámite o petición presentada por el Titular/Asociado
+Adherente dentro de la Plataforma, en particular las relacionadas con el Apoyo Económico
+cuando aplique.
+- Suficiencia: disponibilidad real del Apoyo Económico para atender solicitudes, sin
+generar derecho automático o exigible.
+- Suspensión / Bloqueo / Cancelación: medidas operativas aplicadas a
+la Cuenta o Membresía, de manera temporal o definitiva, conforme a este
+Reglamento y a los instrumentos vigentes.
+- Titular / Usuario: persona física que crea una Cuenta, contrata
+Membresía y utiliza la Plataforma.
+- Validación: procedimiento de revisión y verificación de requisitos,
+datos y evidencias, incluyendo controles antifraude.
+
+
+## CAPÍTULO 2. GOBIERNO DE CUMPLIMIENTO
+
+Artículo 6. Roles y responsabilidades
+- GIRBAZ es responsable de la integridad operativa en el ámbito de la
+Plataforma, incluyendo:
+a) seguridad técnica, registros (logs) y trazabilidad operativa;
+b) verificación digital razonable, prevención de fraude y abuso de
+## Cuenta;
+c) cobros, cargos recurrentes, aclaraciones de pago y soporte; y
+d) adopción de medidas operativas de
+suspensión/bloqueo/cancelación conforme a instrumentos vigentes.
+
+
+
+- CLUB PATA AMIGA, A.C. es responsable de la integridad en el ámbito
+del Apoyo Económico, incluyendo:
+a) validación y resolución de Solicitudes con cargo al Apoyo Económico;
+b) criterios de control y auditoría aplicables a apoyos; y
+c) determinaciones relacionadas con elegibilidad, suficiencia y
+medidas vinculadas al Apoyo Económico, conforme al Convenio de Adhesión y
+Reglamento del Apoyo Económico.
+- La separación funcional anterior se establece para evitar confusión de
+responsabilidades, de manera que:
+a) controversias de Plataforma/cobros/soporte corresponden a
+GIRBAZ; y
+b) decisiones y medidas asociadas al Apoyo Económico corresponden a la
+A.C., sin perjuicio de la colaboración operativa permitida.
+
+Artículo 7. Responsable/Encargado de Cumplimiento
+- GIRBAZ designará un Responsable/Encargado de Cumplimiento
+interno con facultades para:
+- coordinar controles antifraude;
+- requerir información adicional razonable;
+- escalar casos al órgano interno correspondiente; y
+- emitir determinaciones operativas en materia de integridad
+dentro del ámbito de GIRBAZ.
+- CLUB PATA AMIGA, A.C. designará, cuando corresponda, una figura
+responsable  para coordinar las medidas de integridad en el ámbito del Apoyo Económico,
+incluyendo verificación y auditoría, y para canalizar medidas internas
+conforme a sus instrumentos.
+- Gancho LFPIORPI: En caso de que se actualicen supuestos legales
+aplicables (por ejemplo, Actividad Vulnerable por donativos conforme a
+LFPIORPI), la A.C. podrá requerir la adopción de medidas adicionales,
+designaciones y procedimientos necesarios para el cumplimiento normativo
+
+
+
+correspondiente, sin que ello implique modificar la naturaleza del Apoyo Económico ni
+convertirlo en un producto financiero.
+
+## Artículo 8. Comité
+- Para casos relevantes, podrá existir un Comité del Apoyo Económico y de
+Integridad, como órgano interno de revisión, con funciones de análisis,
+auditoría, validación reforzada y emisión de determinaciones internas en
+asuntos relacionados con: (i) el Apoyo Económico y sus Solicitudes; y/o (ii)
+incidentes de fraude, abuso, licitud de recursos (PLD) e
+integridad/anticorrupción vinculados con la Plataforma y/o el Apoyo Económico.
+- Integración y quórum: El Comité se integrará por tres (3) personas,
+designadas por CLUB PATA AMIGA, A.C. y/o por GIRBAZ, S.A. de C.V. según la
+materia del caso. Podrá sesionar de manera presencial o a distancia
+mediante medios electrónicos. Existirá quórum con la participación de al
+menos dos (2) integrantes, y las decisiones se adoptarán por mayoría simple
+de los integrantes presentes.
+- Conflicto de interés: Cualquier integrante que tenga un conflicto de
+interés real o potencial deberá revelarlo de inmediato y abstenerse de
+participar en la revisión, deliberación o decisión del asunto correspondiente.
+El incumplimiento de esta obligación podrá dar lugar a: (i) la revisión interna
+de la determinación adoptada; y (ii) la aplicación de medidas correctivas
+conforme a los instrumentos vigentes del Proyecto.
+
+
+## CAPÍTULO 3. REGLAMENTO ANTIFRAUDE (USUARIOS Y OPERACIÓN)
 
 Artículo 9. Finalidad y alcance del antifraude
 - El presente capítulo establece reglas específicas para prevenir, detectar
@@ -3574,8 +3579,8 @@ Para dudas o solicitudes relacionadas con cookies y privacidad:
 
 
 
-
-## CONVENIO ASOCIADO
+`,
+  "convenio-asociado": `## CONVENIO ASOCIADO
 ## MANIFESTACIÓN EXPRESA
 AL DAR CLIC EN “ACEPTO”, el Titular de la cuenta manifiesta, bajo protesta de
 decir verdad, que (i) ha leído y comprendido el presente Convenio de Adhesión,
