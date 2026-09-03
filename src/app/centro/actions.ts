@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTeam } from "@/lib/alerts";
+import {
+  sanearAdjuntos,
+  type AdjuntoConversacion,
+} from "@/lib/documentos-conversacion";
 
 /**
  * Acciones del dashboard del centro aliado (/centro): el centro edita su
@@ -320,5 +324,53 @@ export async function deletePromotion(promotionId: string) {
   if (error) return { error: "No pudimos borrar la promoción. Intenta de nuevo." };
 
   refreshCenterPages();
+  return { ok: true as const };
+}
+
+/**
+ * RESPUESTA DEL CENTRO EN EL HILO CON EL COMITÉ (Cipatli, 1-sep).
+ *
+ * Gemela de `replySolicitudEmbajador`. `ownCenter` ya acepta `pending` además
+ * de `approved`, que es lo que hace falta: el hilo existe para resolver una
+ * solicitud que todavía se está revisando.
+ *
+ * Un mensaje puede ser SOLO adjuntos: mandar la constancia que les pidieron es
+ * una respuesta completa.
+ */
+export async function replySolicitudCentro(
+  message: string,
+  documents?: AdjuntoConversacion[],
+) {
+  const ctx = await ownCenter();
+  if (!ctx) return { error: "No encontramos tu centro aliado." };
+
+  const text = message?.trim() ?? "";
+  const adjuntos = sanearAdjuntos(documents);
+  if (text.length < 2 && !adjuntos.length)
+    return { error: "Escribe tu mensaje o adjunta un archivo." };
+
+  await ctx.admin.from("solicitud_messages").insert({
+    center_id: ctx.center.id,
+    sender: "solicitante",
+    author_id: ctx.userId,
+    message: text || "(envió archivos)",
+    documents: adjuntos,
+  });
+  await ctx.admin
+    .from("wellness_centers")
+    .update({ info_requested: false })
+    .eq("id", ctx.center.id);
+
+  await notifyTeam(
+    "notify_centers",
+    `Respuesta de ${ctx.center.name} sobre su solicitud`,
+    `<h2 style="color:#1E5350">${ctx.center.name} respondió al comité</h2>
+     <p>${text || "(sin texto)"}</p>
+     ${adjuntos.length ? `<p>Adjuntó ${adjuntos.length} archivo(s).</p>` : ""}
+     <p>Revisa el hilo en el panel → Centros.</p>`,
+  );
+
+  refreshCenterPages();
+  revalidatePath("/admin/centros");
   return { ok: true as const };
 }

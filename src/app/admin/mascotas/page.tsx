@@ -9,6 +9,7 @@ import {
   SensitiveBlock,
 } from "@/components/panel/DetailModal";
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
+import { cuentasPorOmisionDe } from "@/lib/cuentas-bancarias";
 import { FilterChips } from "@/components/panel/FilterChips";
 import { PetReviewRow } from "./PetReviewRow";
 import { etiquetaEspecie } from "@/lib/vocabulario";
@@ -58,6 +59,8 @@ export default async function AdminMascotasPage({
         .in("user_id", duenos)
     : { data: [] };
   const conPasaporte = new Set((pasaportes ?? []).map((d) => d.user_id));
+  // La cuenta de cada dueño, en UNA consulta para toda la lista.
+  const cuentasBanco = await cuentasPorOmisionDe(admin, duenos);
 
   const all = (pets ?? []).filter((p) =>
     verBajas
@@ -472,8 +475,16 @@ export default async function AdminMascotasPage({
                           }
                         />
                         <DetailItem label="DIRECCIÓN" value={addressOf(prof)} />
-                        <DetailItem label="BANCO" value={prof?.bank_name} />
-                        <DetailItem label="CLABE" value={prof?.clabe} />
+                        {/* La cuenta sale de `member_bank_accounts` desde el
+                            2-sep; `profiles.clabe` quedó congelada. */}
+                        <DetailItem
+                          label="BANCO"
+                          value={cuentasBanco.get(p.user_id)?.bank_name ?? null}
+                        />
+                        <DetailItem
+                          label="CLABE"
+                          value={cuentasBanco.get(p.user_id)?.clabe ?? null}
+                        />
                         <DetailItem label="RFC" value={prof?.rfc} />
                       </div>
                     </SensitiveBlock>

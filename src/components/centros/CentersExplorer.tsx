@@ -45,6 +45,9 @@ const CHIP_PALETTES: Record<WellnessService, string> = {
   training: "bg-info-bg text-info-text",
   transport: "bg-warning-bg text-warning-text",
   photography: "bg-error-bg text-error-text",
+  // Categorías nuevas del 2-sep
+  thanatology: "bg-cream text-ink-secondary",
+  psychology: "bg-info-bg text-info-text",
 };
 
 const norm = (s: string) =>

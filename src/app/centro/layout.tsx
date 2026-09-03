@@ -10,6 +10,9 @@ import { ServiciosCard, type LocationRow } from "./ServiciosCard";
 import { RedesCard } from "./RedesCard";
 import { CenterNav } from "./CenterNav";
 import { getCenterContext, getCenterLocations } from "./shared";
+import { SolicitudHiloPortal } from "@/components/app/SolicitudHiloPortal";
+import { leerHiloDeSolicitud } from "@/lib/hilo-solicitud";
+import { replySolicitudCentro } from "./actions";
 
 export const metadata = { title: "Dashboard de centro aliado · Club Pata Amiga" };
 
@@ -75,6 +78,26 @@ export default async function CentroLayout({
     />
   );
 
+  // EL HILO CON EL COMITÉ (Cipatli, 1-sep) — gemelo del portal del embajador.
+  // Va en el layout para que salga en cualquier pestaña y en cualquier estado
+  // de la solicitud, que es cuando más falta hace. Se pinta solo si hay algo
+  // que leer o que contestar.
+  const { mensajes, adjuntos } = await leerHiloDeSolicitud(
+    createAdminClient(),
+    "centro",
+    center.id,
+  );
+  const hilo =
+    mensajes.length > 0 || center.info_requested ? (
+      <SolicitudHiloPortal
+        mensajes={mensajes}
+        adjuntos={adjuntos}
+        infoRequested={center.info_requested}
+        onResponder={replySolicitudCentro}
+        ayuda="Si les pidieron un documento del centro, mándenlo aquí."
+      />
+    ) : null;
+
   if (center.status !== "approved") {
     const admin = createAdminClient();
     // Centros denegados pueden apelar (máx. 2, como miembros) — 16-jul
@@ -102,6 +125,7 @@ export default async function CentroLayout({
             status={center.status as "pending" | "rejected" | "deactivated"}
             reason={center.rejection_reason}
           />
+          {hilo && <div className="w-full">{hilo}</div>}
           {enRevision && (
             <>
               <p className="text-center text-[13.5px] text-ink-secondary">
@@ -170,7 +194,7 @@ export default async function CentroLayout({
   return (
     <div className="min-h-dvh bg-cream pb-24 sm:pb-0">
       {header}
-      <CenterNav />
+      <CenterNav extra={menuEntries} />
       {/* Dueño sin plan activo: invitación a unirse (o reactivar) como miembro */}
       {!isMember && (
         <div className="mx-auto w-full max-w-[980px] px-5 pt-5 sm:px-8">
@@ -192,6 +216,11 @@ export default async function CentroLayout({
               {wasMember ? "Reactivar mi membresía" : "Quiero mi membresía"}
             </Link>
           </div>
+        </div>
+      )}
+      {hilo && (
+        <div className="mx-auto w-full max-w-[980px] px-5 pt-5 sm:px-8">
+          {hilo}
         </div>
       )}
       {children}

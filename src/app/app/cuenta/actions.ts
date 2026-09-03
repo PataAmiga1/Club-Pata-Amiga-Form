@@ -7,7 +7,11 @@ import { getStripe } from "@/lib/stripe";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
 import { ZONA_MX } from "@/lib/zona-horaria";
-import { BANCO_OTRO, bankFromClabe, isValidClabe } from "@/lib/banks";
+import {
+  CUENTAS_MAX,
+  cuentasDelMiembro,
+  revisarCuenta,
+} from "@/lib/cuentas-bancarias";
 import { versionVigente } from "@/lib/plans/versiones";
 import { reemplazarSnapshot } from "@/lib/plans/resolve";
 
@@ -291,35 +295,110 @@ export async function saveBillingData(input: {
 }
 
 /**
- * Datos bancarios del miembro (SPEI): se guardan en su perfil y prefillean
- * cada solicitud de reintegro. CLABE validada con dígito de control.
+ * LAS CUENTAS DEL MIEMBRO PARA SU REINTEGRO — hasta tres (equipo 2-sep).
+ *
+ * Antes era UNA sola y vivía en el perfil. Ahora son hasta tres en
+ * `member_bank_accounts` y el miembro elige a cuál se le deposita al pedir el
+ * reintegro. `profiles.clabe` YA NO SE ESCRIBE: ver `src/lib/cuentas-bancarias.ts`.
+ *
+ * Las tres acciones resuelven de quién es la cuenta antes de tocar nada, y
+ * escriben con el service role — mismo patrón que el resto de este archivo.
  */
-export async function saveMemberBanking(bankNameRaw: string, clabeRaw: string) {
+async function miSesion() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Inicia sesión de nuevo." };
+  if (!user) return null;
+  return { userId: user.id, admin: createAdminClient() };
+}
 
-  const clabe = clabeRaw?.replace(/\D/g, "") ?? "";
-  if (!isValidClabe(clabe))
-    return { error: "Revisa tu CLABE — deben ser 18 dígitos válidos." };
-  // "Otro" a secas no es un banco (equipo, 13-ago): si llega la palabra sin el
-  // nombre real se prefiere el que delata la CLABE.
-  const escrito = bankNameRaw?.trim() ?? "";
-  const bankName =
-    (escrito.toLowerCase() === BANCO_OTRO.toLowerCase() ? "" : escrito) ||
-    bankFromClabe(clabe) ||
-    "";
-  if (!bankName) return { error: "Escribe el nombre de tu banco." };
+export async function agregarCuentaBancaria(entrada: {
+  clabe: string;
+  bankName: string;
+  holder?: string;
+}) {
+  const ctx = await miSesion();
+  if (!ctx) return { error: "Inicia sesión de nuevo." };
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("profiles")
-    .update({ bank_name: bankName, clabe })
-    .eq("id", user.id);
-  if (error) return { error: "No pudimos guardar tus datos. Intenta de nuevo." };
+  const revisada = revisarCuenta(entrada);
+  if ("error" in revisada) return revisada;
+
+  const cuentas = await cuentasDelMiembro(ctx.admin, ctx.userId);
+  if (cuentas.length >= CUENTAS_MAX)
+    return {
+      error: `Puedes guardar hasta ${CUENTAS_MAX} cuentas. Borra una si quieres agregar otra.`,
+    };
+  if (cuentas.some((c) => c.clabe === revisada.clabe))
+    return { error: "Esa cuenta ya está guardada." };
+
+  const { error } = await ctx.admin.from("member_bank_accounts").insert({
+    user_id: ctx.userId,
+    clabe: revisada.clabe,
+    bank_name: revisada.bankName,
+    holder: revisada.holder,
+    // La primera que guarda queda por omisión sin que tenga que elegir nada.
+    is_default: cuentas.length === 0,
+  });
+  if (error) return { error: "No pudimos guardar la cuenta. Intenta de nuevo." };
 
   revalidatePath("/app/cuenta");
-  return { ok: true as const, bankName };
+  revalidatePath("/app/reintegros/nueva");
+  return { ok: true as const, bankName: revisada.bankName };
+}
+
+export async function borrarCuentaBancaria(id: string) {
+  const ctx = await miSesion();
+  if (!ctx) return { error: "Inicia sesión de nuevo." };
+
+  const cuentas = await cuentasDelMiembro(ctx.admin, ctx.userId);
+  const cuenta = cuentas.find((c) => c.id === id);
+  if (!cuenta) return { error: "No encontramos esa cuenta." };
+
+  await ctx.admin
+    .from("member_bank_accounts")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", ctx.userId);
+
+  // Si se borró la de omisión, la más antigua de las que quedan toma su lugar:
+  // sin esto el formulario del reintegro se quedaría sin cuenta propuesta.
+  if (cuenta.is_default) {
+    const quedan = cuentas.filter((c) => c.id !== id);
+    if (quedan.length)
+      await ctx.admin
+        .from("member_bank_accounts")
+        .update({ is_default: true })
+        .eq("id", quedan[0].id);
+  }
+
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/reintegros/nueva");
+  return { ok: true as const };
+}
+
+export async function marcarCuentaPorOmision(id: string) {
+  const ctx = await miSesion();
+  if (!ctx) return { error: "Inicia sesión de nuevo." };
+
+  const cuentas = await cuentasDelMiembro(ctx.admin, ctx.userId);
+  if (!cuentas.some((c) => c.id === id))
+    return { error: "No encontramos esa cuenta." };
+
+  // Primero se apagan TODAS y luego se prende la elegida: hay un índice único
+  // que impide dos por omisión, así que el orden importa.
+  await ctx.admin
+    .from("member_bank_accounts")
+    .update({ is_default: false })
+    .eq("user_id", ctx.userId);
+  const { error } = await ctx.admin
+    .from("member_bank_accounts")
+    .update({ is_default: true })
+    .eq("id", id)
+    .eq("user_id", ctx.userId);
+  if (error) return { error: "No pudimos cambiar la cuenta. Intenta de nuevo." };
+
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/reintegros/nueva");
+  return { ok: true as const };
 }

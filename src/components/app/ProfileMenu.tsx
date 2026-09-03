@@ -8,6 +8,12 @@ export type DashboardEntry = {
   href: string;
   icon: string;
   label: string;
+  /**
+   * Etiqueta corta para la barra de abajo en móvil. Existe porque desde el
+   * 2-sep el cambio de panel sale en LOS DOS lados —el menú y la barra— y ahí
+   * no cabe "Panel de miembro".
+   */
+  short?: string;
 };
 
 /**

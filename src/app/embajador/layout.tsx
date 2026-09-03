@@ -9,6 +9,9 @@ import { PaymentDataCard } from "./PaymentDataCard";
 import { ExtrasCard } from "./ExtrasCard";
 import { IneCard } from "./IneCard";
 import { getAmbassadorContext } from "./shared";
+import { SolicitudHiloPortal } from "@/components/app/SolicitudHiloPortal";
+import { leerHiloDeSolicitud } from "@/lib/hilo-solicitud";
+import { replySolicitudEmbajador } from "./actions";
 
 /** Lo que se desbloquea al ser aprobado — se muestra en gris mientras tanto. */
 function LockedPreview() {
@@ -92,12 +95,15 @@ export default async function EmbajadorLayout({
     .eq("status", "approved")
     .limit(1);
 
+  // Una sola lista para el menú del avatar Y para la barra (equipo, 2-sep):
+  // si cada uno armara la suya, volverían a ofrecer cosas distintas, que es
+  // justo lo que pidieron arreglar.
   const entries: DashboardEntry[] = [
     ...(isMember
-      ? [{ href: "/app", icon: "🐾", label: "Panel de miembro" }]
+      ? [{ href: "/app", icon: "🐾", label: "Panel de miembro", short: "Miembro" }]
       : []),
     ...(centerRows?.length
-      ? [{ href: "/centro", icon: "🏪", label: "Mi centro aliado" }]
+      ? [{ href: "/centro", icon: "🏪", label: "Mi centro aliado", short: "Mi centro" }]
       : []),
   ];
 
@@ -125,6 +131,27 @@ export default async function EmbajadorLayout({
   // portal, ve en qué va su solicitud y puede ir completando su perfil (datos
   // de pago, RFC, redes, contraseña). Lo que depende de la aprobación —código,
   // métricas, materiales— se muestra en gris y bloqueado (equipo, 11-ago).
+  // EL HILO CON EL COMITÉ (Cipatli, 1-sep). Vive en el layout y no en una
+  // pantalla suelta para que no se pueda perder: sale en cualquier pestaña del
+  // portal y en cualquier estado de la solicitud, que es justo cuando más
+  // falta hace —en revisión—. Se pinta solo si hay algo que leer o que
+  // contestar; un hilo vacío sugeriría que le falta hacer algo cuando no.
+  const { mensajes, adjuntos } = await leerHiloDeSolicitud(
+    createAdminClient(),
+    "embajador",
+    ambassador.id,
+  );
+  const hilo =
+    mensajes.length > 0 || ambassador.info_requested ? (
+      <SolicitudHiloPortal
+        mensajes={mensajes}
+        adjuntos={adjuntos}
+        infoRequested={ambassador.info_requested}
+        onResponder={replySolicitudEmbajador}
+        ayuda="Si te pidieron tu INE o un documento, mándalo aquí."
+      />
+    ) : null;
+
   if (ambassador.status !== "approved") {
     const enRevision = ambassador.status === "pending";
     return (
@@ -136,6 +163,7 @@ export default async function EmbajadorLayout({
             status={ambassador.status}
             reason={ambassador.rejection_reason}
           />
+          {hilo}
           {enRevision && (
             <>
               <p className="text-center text-[13.5px] text-ink-secondary">
@@ -170,7 +198,7 @@ export default async function EmbajadorLayout({
   return (
     <div className="min-h-dvh bg-cream pb-24 sm:pb-0">
       {header}
-      <AmbassadorNav />
+      <AmbassadorNav extra={entries} />
       {/* Embajador sin plan activo: invitación a unirse (o reactivar) como miembro */}
       {!isMember && (
         <div className="mx-auto w-full max-w-[980px] px-5 pt-5 sm:px-8">
@@ -192,6 +220,11 @@ export default async function EmbajadorLayout({
               {wasMember ? "Reactivar mi membresía" : "Quiero mi membresía"}
             </Link>
           </div>
+        </div>
+      )}
+      {hilo && (
+        <div className="mx-auto w-full max-w-[980px] px-5 pt-5 sm:px-8">
+          {hilo}
         </div>
       )}
       {children}

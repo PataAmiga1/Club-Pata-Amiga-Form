@@ -46,6 +46,32 @@ export const REJECTION_REASONS = [
   "Tope excedido",
 ] as const;
 
+/**
+ * Mensajes predeterminados para PEDIRLE algo al miembro sobre su peludo
+ * (equipo, 2-sep).
+ *
+ * NACIERON EN EL LUGAR EQUIVOCADO. El 1-sep se pusieron colgando del botón
+ * "Denegar", y el equipo lo corrigió al verlos: no son razones para RECHAZAR
+ * un peludo —"la foto no se ve", "falta el certificado"— son razones para
+ * PEDIR algo. Denegar es la acción rara y terminal; pedir una mejor foto es la
+ * de todos los días. Así que viven en "Solicitar información", que es el
+ * botón que de verdad se usa, y el de denegar quedó en blanco para que el
+ * comité escriba lo que ocupe.
+ *
+ * PRELLENAN el mensaje y se pueden editar encima, a diferencia de los del
+ * reintegro, que son la resolución misma y no se tocan: el miembro recibe este
+ * texto tal cual, así que tiene que poder decir CUÁL foto o CUÁL dato.
+ *
+ * Están redactados como lo que hay que HACER, no como un veredicto.
+ */
+export const PET_REQUEST_MESSAGES = [
+  "La foto no deja ver bien al peludo. ¿Nos mandas otra?",
+  "Los datos no coinciden con la foto. ¿Los revisas?",
+  "Falta el certificado veterinario.",
+  "La raza o la especie no coinciden con la foto.",
+  "La edad registrada no coincide con la foto.",
+] as const;
+
 export const MAX_ACTIVE_PETS = 3;
 /** Fotos adicionales por mascota (además de la foto principal). */
 export const PET_GALLERY_MAX = 5;
@@ -155,6 +181,20 @@ export const WELLNESS_SERVICES = {
     plural: "Fotografía y experiencias",
     emoji: "📸",
   },
+  // DOS CATEGORÍAS NUEVAS (equipo, 2-sep), y van SEPARADAS a petición suya:
+  // acompañar una pérdida y atender la conducta o el ánimo son dos oficios
+  // distintos y rara vez los da el mismo lugar.
+  //
+  // Las dos cubren A PERSONAS Y A ANIMALES (Pablo, 2-sep), pero la etiqueta no
+  // lo dice: un centro puede ofrecer solo una de las dos mitades —tanatología
+  // para el tutor que perdió a su peludo, o etología para el peludo— y una
+  // etiqueta que prometiera ambas lo haría quedar mal. Quién es el paciente lo
+  // explica cada centro en su beneficio.
+  //
+  // No lleva migración: `services` es un arreglo de texto sin restricción, y
+  // las llaves de los nueve anteriores no se tocan.
+  thanatology: { label: "Tanatología", plural: "Tanatología", emoji: "🤍" },
+  psychology: { label: "Psicología", plural: "Psicología", emoji: "🧠" },
 } as const;
 
 export type WellnessService = keyof typeof WELLNESS_SERVICES;

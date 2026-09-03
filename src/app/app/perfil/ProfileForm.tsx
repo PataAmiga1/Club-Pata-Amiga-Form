@@ -154,13 +154,9 @@ export function ProfileForm({
   const [cp, setCp] = useState(initial.postal_code ?? "");
   const [stateMx, setStateMx] = useState(initial.state ?? "");
   const [city, setCity] = useState(initial.city ?? "");
-  const [colony, setColony] = useState(initial.colony ?? "");
-  const [colonies, setColonies] = useState<string[]>(
-    initial.colony ? [initial.colony] : [],
-  );
-  const [street, setStreet] = useState(initial.street ?? "");
-  const [numExt, setNumExt] = useState(initial.number_ext ?? "");
-  const [numInt, setNumInt] = useState(initial.number_int ?? "");
+  // Alcaldia y estado no se preguntan, pero SI se le confirman a la persona:
+  // sin eso, teclear cinco digitos y que no pase nada visible se siente roto.
+  const ubicacion = [city, stateMx].filter(Boolean).join(", ");
   const [passportFile, setPassportFile] = useState(passport);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -257,16 +253,15 @@ export function ProfileForm({
       .then((r) => r.json())
       .then((data) => {
         if (cancelled || !data.found) return;
+        // Alcaldia y estado se llenan solos y no se muestran: sirven para la
+        // estadistica del panel, que agrupa la manada por estado.
         setStateMx(data.state);
         setCity(data.city);
-        setColonies(data.colonies);
-        if (!data.colonies.includes(colony)) setColony(data.colonies[0] ?? "");
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cp]);
 
   // Nacionalidad y fecha de nacimiento son obligatorias para el 100%
@@ -283,7 +278,7 @@ export function ProfileForm({
     // titular de la membresía tiene que ser mayor de edad.
     15 * Number(fechaValida && !menorDeEdad) +
     10 * Number(nationality.trim().length > 0) +
-    25 * Number(Boolean(cp.length === 5 && colony && street));
+    25 * Number(cp.length === 5);
 
   async function save(finalize: boolean) {
     if (menorDeEdad) {
@@ -319,14 +314,6 @@ export function ProfileForm({
         postal_code: cp || null,
         state: stateMx || null,
         city: city || null,
-        colony: colony || null,
-        street: street || null,
-        number_ext: numExt || null,
-        number_int: numInt || null,
-        street_address:
-          [street, numExt && `#${numExt}`, numInt && `Int. ${numInt}`]
-            .filter(Boolean)
-            .join(" ") || null,
         profile_completed: completion === 100,
       })
       .eq("id", userId);
@@ -563,6 +550,17 @@ export function ProfileForm({
         )}
       </section>
 
+      {/* DEL DOMICILIO SOLO QUEDA EL CP (equipo, 1-sep). Es el mismo criterio
+          que Pablo aplico al alta de embajador el 19-ago, y aqui la razon es
+          mas fuerte todavia: a un miembro NUNCA se le manda nada a su casa
+          —el reintegro se deposita a su cuenta y la membresia es 100% digital—
+          asi que la calle, el numero y la colonia se pedian, se guardaban y
+          solo se mostraban. Con el CP alcanza para saber en que zonas esta la
+          manada, y la alcaldia y el estado se siguen derivando solos del
+          catalogo sin preguntarlos.
+
+          Lo que ya habian capturado los miembros de antes NO se borra: estos
+          campos simplemente dejan de escribirse. */}
       <section className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
         <span className="text-[13px] font-extrabold tracking-[.06em] text-teal-deep">
           TU DOMICILIO
@@ -576,58 +574,11 @@ export function ProfileForm({
             value={cp}
             onChange={(e) => setCp(e.target.value.replace(/\D/g, ""))}
             autoComplete="postal-code"
-          />
-          {/* El código postal propone la colonia, pero SIEMPRE se puede
-              escribir otra: el catálogo se equivoca o le falta la de alguien
-              (PM, 12-ago). Antes era una lista cerrada. */}
-          <AutocompleteField
-            label="Colonia"
-            options={colonies}
-            value={colony}
-            onChange={setColony}
-            placeholder="Escribe o elige tu colonia"
             hint={
-              colonies.length > 0
-                ? "La sugerimos según tu código postal; si no es correcta, puedes cambiarla."
-                : undefined
+              ubicacion
+                ? `Te ubicamos en ${ubicacion}.`
+                : "Lo usamos para saber en qué zonas está la manada."
             }
-          />
-        </div>
-        {/* Alcaldía y estado: se llenan solos con el CP y ahora SE PUEDEN
-            CORREGIR. Antes eran texto fijo, así que un dato equivocado del
-            catálogo no había forma de arreglarlo (PM, 12-ago). */}
-        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-          <TextField
-            label="Alcaldía o municipio"
-            placeholder="Gustavo A. Madero"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-          />
-          <TextField
-            label="Estado"
-            placeholder="Ciudad de México"
-            value={stateMx}
-            onChange={(e) => setStateMx(e.target.value)}
-          />
-        </div>
-        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-[1fr_120px_120px]">
-          <TextField
-            label="Calle"
-            placeholder="Av. de la Luz"
-            value={street}
-            onChange={(e) => setStreet(e.target.value)}
-          />
-          <TextField
-            label="No. ext."
-            placeholder="128"
-            value={numExt}
-            onChange={(e) => setNumExt(e.target.value)}
-          />
-          <TextField
-            label="No. int."
-            placeholder="—"
-            value={numInt}
-            onChange={(e) => setNumInt(e.target.value)}
           />
         </div>
       </section>

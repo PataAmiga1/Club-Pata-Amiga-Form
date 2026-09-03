@@ -382,6 +382,32 @@ ${BOTON("{{siteUrl}}/app/cuenta", "Ver mi cuenta")}`),
 ${BOTON("{{siteUrl}}/app/perfil", "Completar mi perfil")}`),
   },
   {
+    key: "ambassador_info_request",
+    name: "El comité pide información (embajador)",
+    description:
+      "Cuando el comité necesita un documento o una aclaración sobre la solicitud de un embajador. El caso típico: la INE llegó borrosa.",
+    variables: {
+      firstName: "Nombre del solicitante",
+      itemsList: "Lista de lo solicitado (puede venir vacía)",
+      message: "Mensaje del comité",
+      portalUrl: "URL de su portal de embajador",
+    },
+    sample: {
+      firstName: "Paola",
+      itemsList: "<li>🪪 INE por el frente</li>",
+      message:
+        "La foto del frente de tu INE salió movida y no alcanzamos a leer los datos. ¿Nos mandas otra?",
+      portalUrl: "https://pataamiga.mx/embajador",
+    },
+    subject: "El comité necesita algo de tu solicitud de embajador",
+    html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
+<p>El comité está revisando tu solicitud de embajador y necesita esto de tu parte:</p>
+<ul>{{itemsList}}</ul>
+<p style="background:#FAF7F1;border-radius:12px;padding:12px">{{message}}</p>
+<p>Puedes responder y mandar tus archivos desde tu portal, sin salir de la plataforma.</p>
+${BOTON("{{portalUrl}}", "Responder al comité")}`),
+  },
+  {
     key: "ambassador_deactivated",
     name: "Baja de embajador (por el comité)",
     description:
@@ -525,6 +551,34 @@ ${BOTON("{{siteUrl}}/centro", "Ver mi solicitud")}`),
 ${BOTON("{{siteUrl}}/centro", "Ir a mi panel")}`),
   },
   {
+    key: "center_info_request",
+    name: "El comité pide información (centro aliado)",
+    description:
+      "Cuando el comité necesita un documento o una aclaración sobre la solicitud de un centro aliado.",
+    variables: {
+      contactName: "Nombre de contacto",
+      centerName: "Nombre del centro",
+      itemsList: "Lista de lo solicitado (puede venir vacía)",
+      message: "Mensaje del comité",
+      portalUrl: "URL de su portal de centro aliado",
+    },
+    sample: {
+      contactName: "Dra. Lucía Ramos",
+      centerName: "Vet San Ángel",
+      itemsList: "<li>🧾 Constancia de situación fiscal</li>",
+      message:
+        "La constancia que subieron es de 2023. ¿Nos comparten la más reciente?",
+      portalUrl: "https://pataamiga.mx/centro",
+    },
+    subject: "El comité necesita algo de la solicitud de {{centerName}}",
+    html: WRAP(`<h2 style="color:#1E5350">Hola, {{contactName}}</h2>
+<p>El comité está revisando la solicitud de <strong>{{centerName}}</strong> y necesita esto de su parte:</p>
+<ul>{{itemsList}}</ul>
+<p style="background:#FAF7F1;border-radius:12px;padding:12px">{{message}}</p>
+<p>Pueden responder y mandar sus archivos desde su portal, sin salir de la plataforma.</p>
+${BOTON("{{portalUrl}}", "Responder al comité")}`),
+  },
+  {
     key: "center_rejected",
     name: "Centro aliado no aprobado",
     description: "Cuando el comité deniega la solicitud de un centro.",
@@ -650,9 +704,11 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   ambassador_approved: "embajadores",
   ambassador_rejected: "embajadores",
   ambassador_deactivated: "embajadores",
+  ambassador_info_request: "embajadores",
   center_received: "centros",
   center_approved: "centros",
   center_rejected: "centros",
+  center_info_request: "centros",
   campaign_gift: "campanas",
   birthday_member: "celebraciones",
   birthday_pet: "celebraciones",

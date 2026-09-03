@@ -8,9 +8,11 @@ import { validateCurp } from "@/lib/curp";
  *
  *   nombre y apellido · identidad (CURP válida para mexicanos, pasaporte
  *   subido para extranjeros — equipo, 11-ago) · fecha de nacimiento ·
- *   nacionalidad (obligatorias desde el 5-ago) · domicilio (CP + colonia +
- *   calle). El INE es OPCIONAL (Pablo, 10-ago) y no cuenta aquí; el teléfono
- *   tampoco entra al 100%.
+ *   nacionalidad (obligatorias desde el 5-ago) · domicilio, que desde el
+ *   1-sep es SOLO EL CP: a un miembro no se le manda nada a su casa, así que
+ *   la calle y la colonia se pedían para nada más que mostrarse. El INE es
+ *   OPCIONAL (Pablo, 10-ago) y no cuenta aquí; el teléfono tampoco entra al
+ *   100%.
  */
 export type PerfilCampos = {
   first_name?: string | null;
@@ -19,8 +21,6 @@ export type PerfilCampos = {
   birth_date?: string | null;
   nationality?: string | null;
   postal_code?: string | null;
-  colony?: string | null;
-  street?: string | null;
 };
 
 /** Nacionalidad vacía se trata como mexicana (misma regla del ProfileForm). */
@@ -51,8 +51,7 @@ export function datosFaltantesDelPerfil(
   if (!p.birth_date || !/^\d{4}-\d{2}-\d{2}$/.test(p.birth_date))
     faltan.push("fecha de nacimiento");
   if (!p.nationality?.trim()) faltan.push("nacionalidad");
-  if (!(p.postal_code?.length === 5 && p.colony && p.street))
-    faltan.push("domicilio (CP, colonia y calle)");
+  if (p.postal_code?.length !== 5) faltan.push("código postal");
   return faltan;
 }
 

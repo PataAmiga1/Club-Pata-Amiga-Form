@@ -23,6 +23,8 @@ export type CenterRow = {
   logo_url: string | null;
   services: string[] | null;
   member_benefit: string | null;
+  /** El comite le pidio algo por el hilo y todavia no contesta (1-sep). */
+  info_requested: boolean;
   status: string;
   rejection_reason: string | null;
   social_links: Record<string, string> | null;
@@ -38,7 +40,7 @@ export type CenterContext = {
 };
 
 const CENTER_COLS =
-  "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, social_links";
+  "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, info_requested, status, rejection_reason, social_links";
 
 /**
  * Envuelto en `cache()` porque el layout y la página de la pestaña lo piden
@@ -113,12 +115,21 @@ export const getCenterContext = cache(async function getCenterContext(): Promise
     center: center as CenterRow,
     isMember,
     wasMember: Boolean(memberProfile?.member_since),
+    // Alimenta el menú del avatar Y la barra de abajo (equipo, 2-sep): una
+    // sola lista para que las dos ofrezcan lo mismo.
     menuEntries: [
       ...(isMember
-        ? [{ href: "/app", icon: "🐾", label: "Panel de miembro" }]
+        ? [{ href: "/app", icon: "🐾", label: "Panel de miembro", short: "Miembro" }]
         : []),
       ...(ambassadorRows?.length
-        ? [{ href: "/embajador", icon: "🤝", label: "Panel de embajador" }]
+        ? [
+            {
+              href: "/embajador",
+              icon: "🤝",
+              label: "Panel de embajador",
+              short: "Embajador",
+            },
+          ]
         : []),
     ],
   };

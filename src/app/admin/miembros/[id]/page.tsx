@@ -7,6 +7,7 @@ import { formatDateEs } from "@/lib/dates";
 import { formatMxn } from "@/lib/format";
 import { curpCoincide } from "@/lib/curp";
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
+import { cuentaPorOmision, cuentasDelMiembro } from "@/lib/cuentas-bancarias";
 import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
 import { PetThreadPanel } from "./PetThreadPanel";
 import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
@@ -89,6 +90,13 @@ export default async function AdminMiembroDetailPage({
     .order("created_at", { ascending: false });
 
   if (!m) notFound();
+
+  // Sus cuentas para reintegro (hasta 3 desde el 2-sep). Se muestra la que
+  // eligió por omisión, y cuántas tiene, para que el comité sepa que hay más
+  // de un destino posible antes de mirar un archivo del banco.
+  const cuentasBancarias = await cuentasDelMiembro(admin, id);
+  const cuentaBanco = cuentaPorOmision(cuentasBancarias);
+  const cuentasDelMiembroCount = cuentasBancarias.length;
 
   // Documentos de identidad (INE) con links firmados — bucket privado
   const { data: docs } = await admin
@@ -320,8 +328,16 @@ export default async function AdminMiembroDetailPage({
             DATOS BANCARIOS Y CÓDIGO
           </span>
           <span>
-            Banco: {m.bank_name ?? "—"}
-            {m.clabe ? ` · CLABE ····${String(m.clabe).slice(-4)}` : ""}
+            {/* Sale de `member_bank_accounts` (2-sep): el miembro puede
+                tener hasta tres y aquí se muestra la que eligió por omisión.
+                `profiles.clabe` quedó congelada. */}
+            Banco: {cuentaBanco?.bank_name ?? "—"}
+            {cuentaBanco
+              ? ` · CLABE ····${cuentaBanco.clabe.slice(-4)}`
+              : ""}
+            {cuentasDelMiembroCount > 1
+              ? ` (${cuentasDelMiembroCount} cuentas guardadas)`
+              : ""}
           </span>
           <span>
             Código de embajador usado: {m.ambassador_code_used ?? "—"}

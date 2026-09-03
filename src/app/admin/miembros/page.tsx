@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { cuentasPorOmisionDe } from "@/lib/cuentas-bancarias";
 import { reportError } from "@/lib/alerts";
 import { getAdminRole } from "@/lib/admin-guard";
 import { formatDateEs } from "@/lib/dates";
@@ -33,6 +34,9 @@ type Row = {
   nationality: string | null;
   bank_name: string | null;
   clabe: string | null;
+  /** Resuelta desde `member_bank_accounts` (2-sep), no del perfil. */
+  cuenta_banco?: string | null;
+  cuenta_clabe?: string | null;
   cfdi_requested: boolean | null;
   profile_completed: boolean | null;
   pets: { id: string; name: string; is_active: boolean }[];
@@ -163,7 +167,19 @@ export default async function AdminMiembrosPage({
     if (respaldo.error)
       fallaDeLectura = `${fallaDeLectura} · el respaldo también falló: ${respaldo.error.message}`;
   }
-  const members = (membersRaw ?? []) as unknown as Row[];
+  const membersBase = (membersRaw ?? []) as unknown as Row[];
+  // Su cuenta para reintegros, en UNA consulta para toda la lista. Desde el
+  // 2-sep puede tener hasta tres y `profiles.clabe` quedó congelada, así que
+  // la columna del banco sale de aquí y no del perfil.
+  const cuentasBanco = await cuentasPorOmisionDe(
+    admin,
+    membersBase.map((m) => m.id),
+  );
+  const members: Row[] = membersBase.map((m) => ({
+    ...m,
+    cuenta_banco: cuentasBanco.get(m.id)?.bank_name ?? null,
+    cuenta_clabe: cuentasBanco.get(m.id)?.clabe ?? null,
+  }));
 
   // Motivo de baja: la cancelación más reciente de cada miembro listado
   const motivoDeBaja = new Map<string, string>();
@@ -250,17 +266,21 @@ export default async function AdminMiembrosPage({
     h: "BANCO · CLABE",
     w: "150px",
     render: (m) => {
-      if (!m.bank_name && !m.clabe) return "—";
+      // Desde el 2-sep la cuenta sale de `member_bank_accounts`: el miembro
+      // puede tener hasta tres y `profiles.clabe` quedó congelada.
+      const banco = m.cuenta_banco ?? null;
+      const numero = m.cuenta_clabe ?? null;
+      if (!banco && !numero) return "—";
       // La CLABE completa es dato sensible: solo la ve el super admin;
       // el admin normal ve los últimos 4 dígitos.
-      const clabe = m.clabe
+      const clabe = numero
         ? isSuper
-          ? m.clabe
-          : `•••${m.clabe.slice(-4)}`
+          ? numero
+          : `•••${numero.slice(-4)}`
         : null;
       return (
         <span className="min-w-0">
-          {m.bank_name || "Banco sin capturar"}
+          {banco || "Banco sin capturar"}
           {clabe && (
             <span className="block truncate text-[11px] text-ink-tertiary">{clabe}</span>
           )}

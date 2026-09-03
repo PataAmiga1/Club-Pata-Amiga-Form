@@ -6,6 +6,8 @@ import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
 import { inicioDelMes } from "@/lib/zona-horaria";
 import { ligaFirmadaDeIne } from "@/lib/documentos-ine";
 import { ExpedienteDocumentos } from "@/components/panel/ExpedienteDocumentos";
+import { SolicitudHiloComite } from "@/components/panel/SolicitudHiloComite";
+import { HILO_VACIO, leerHilosDeSolicitud } from "@/lib/hilo-solicitud";
 import {
   documentosDeSolicitud,
   documentosRequeridos,
@@ -106,6 +108,7 @@ type Row = {
       del representante legal y la entidad vive en `razon_social`. */
   tipo_persona: string | null;
   razon_social: string | null;
+  info_requested: boolean;
   motivation: string | null;
   social_links: Record<string, string> | null;
   deactivation_reason: string | null;
@@ -136,7 +139,7 @@ export default async function AdminEmbajadoresPage({
   const { data } = await admin
     .from("ambassadors")
     .select(
-      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, deactivated_at, tipo_persona, razon_social, referrals(commission_amount, status, created_at)",
+      "id, first_name, last_name, email, phone, curp, city, state, referral_code, status, user_id, created_at, bank_name, clabe, bank_holder, ine_front_url, ine_back_url, birth_date, rfc, motivation, social_links, deactivation_reason, deactivated_at, tipo_persona, razon_social, info_requested, referrals(commission_amount, status, created_at)",
     )
     .order("created_at", { ascending: masAntiguos });
 
@@ -172,6 +175,15 @@ export default async function AdminEmbajadoresPage({
           [a.id, await documentosDeSolicitud({ ambassadorId: a.id })] as const,
       ),
     ),
+  );
+
+  // Los hilos con el comité (Cipatli, 1-sep), TODOS en una consulta: el popup
+  // de cada solicitud lo abre, y pedirlos de uno en uno serían decenas de
+  // viajes en cada carga de la pantalla.
+  const hilos = await leerHilosDeSolicitud(
+    admin,
+    "embajador",
+    rows.map((a) => a.id),
   );
 
   const pending = rows.filter((a) => a.status === "pending");
@@ -397,6 +409,17 @@ export default async function AdminEmbajadoresPage({
                           ),
                       )
                       .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                  />
+                  {/* El hilo con el comité (Cipatli, 1-sep). Va PEGADO al expediente
+                      porque es donde se decide: si un documento llegó borroso, pedir otro
+                      se hace aquí mismo en vez de salirse a un correo suelto. */}
+                  <SolicitudHiloComite
+                    sujeto="embajador"
+                    id={a.id}
+                    nombre={a.first_name}
+                    infoRequested={a.info_requested}
+                    mensajes={(hilos.get(a.id) ?? HILO_VACIO).mensajes}
+                    adjuntos={(hilos.get(a.id) ?? HILO_VACIO).adjuntos}
                   />
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
@@ -626,6 +649,17 @@ export default async function AdminEmbajadoresPage({
                             ),
                         )
                         .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                    />
+                    {/* El hilo con el comité (Cipatli, 1-sep). Va PEGADO al expediente
+                        porque es donde se decide: si un documento llegó borroso, pedir otro
+                        se hace aquí mismo en vez de salirse a un correo suelto. */}
+                    <SolicitudHiloComite
+                      sujeto="embajador"
+                      id={a.id}
+                      nombre={a.first_name}
+                      infoRequested={a.info_requested}
+                      mensajes={(hilos.get(a.id) ?? HILO_VACIO).mensajes}
+                      adjuntos={(hilos.get(a.id) ?? HILO_VACIO).adjuntos}
                     />
 
                     {/* Tablero dinámico por embajador (equipo, 5-ago) */}

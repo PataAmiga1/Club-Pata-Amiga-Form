@@ -4,6 +4,11 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import {
+  cuentaPorOmision,
+  etiquetaDeCuenta,
+  type CuentaBancaria,
+} from "@/lib/cuentas-bancarias";
 import { TextField } from "@/components/ui/Field";
 import {
   REIMBURSEMENT_CAPS_MXN,
@@ -49,14 +54,18 @@ const CATEGORIES: {
 export function RequestForm({
   userId,
   pets,
-  lastClabe,
+  cuentas,
+  ultimaClabe,
   holderName,
   balances,
   blocked,
 }: {
   userId: string;
   pets: EligiblePet[];
-  lastClabe: string;
+  /** Las cuentas guardadas del miembro — hasta 3 desde el 2-sep. */
+  cuentas: CuentaBancaria[];
+  /** Respaldo si no tiene ninguna guardada: la del último reintegro. */
+  ultimaClabe: string;
   holderName: string;
   balances: Record<Category, CategoryBalance>;
   blocked: boolean;
@@ -72,8 +81,14 @@ export function RequestForm({
   const [files, setFiles] = useState<
     Partial<Record<ReimbursementDocType, File | null>>
   >({});
-  const [clabe, setClabe] = useState(lastClabe);
-  const [holder, setHolder] = useState(holderName);
+  // LA CUENTA SE ELIGE AQUÍ, al pedir, y no en "Mi cuenta" (Pablo, 2-sep). Si
+  // la elección viviera en el perfil, cambiarla después movería el destino de
+  // una solicitud YA ENVIADA. Lo que se manda es la CLABE, y el servidor la
+  // congela en el renglón del reintegro.
+  const propuesta = cuentaPorOmision(cuentas);
+  const [clabe, setClabe] = useState(propuesta?.clabe ?? ultimaClabe);
+  const [holder, setHolder] = useState(propuesta?.holder ?? holderName);
+  const elegida = cuentas.find((c) => c.clabe === clabe) ?? null;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRefs = useRef<Partial<Record<ReimbursementDocType, HTMLInputElement | null>>>({});
@@ -407,15 +422,70 @@ export function RequestForm({
           </div>
         </div>
 
+        {/* Con VARIAS cuentas guardadas se elige entre ellas; con una sola
+            —o con ninguna— se ve el campo de siempre, para que quien no use
+            esto no note que existe. */}
+        {cuentas.length > 1 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-bold text-ink-title">
+              ¿A cuál cuenta te lo depositamos?
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {cuentas.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setClabe(c.clabe);
+                    // El titular SIEMPRE se reemplaza, aunque la cuenta no
+                    // traiga uno: si solo se pusiera cuando existe, al cambiar
+                    // de cuenta se quedaría el nombre de la anterior y la
+                    // transferencia saldría a nombre de quien no es.
+                    setHolder(c.holder ?? holderName);
+                  }}
+                  className={`rounded-full border-[1.5px] px-3.5 py-2 text-[12.5px] font-bold transition-colors ${
+                    clabe === c.clabe
+                      ? "border-teal bg-info-bg text-teal-deep"
+                      : "border-border-input bg-white text-ink-secondary hover:border-teal"
+                  }`}
+                >
+                  {etiquetaDeCuenta(c)}
+                  {c.is_default && clabe !== c.clabe ? " · la de siempre" : ""}
+                </button>
+              ))}
+            </div>
+            <Link
+              href="/app/cuenta"
+              className="self-start text-[12px] font-bold text-teal-deep hover:underline"
+            >
+              Administrar mis cuentas →
+            </Link>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <TextField
-            label="Cuenta para tu transferencia (CLABE)"
-            placeholder="18 dígitos"
-            inputMode="numeric"
-            maxLength={18}
-            value={clabe}
-            onChange={(e) => setClabe(e.target.value.replace(/\D/g, ""))}
-          />
+          {/* Ya elegida de la lista, la CLABE se enseña pero no se teclea: si
+              se pudiera editar encima, el depósito se iría a un número que no
+              corresponde a ninguna cuenta guardada. Para usar otra, se agrega
+              en "Mi cuenta". */}
+          {elegida && cuentas.length > 1 ? (
+            <TextField
+              label="Cuenta para tu transferencia (CLABE)"
+              value={elegida.clabe}
+              readOnly
+              hint="Para depositar a otra cuenta, agrégala en Mi cuenta."
+              onChange={() => {}}
+            />
+          ) : (
+            <TextField
+              label="Cuenta para tu transferencia (CLABE)"
+              placeholder="18 dígitos"
+              inputMode="numeric"
+              maxLength={18}
+              value={clabe}
+              onChange={(e) => setClabe(e.target.value.replace(/\D/g, ""))}
+            />
+          )}
           <TextField
             label="Nombre del titular de la cuenta"
             placeholder="Como aparece en tu banco"

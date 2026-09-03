@@ -8,6 +8,8 @@ import { SocialLinks } from "@/components/panel/SocialLinks";
 import { CenterReviewRow } from "./CenterReviewRow";
 import { CenterResolveButtons } from "./CenterResolveButtons";
 import { ExpedienteDocumentos } from "@/components/panel/ExpedienteDocumentos";
+import { SolicitudHiloComite } from "@/components/panel/SolicitudHiloComite";
+import { HILO_VACIO, leerHilosDeSolicitud } from "@/lib/hilo-solicitud";
 import {
   documentosDeSolicitud,
   documentosRequeridos,
@@ -26,6 +28,7 @@ type Row = {
   logo_url: string | null;
   services: string[];
   member_benefit: string | null;
+  info_requested: boolean;
   status: string;
   rejection_reason: string | null;
   created_at: string;
@@ -88,7 +91,7 @@ export default async function AdminCentrosPage({
     admin
       .from("wellness_centers")
       .select(
-        "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, status, rejection_reason, created_at, tipo_persona, razon_social, rfc, curp, social_links, wellness_center_locations(address, colony, city, state, postal_code), center_promotions(title, discount_label, is_active, valid_until)",
+        "id, name, contact_name, email, phone, website, logo_url, services, member_benefit, info_requested, status, rejection_reason, created_at, tipo_persona, razon_social, rfc, curp, social_links, wellness_center_locations(address, colony, city, state, postal_code), center_promotions(title, discount_label, is_active, valid_until)",
       )
       .order("created_at", { ascending: masAntiguos }),
     admin
@@ -121,6 +124,14 @@ export default async function AdminCentrosPage({
           [c.id, await documentosDeSolicitud({ centerId: c.id })] as const,
       ),
     ),
+  );
+
+  // Los hilos con el comité (Cipatli, 1-sep), todos en una consulta — gemelo
+  // del panel de embajadores.
+  const hilos = await leerHilosDeSolicitud(
+    admin,
+    "centro",
+    rows.map((c) => c.id),
   );
 
   const pending = rows.filter(
@@ -281,6 +292,17 @@ export default async function AdminCentrosPage({
                           ),
                       )
                       .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                  />
+                  {/* El hilo con el comité (Cipatli, 1-sep). Pegado al
+                      expediente porque es donde se decide: si la constancia
+                      llegó vencida, pedir otra se hace aquí mismo. */}
+                  <SolicitudHiloComite
+                    sujeto="centro"
+                    id={c.id}
+                    nombre={c.name}
+                    infoRequested={c.info_requested}
+                    mensajes={(hilos.get(c.id) ?? HILO_VACIO).mensajes}
+                    adjuntos={(hilos.get(c.id) ?? HILO_VACIO).adjuntos}
                   />
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
@@ -460,6 +482,17 @@ export default async function AdminCentrosPage({
                           ),
                       )
                       .map((t) => ETIQUETA_DOCUMENTO[t] ?? t)}
+                  />
+                  {/* El hilo con el comité (Cipatli, 1-sep). Pegado al
+                      expediente porque es donde se decide: si la constancia
+                      llegó vencida, pedir otra se hace aquí mismo. */}
+                  <SolicitudHiloComite
+                    sujeto="centro"
+                    id={c.id}
+                    nombre={c.name}
+                    infoRequested={c.info_requested}
+                    mensajes={(hilos.get(c.id) ?? HILO_VACIO).mensajes}
+                    adjuntos={(hilos.get(c.id) ?? HILO_VACIO).adjuntos}
                   />
                   {(c.wellness_center_locations ?? []).length > 0 && (
                     <div className="flex flex-col gap-1.5">

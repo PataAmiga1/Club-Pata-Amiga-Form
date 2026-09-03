@@ -91,8 +91,10 @@ export default async function AppLayout({
       : []),
   ];
 
-  const displayName =
-    profile?.first_name || profile?.email?.split("@")[0] || "Miembro";
+  // Mismo caso que el saludo de /app: sin el correo de por medio. Ya habia un
+  // respaldo digno —"Miembro"— y nunca se usaba porque el correo se colaba
+  // antes.
+  const displayName = profile?.first_name || "Miembro";
   const initial = displayName.charAt(0).toUpperCase();
   // Un heredado de Memberstack está activo aunque no tenga suscripción aquí:
   // la barra decía "Sin plan activo" a 60 miembros (auditoría 11-ago).

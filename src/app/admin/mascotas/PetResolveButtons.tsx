@@ -22,15 +22,20 @@ export function PetResolveButtons({ petId }: { petId: string }) {
     });
   }
 
+  // DENEGAR SE QUEDA EN BLANCO (equipo, 2-sep). Los motivos predeterminados
+  // que vivían aquí se mudaron a "Solicitar información", en el hilo: no eran
+  // razones para RECHAZAR —"la foto no se ve", "falta el certificado"— eran
+  // razones para PEDIR algo. Denegar es la acción rara y terminal, y para esos
+  // casos el comité necesita escribir lo que ocupe, no elegir de una lista.
   if (rejecting) {
     return (
       <div className="flex w-full gap-2 sm:w-auto">
         <input
           autoFocus
-          placeholder="Observaciones para el miembro"
+          placeholder="Motivo de la denegación"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="h-10 min-w-0 flex-1 rounded-full border-[1.5px] border-border-input px-4 text-[13px] text-ink-title outline-none focus:border-teal sm:w-64"
+          className="h-10 min-w-0 flex-1 rounded-full border-[1.5px] border-border-input px-4 text-[13px] text-ink-title outline-none focus:border-teal sm:w-80"
         />
         <button
           type="button"

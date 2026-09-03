@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { requestPetInfo, sendPetMessage } from "@/app/admin/actions";
+import { PET_REQUEST_MESSAGES } from "@/lib/constants";
 import { AdjuntosPicker } from "@/components/app/AdjuntosPicker";
 import { AdjuntosLista } from "@/components/app/AdjuntosLista";
 import type {
@@ -148,6 +149,27 @@ export function PetThreadPanel({
                 placeholder="Mensaje para el miembro (opcional)…"
                 className="rounded-[10px] border-[1.5px] border-border-input bg-white p-2.5 text-[12.5px] outline-none focus:border-teal"
               />
+              {/* Los mensajes de siempre, a un clic (equipo, 2-sep). Vivían
+                  colgando de "Denegar" y ahí no servían: no son razones para
+                  rechazar un peludo, son razones para PEDIR algo. PRELLENAN el
+                  texto y se escribe encima — el miembro recibe esto tal cual,
+                  así que tiene que poder decir cuál foto o cuál dato. */}
+              <div className="flex flex-wrap gap-1.5">
+                {PET_REQUEST_MESSAGES.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMessage(m)}
+                    className={`rounded-full border px-2.5 py-[5px] text-left text-[11px] font-semibold transition-colors ${
+                      message === m
+                        ? "border-warning-text bg-white text-warning-text"
+                        : "border-warning-text/40 bg-white/70 text-ink-secondary hover:border-warning-text"
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
               <AdjuntosPicker
                 adjuntos={adjuntosSolicitud}
                 onChange={setAdjuntosSolicitud}

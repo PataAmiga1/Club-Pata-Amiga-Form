@@ -30,13 +30,15 @@ export type AmbassadorContext = {
     /** Ruta dentro del bucket privado (o URL completa en las filas heredadas). */
     ine_front_url: string | null;
     ine_back_url: string | null;
+    /** El comité le pidió algo por el hilo y todavía no contesta (1-sep). */
+    info_requested: boolean;
   };
   isMember: boolean;
   wasMember: boolean;
 };
 
 const AMBASSADOR_COLS =
-  "id, first_name, last_name, second_last_name, email, phone, curp, birth_date, postal_code, colony, city, state, referral_code, code_change_count, status, rejection_reason, bank_name, clabe, bank_holder, rfc, social_links, ine_front_url, ine_back_url";
+  "id, first_name, last_name, second_last_name, email, phone, curp, birth_date, postal_code, colony, city, state, referral_code, code_change_count, status, rejection_reason, bank_name, clabe, bank_holder, rfc, social_links, ine_front_url, ine_back_url, info_requested";
 
 /**
  * Contexto del portal del embajador: exige sesión, resuelve el perfil de
