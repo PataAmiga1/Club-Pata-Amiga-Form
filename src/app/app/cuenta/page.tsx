@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { cuentasDelMiembro } from "@/lib/cuentas-bancarias";
 import { renewalDate, formatDateEs } from "@/lib/dates";
 import { situacionDeCobro } from "@/lib/membresia";
 import { PagoPendienteCard } from "./PagoPendienteCard";
@@ -17,11 +19,11 @@ export default async function CuentaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/iniciar-sesion?next=/app/cuenta");
 
-  const [{ data: profile }, { data: subs }] = await Promise.all([
+  const [{ data: profile }, { data: subs }, cuentas] = await Promise.all([
     supabase
       .from("profiles")
       .select(
-        "first_name, last_name, email, phone, membership_status, member_since, cfdi_requested, rfc, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal, bank_name, clabe",
+        "first_name, last_name, email, phone, membership_status, member_since, cfdi_requested, rfc, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal",
       )
       .eq("id", user.id)
       .single(),
@@ -36,6 +38,7 @@ export default async function CuentaPage() {
       .neq("status", "canceled")
       .order("created_at", { ascending: false })
       .limit(1),
+    cuentasDelMiembro(createAdminClient(), user.id),
   ]);
 
   const settings = await fetchSiteSettings();
@@ -146,10 +149,9 @@ export default async function CuentaPage() {
         }}
       />
 
-      <BankingCard
-        initialBank={profile?.bank_name ?? null}
-        initialClabe={profile?.clabe ?? null}
-      />
+      {/* Hasta tres cuentas desde el 2-sep. Salen de `member_bank_accounts`,
+          no de `profiles.clabe`, que quedó obsoleta. */}
+      <BankingCard cuentas={cuentas} />
 
       <ChangePasswordCard />
 

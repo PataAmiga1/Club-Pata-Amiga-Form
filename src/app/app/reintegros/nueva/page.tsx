@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { cuentasDelMiembro } from "@/lib/cuentas-bancarias";
 import { waitingProgress } from "@/lib/dates";
 import { beneficiosDe, topesDe } from "@/lib/plans/resolve";
 import {
@@ -22,10 +24,11 @@ export default async function NuevaSolicitudPage() {
     { data: lastReq },
     { data: yearRows },
     { data: sub },
+    cuentas,
   ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("membership_status, profile_completed, clabe, first_name, last_name")
+        .select("membership_status, profile_completed, first_name, last_name")
         .eq("id", user.id)
         .single(),
       supabase
@@ -58,7 +61,8 @@ export default async function NuevaSolicitudPage() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-    ]);
+      cuentasDelMiembro(createAdminClient(), user.id),
+  ]);
 
   if (profile?.membership_status !== "active") redirect("/app");
 
@@ -109,7 +113,11 @@ export default async function NuevaSolicitudPage() {
       <RequestForm
         userId={user.id}
         pets={petOptions}
-        lastClabe={profile?.clabe ?? lastReq?.[0]?.clabe ?? ""}
+        /* Las cuentas guardadas (hasta 3 desde el 2-sep). Si no tiene ninguna
+           —o si su CLABE nunca se guardó en el perfil— se cae a la del último
+           reintegro, que es lo que se hacía antes. */
+        cuentas={cuentas}
+        ultimaClabe={lastReq?.[0]?.clabe ?? ""}
         holderName={[profile?.first_name, profile?.last_name]
           .filter(Boolean)
           .join(" ")}
