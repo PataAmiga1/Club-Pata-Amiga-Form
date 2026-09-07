@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   sendExtraordinaryEmail,
   sendMissingDocsReminders,
+  sendRenewalReminders,
   type EmailAudience,
 } from "@/app/admin/actions";
 
@@ -22,7 +23,14 @@ const AUDIENCES: { value: EmailAudience; label: string }[] = [
  * una audiencia elegida + recordatorios de datos faltantes. Solo el super
  * admin puede disparar los envíos (el botón lo valida el servidor).
  */
-export function EnvioForm({ isSuper }: { isSuper: boolean }) {
+export function EnvioForm({
+  isSuper,
+  diasConfigurados,
+}: {
+  isSuper: boolean;
+  /** Lo que hoy dice el ajuste de /admin/sitio, para no mandar a ciegas. */
+  diasConfigurados: string;
+}) {
   const [pending, startTransition] = useTransition();
   const [subject, setSubject] = useState("");
   const [html, setHtml] = useState("");
@@ -31,6 +39,7 @@ export function EnvioForm({ isSuper }: { isSuper: boolean }) {
   const [preview, setPreview] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [reminderMsg, setReminderMsg] = useState<string | null>(null);
+  const [renovMsg, setRenovMsg] = useState<string | null>(null);
 
   const field =
     "rounded-[10px] border-[1.5px] border-border-input bg-white px-3 text-[13px] text-ink-title outline-none focus:border-teal";
@@ -195,6 +204,73 @@ export function EnvioForm({ isSuper }: { isSuper: boolean }) {
             className={`text-xs font-semibold ${reminderMsg.includes("✓") ? "text-success-text" : "text-error-text"}`}
           >
             {reminderMsg}
+          </span>
+        )}
+      </div>
+
+      {/* RECORDATORIOS DE RENOVACIÓN (2-sep). Mientras el cron no esté
+          agendado en el `vercel.json` de producción, este botón es el único
+          camino — y es seguro apretarlo de más: cada aviso queda registrado
+          con una restricción única y no se manda dos veces. */}
+      <div className="flex flex-col gap-2.5 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] md:p-[26px]">
+        <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
+          RECORDATORIOS DE RENOVACIÓN
+        </span>
+        <p className="text-[13px] leading-normal text-ink-secondary">
+          Avisa al miembro que su membresía se renueva pronto, para que le dé
+          tiempo de actualizar su tarjeta si cambió. <strong>Los días de
+          anticipación se configuran en Sitio web → «Recordatorios de
+          renovación»</strong> (hoy: {diasConfigurados || "apagado"}). No lo
+          reciben quienes ya cancelaron ni quienes están en mora — a esos les
+          llega otro correo que dice lo contrario.
+        </p>
+        <p className="text-[12.5px] leading-normal text-ink-tertiary">
+          Puedes apretarlo las veces que quieras: cada aviso queda registrado y
+          no se manda dos veces.
+        </p>
+        {isSuper && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                setRenovMsg(null);
+                const res = await sendRenewalReminders();
+                const r = res as {
+                  enviados: number;
+                  candidatos: number;
+                  bloqueados?: number;
+                  yaEnviados?: number;
+                  dias?: number[];
+                };
+                if (!r.dias?.length) {
+                  setRenovMsg(
+                    "No hay días configurados: revisa Sitio web → Recordatorios de renovación.",
+                  );
+                  return;
+                }
+                const partes = [
+                  `Enviados ${r.enviados} avisos (de ${r.candidatos} que renuevan en ${r.dias.join(" y ")} día(s)) ✓`,
+                ];
+                if (r.yaEnviados)
+                  partes.push(`${r.yaEnviados} ya lo habían recibido`);
+                if (r.bloqueados)
+                  partes.push(
+                    `${r.bloqueados} bloqueado${r.bloqueados === 1 ? "" : "s"} por la reja de pruebas`,
+                  );
+                setRenovMsg(partes.join(" · "));
+              })
+            }
+            className="self-start rounded-full bg-teal px-5 py-2 text-[12.5px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
+          >
+            {pending ? "Enviando…" : "Enviar recordatorios de renovación"}
+          </button>
+        )}
+        {renovMsg && (
+          <span
+            className={`text-xs font-semibold ${renovMsg.includes("✓") ? "text-success-text" : "text-error-text"}`}
+          >
+            {renovMsg}
           </span>
         )}
       </div>

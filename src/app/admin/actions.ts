@@ -474,6 +474,27 @@ export async function sendMissingDocsReminders() {
 }
 
 /**
+ * Recordatorios de renovación — botón "enviar ahora" (2-sep). SOLO super
+ * admin, igual que el de datos faltantes.
+ *
+ * Existe por dos razones: para que el equipo pueda probar la secuencia sin
+ * esperar al cron, y porque MIENTRAS el cron no esté agendado en `vercel.json`
+ * de producción este botón es el único camino.
+ *
+ * Es seguro apretarlo de más: cada aviso queda registrado en
+ * `renewal_reminders` con una restricción única, así que apretar dos veces el
+ * mismo día no manda nada dos veces.
+ */
+export async function sendRenewalReminders() {
+  const { admin } = await requireAdmin(true);
+  const { enviarRecordatoriosDeRenovacion } = await import(
+    "@/lib/email/recordatorios"
+  );
+  const result = await enviarRecordatoriosDeRenovacion(admin);
+  return { ok: true as const, ...result };
+}
+
+/**
  * Registrar un pago directo a un centro de bienestar (equipo, 5-ago).
  * Etapa manual: el SPEI se hace fuera; aquí queda el registro y el centro
  * lo ve en su portal.

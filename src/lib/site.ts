@@ -30,6 +30,14 @@ export const SITE_SETTINGS = [
     label: "TikTok (URL)",
     default: "https://www.tiktok.com/@pataamigamx",
   },
+  {
+    // El equipo todavía no define la secuencia, así que vive AQUÍ y no en el
+    // código: el día que decidan, se cambia desde /admin/sitio sin un
+    // despliegue. Se leen los números separados por coma; vacío = apagado.
+    key: "renewal_reminder_days",
+    label: "Recordatorios de renovación (días antes, separados por coma)",
+    default: "7,1",
+  },
 ] as const;
 
 /**

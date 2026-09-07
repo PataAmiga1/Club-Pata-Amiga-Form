@@ -309,6 +309,34 @@ ${BOTON("{{siteUrl}}/embajador", "Ver mi solicitud")}`),
 ${BOTON("{{siteUrl}}/embajador", "Ir a mi perfil de embajador")}`),
   },
   {
+    key: "renovacion_proxima",
+    name: "Tu membresía se renueva pronto",
+    description:
+      "Aviso antes del cobro de renovación. Los días de anticipación se configuran en Sitio web → Recordatorios de renovación.",
+    variables: {
+      firstName: "Nombre del miembro",
+      fecha: "Fecha del próximo cobro, ya escrita en español",
+      dias: "Cuántos días faltan (ej. «7 días» o «mañana»)",
+      monto: "Importe del cobro con su moneda",
+      plan: "Mensual o Anual",
+      cuentaUrl: "URL de Mi cuenta",
+    },
+    sample: {
+      firstName: "Cipatli",
+      fecha: "9 de septiembre de 2026",
+      dias: "7 días",
+      monto: "$159.00 MXN",
+      plan: "Mensual",
+      cuentaUrl: "https://pataamiga.mx/app/cuenta",
+    },
+    subject: "Tu membresía se renueva en {{dias}} 🐾",
+    html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
+<p>Te avisamos que tu membresía <strong>{{plan}}</strong> se renueva el <strong>{{fecha}}</strong>, en {{dias}}.</p>
+<p>El cobro es de <strong>{{monto}}</strong> y se hace solo, con la tarjeta que tienes guardada. No tienes que hacer nada.</p>
+<p><strong>Solo por si acaso:</strong> si cambiaste de tarjeta o está por vencer, actualízala antes de esa fecha para que tus peludos no se queden sin cobertura de reintegros.</p>
+${BOTON("{{cuentaUrl}}", "Revisar mi tarjeta")}`),
+  },
+  {
     key: "pago_fallido",
     name: "Pago rechazado (renovación)",
     description:
@@ -688,6 +716,7 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   cancellation: "membresia",
   account_deactivated: "membresia",
   profile_incomplete_reminder: "membresia",
+  renovacion_proxima: "membresia",
   pago_fallido: "membresia",
   // `plan_migrado` faltaba en este mapa desde que se creó, así que el editor
   // de /admin/comunicados nunca la listó y el comité no podía tocarla.
