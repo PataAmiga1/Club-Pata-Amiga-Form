@@ -6,10 +6,21 @@ import { enviarRecordatoriosDatosFaltantes } from "@/lib/email/recordatorios";
  * Cron de recordatorios de datos faltantes (equipo, 5-ago): correo periódico
  * a miembros activos con el perfil incompleto.
  *
- * CONECTAR: agregar a vercel.json → crons cuando la cuenta sea Pro (el plan
- * de prueba solo permite 2 crons y ya están ocupados por cumpleaños y
- * carritos). Mientras, el botón "Enviar ahora" vive en Admin → Comunicados
- * → Envíos. Sugerido: semanal, `0 16 * * 1` (lunes 10am CDMX).
+ * AGENDADO EL 2-SEP, `30 16 * * 1` — lunes 10:30 CDMX. La nota vieja decía
+ * "cuando la cuenta sea Pro"; la cuenta ya lo es desde hace tiempo y esto
+ * simplemente se quedó sin agendar, así que durante semanas solo salió si
+ * alguien apretaba el botón de Comunicados → Envíos. Ese botón sigue ahí para
+ * adelantarlo.
+ *
+ * ⚠ NO LLEVA CONTROL DE REPETICIÓN, a diferencia de `/api/cron/renovaciones`:
+ * manda a TODOS los del perfil incompleto cada vez que corre. Semanal quiere
+ * decir que quien nunca lo complete va a recibirlo todos los lunes. Si eso
+ * empieza a molestar, la solución es un tope por persona (tabla de registro
+ * como `renewal_reminders`), no bajar la frecuencia.
+ *
+ * OJO: la entrada del calendario vive en el `vercel.json` de `main`, no en el
+ * de `staging` — allá hay 2 crons a propósito y editarlo apagaría los de
+ * producción al fusionar.
  *
  * Protección: igual que los demás crons (Bearer CRON_SECRET o x-vercel-cron).
  */
