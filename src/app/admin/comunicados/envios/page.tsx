@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAdminRole } from "@/lib/admin-guard";
 import { EnvioForm } from "./EnvioForm";
+import { fetchSiteSettings } from "@/lib/site";
 
 /**
  * Envíos dirigidos y extraordinarios (equipo, 5-ago): elegir a quién se le
@@ -9,6 +10,10 @@ import { EnvioForm } from "./EnvioForm";
  */
 export default async function AdminEnviosPage() {
   const isSuper = (await getAdminRole()) === "super_admin";
+  // Se muestra en la pantalla lo que hoy dice el ajuste, para que nadie
+  // dispare los recordatorios sin saber con cuántos días van a salir.
+  const ajustes = await fetchSiteSettings();
+  const diasConfigurados = (ajustes.renewal_reminder_days ?? "").trim();
 
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
@@ -23,7 +28,7 @@ export default async function AdminEnviosPage() {
           Envíos dirigidos
         </h1>
       </div>
-      <EnvioForm isSuper={isSuper} />
+      <EnvioForm isSuper={isSuper} diasConfigurados={diasConfigurados} />
     </div>
   );
 }
