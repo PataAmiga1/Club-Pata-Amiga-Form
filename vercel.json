@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/renovaciones",
       "schedule": "30 15 * * *"
+    },
+    {
+      "path": "/api/cron/documentos",
+      "schedule": "30 16 * * 1"
     }
   ]
 }

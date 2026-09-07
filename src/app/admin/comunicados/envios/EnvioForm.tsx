@@ -162,12 +162,10 @@ export function EnvioForm({
         <p className="text-[13px] leading-normal text-ink-secondary">
           Envía el correo «Recordatorio de datos faltantes» (editable en
           Comunicados) a todos los miembros activos con el perfil incompleto,
-          con la lista exacta de lo que le falta a cada quien. El envío
-          automático semanal se activa con el cron{" "}
-          <code className="rounded bg-cream px-1.5 py-0.5 text-[11.5px]">
-            /api/cron/documentos
-          </code>{" "}
-          cuando la cuenta de Vercel sea Pro.
+          con la lista exacta de lo que le falta a cada quien.{" "}
+          <strong>Sale solo cada lunes</strong> a las 10:30 de la mañana
+          (agendado el 2-sep; antes solo salía si alguien apretaba este botón).
+          Este botón sigue sirviendo para adelantarlo.
         </p>
         {isSuper && (
           <button
