@@ -1,13 +1,14 @@
 /**
- * Medición: Google Analytics 4 y el píxel de Meta.
+ * Medición: Google Analytics 4, el píxel de Meta y Microsoft Clarity.
  *
- * CONECTAR: las dos llaves son variables de entorno públicas y el equipo las
+ * CONECTAR: las tres llaves son variables de entorno públicas y el equipo las
  * pone cuando tenga las cuentas. **Sin ellas no se carga NADA** — ni scripts,
- * ni cookies de terceros, ni peticiones a Google o Meta. Así el sitio no
- * arrastra rastreadores mientras no exista la decisión de usarlos:
+ * ni cookies de terceros, ni peticiones a Google, Meta o Microsoft. Así el
+ * sitio no arrastra rastreadores mientras no exista la decisión de usarlos:
  *
- *   NEXT_PUBLIC_GA4_ID         G-XXXXXXXXXX
- *   NEXT_PUBLIC_META_PIXEL_ID  1234567890
+ *   NEXT_PUBLIC_GA4_ID         G-XXXXXXXXXX   (Google Analytics 4)
+ *   NEXT_PUBLIC_META_PIXEL_ID  1234567890     (píxel de Meta)
+ *   NEXT_PUBLIC_CLARITY_ID     abcdefghij     (Microsoft Clarity)
  *
  * Se leen con `process.env.NEXT_PUBLIC_*` escrito completo a propósito: Next
  * sustituye estas expresiones en tiempo de compilación y un acceso dinámico
@@ -15,9 +16,39 @@
  */
 export const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID ?? "";
 export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "";
+export const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID ?? "";
 
 export function medicionActiva(): boolean {
-  return Boolean(GA4_ID || META_PIXEL_ID);
+  return Boolean(GA4_ID || META_PIXEL_ID || CLARITY_ID);
+}
+
+/**
+ * Rutas donde Clarity NO se carga.
+ *
+ * Clarity no cuenta visitas: GRABA LA SESIÓN — movimientos, clics, scroll y el
+ * contenido de la pantalla. Dentro de la sesión del socio se ven CURP, INE,
+ * cuentas bancarias, facturas y datos del peludo. Grabar eso sería recolectar
+ * datos personales sensibles en un tercero sin que nadie lo haya decidido.
+ *
+ * Del lado público —donde vive el embudo que sí queremos entender— no hay nada
+ * de eso, y ahí es justamente donde sirve el mapa de calor.
+ *
+ * Si algún día hace falta grabar dentro de la sesión, primero va la decisión
+ * legal (aviso de privacidad + política de cookies) y el enmascarado estricto,
+ * no al revés.
+ */
+export const CLARITY_RUTAS_EXCLUIDAS = [
+  "/app",
+  "/admin",
+  "/ventas",
+  "/embajador",
+  "/centro",
+] as const;
+
+export function clarityPermitidoEn(ruta: string): boolean {
+  return !CLARITY_RUTAS_EXCLUIDAS.some(
+    (prefijo) => ruta === prefijo || ruta.startsWith(`${prefijo}/`),
+  );
 }
 
 type Gtag = (...args: unknown[]) => void;

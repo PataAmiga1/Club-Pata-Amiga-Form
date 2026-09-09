@@ -1,17 +1,30 @@
 "use client";
 
 import Script from "next/script";
-import { GA4_ID, META_PIXEL_ID } from "@/lib/analytics";
+import { usePathname } from "next/navigation";
+import {
+  GA4_ID,
+  META_PIXEL_ID,
+  CLARITY_ID,
+  clarityPermitidoEn,
+} from "@/lib/analytics";
 
 /**
- * Carga GA4 y el píxel de Meta — SOLO si sus llaves están configuradas.
+ * Carga GA4, el píxel de Meta y Clarity — SOLO si sus llaves están configuradas.
  *
- * Sin llaves este componente no pinta nada: el sitio no manda una sola
- * petición a Google ni a Meta, así que no hay rastreadores esperando a que
+ * Sin llaves este componente no pinta nada: el sitio no manda una sola petición
+ * a Google, Meta ni Microsoft, así que no hay rastreadores esperando a que
  * alguien decida usarlos. Las llaves se ponen en Vercel (ver lib/analytics).
+ *
+ * Clarity es distinto a los otros dos: no cuenta visitas, GRABA LA SESIÓN. Por
+ * eso no carga en las rutas privadas (ver `CLARITY_RUTAS_EXCLUIDAS`), donde la
+ * pantalla trae CURP, INE, cuentas bancarias y datos del peludo.
  */
 export function Analytics() {
-  if (!GA4_ID && !META_PIXEL_ID) return null;
+  const ruta = usePathname() ?? "/";
+  const cargarClarity = Boolean(CLARITY_ID) && clarityPermitidoEn(ruta);
+
+  if (!GA4_ID && !META_PIXEL_ID && !cargarClarity) return null;
 
   return (
     <>
@@ -56,6 +69,16 @@ fbq('track', 'PageView');`}
             />
           </noscript>
         </>
+      )}
+
+      {cargarClarity && (
+        <Script id="ms-clarity" strategy="afterInteractive">
+          {`(function(c,l,a,r,i,t,y){
+c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+})(window, document, "clarity", "script", "${CLARITY_ID}");`}
+        </Script>
       )}
     </>
   );
