@@ -11,6 +11,7 @@ import { NewsletterForm } from "@/components/landing/NewsletterForm";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { SocialIcon } from "@/components/landing/SocialIcons";
 import { PhoneMockup } from "@/components/landing/PhoneMockup";
+import { ConfigurarCookies } from "@/components/analytics/ConfigurarCookies";
 import { RUTA_LISTA_DE_ESPERA, valorAbierto } from "@/lib/registro";
 
 export const metadata: Metadata = {
@@ -476,6 +477,10 @@ export default async function Home() {
                 {doc.title}
               </Link>
             ))}
+            {/* La política de cookies promete poder cambiar la elección «en
+                cualquier momento»: este es ese enlace. Se pinta solo si hay
+                medición configurada. */}
+            <ConfigurarCookies className="text-left text-[13px] text-white/75 underline-offset-2 transition-colors hover:text-white hover:underline" />
           </div>
           <div className="flex flex-col gap-2.5">
             <span className="text-[11px] font-extrabold tracking-[.08em] text-white/50">
