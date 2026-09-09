@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
 import localFont from "next/font/local";
 import { Analytics } from "@/components/analytics/Analytics";
+import { BannerCookies } from "@/components/analytics/BannerCookies";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -34,8 +35,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
-        {/* Medición: no carga NADA mientras no existan las llaves de GA4/Meta */}
+        {/* Medición: no carga NADA sin llaves configuradas Y sin un sí explícito */}
         <Analytics />
+        <BannerCookies />
       </body>
     </html>
   );
