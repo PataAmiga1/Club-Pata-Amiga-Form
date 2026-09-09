@@ -8,22 +8,31 @@ import {
   CLARITY_ID,
   clarityPermitidoEn,
 } from "@/lib/analytics";
+import { useConsentimiento } from "./useConsentimiento";
 
 /**
- * Carga GA4, el píxel de Meta y Clarity — SOLO si sus llaves están configuradas.
+ * Carga GA4, el píxel de Meta y Clarity — SOLO si sus llaves están configuradas
+ * Y la persona aceptó.
  *
- * Sin llaves este componente no pinta nada: el sitio no manda una sola petición
- * a Google, Meta ni Microsoft, así que no hay rastreadores esperando a que
- * alguien decida usarlos. Las llaves se ponen en Vercel (ver lib/analytics).
+ * Dos candados, en este orden:
  *
- * Clarity es distinto a los otros dos: no cuenta visitas, GRABA LA SESIÓN. Por
- * eso no carga en las rutas privadas (ver `CLARITY_RUTAS_EXCLUIDAS`), donde la
- * pantalla trae CURP, INE, cuentas bancarias y datos del peludo.
+ * 1. **Sin llaves no se carga nada.** El sitio no manda una sola petición a
+ *    Google, Meta ni Microsoft mientras el equipo no configure las variables.
+ * 2. **Sin un "sí" explícito, tampoco.** La política de cookies dice que las
+ *    opcionales «se activan solo si aceptas»; cargarlas antes de preguntar
+ *    volvería falsa esa frase. Mientras no haya decisión, esto no pinta nada.
+ *
+ * Clarity además es distinto a los otros dos: no cuenta visitas, GRABA LA
+ * SESIÓN. Por eso no carga en las rutas privadas (ver
+ * `CLARITY_RUTAS_EXCLUIDAS`), donde la pantalla trae CURP, INE, cuentas
+ * bancarias y datos del peludo — ahí ni siquiera aceptando.
  */
 export function Analytics() {
   const ruta = usePathname() ?? "/";
+  const consentimiento = useConsentimiento();
   const cargarClarity = Boolean(CLARITY_ID) && clarityPermitidoEn(ruta);
 
+  if (consentimiento !== "aceptado") return null;
   if (!GA4_ID && !META_PIXEL_ID && !cargarClarity) return null;
 
   return (

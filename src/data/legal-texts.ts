@@ -3496,43 +3496,65 @@ alta tras ver un anuncio). Se activan solo si aceptas.
 4) Cookies específicas por herramienta (ejemplos)
 A continuación se describen las cookies típicas asociadas a las herramientas que
 utilizamos. La nomenclatura puede variar por actualizaciones técnicas.
-4.1 Autenticación y sesión (Memberstack)
-Finalidad: mantener la sesión activa del socio y permitir que el “Widget de
-Membresía” muestre datos sin loguearse en cada página.
-## • _ms-session (sesión/autenticación)
-- _ms-id (identificador de sesión/usuario) Categoría: Estrictamente necesarias.
+4.1 Autenticación y sesión (Supabase)
+Finalidad: mantener la sesión activa del socio para que no tenga que iniciar
+sesión en cada página del portal.
+- sb-access-token (sesión/autenticación)
+- sb-refresh-token (renovación de la sesión)
+Categoría: Estrictamente necesarias.
 4.2 Seguridad y pagos (Stripe)
 Finalidad: procesar pagos de membresía de manera segura y prevenir fraude.
 - __stripe_mid (seguridad/prevención fraude)
 - __stripe_sid (seguridad/gestión de sesión de pago)
 Categoría: Estrictamente necesarias (seguridad/pagos), cuando se interactúa con el
 flujo de pago.
-4.3 Gestión de etiquetas y píxeles (Google Tag Manager + píxeles)
-Finalidad: gestión de etiquetas de medición (GTM) y, cuando se habilite, medición de
-campañas con píxeles (por ejemplo Facebook/Meta, Google Ads, Google Analytics u
-otros).
-- Google Tag Manager (GTM): administración de etiquetas en la página
-principal (Webflow) para medición eficiente.
-- Píxeles de medición (cuando estén habilitados): ayudan a entender
-cómo llegan usuarios al sitio y medir efectividad de campañas
+4.3 Analítica de uso (Google Analytics 4)
+Finalidad: entender cuánta gente visita el sitio, de dónde llega y qué páginas
+recorre, en forma agregada, para mejorar el servicio.
+- _ga (identificador de navegador para distinguir visitas)
+- _ga_* (estado de la sesión de medición)
+Categoría: Analítica (opcional, requiere consentimiento).
 
+4.4 Medición de campañas (píxel de Meta)
+Finalidad: entender cómo llegan las personas al sitio desde nuestros anuncios y
+medir la efectividad de las campañas (atribución y conversión).
+- _fbp (identificador de navegador para atribución de campañas)
+Categoría: Marketing (opcional, requiere consentimiento).
 
+4.5 Mapas de calor y grabación de sesión (Microsoft Clarity)
+Finalidad: ver de forma agregada hasta dónde se desplaza la gente en la página y
+dónde hace clic, para detectar y corregir problemas de uso.
+IMPORTANTE — qué implica esta herramienta: a diferencia de las anteriores,
+Clarity no solo cuenta visitas: registra el recorrido dentro de la página
+(movimiento del cursor, clics y desplazamiento) y genera una reproducción visual
+de esa navegación.
+Cómo lo limitamos:
+- Clarity NO se carga en las áreas privadas de la Plataforma. No opera dentro
+del portal del socio, del embajador, del centro aliado ni de los paneles
+internos. Únicamente funciona en las páginas públicas del sitio.
+- En consecuencia, no se registran pantallas con datos personales del socio
+(CURP, identificación oficial, cuentas bancarias, comprobantes o información
+del peludo).
+- El contenido escrito en campos de formulario se enmascara y no se recopila.
+- No se activa sin tu consentimiento.
+- _clck, _clsk (identificadores de sesión de la herramienta)
+Categoría: Analítica (opcional, requiere consentimiento).
 
-## (atribución/conversión).
-Categoría: Analítica y/o Marketing (opcionales, requieren consentimiento).
-4.4 Cookies técnicas de rendimiento/hosting (Vercel)
+4.6 Cookies técnicas de rendimiento/hosting (Vercel)
 Finalidad: asegurar disponibilidad, rendimiento y estabilidad del portal (carga rápida,
 continuidad del servicio).
 Categoría: Estrictamente necesarias.
 
-5) Consentimiento y panel de configuración
-Al entrar a https://www.pataamiga.mx/ se mostrará un banner/centro de preferencias
-para que puedas:
--  Aceptar todas •  Rechazar las opcionales •  Configurar por
-categorías (Analítica / Marketing)
--  Mantener solo necesarias
-Podrás cambiar tu elección en cualquier momento desde el enlace:
-“Configurar cookies” en el pie de página o en el Centro de Preferencias del sitio.
+5) Consentimiento
+Al entrar a https://www.pataamiga.mx/ se muestra un banner para que elijas:
+- Aceptar: se activan las cookies de analítica y marketing descritas en los
+puntos 4.3, 4.4 y 4.5.
+- Solo las necesarias: NO se carga ninguna de esas herramientas. No se envía una
+sola petición a Google, Meta ni Microsoft.
+Mientras no elijas, no se activa ninguna cookie opcional: el estado por omisión
+es no medir.
+Tu elección se guarda en tu propio navegador y puedes cambiarla en cualquier
+momento borrando los datos del sitio desde tu navegador (ver punto 6).
 
 6) ¿Cómo desactivar o eliminar cookies desde tu navegador?
 También puedes gestionar cookies desde el navegador. Ten en cuenta que, si
