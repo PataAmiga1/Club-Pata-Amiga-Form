@@ -3554,7 +3554,10 @@ sola petición a Google, Meta ni Microsoft.
 Mientras no elijas, no se activa ninguna cookie opcional: el estado por omisión
 es no medir.
 Tu elección se guarda en tu propio navegador y puedes cambiarla en cualquier
-momento borrando los datos del sitio desde tu navegador (ver punto 6).
+momento desde el enlace “Configurar cookies” en el pie de página del sitio: al
+usarlo se borra tu decisión anterior y vuelve a aparecer el banner para que
+elijas de nuevo. También puedes borrar los datos del sitio desde tu navegador
+(ver punto 6).
 
 6) ¿Cómo desactivar o eliminar cookies desde tu navegador?
 También puedes gestionar cookies desde el navegador. Ten en cuenta que, si
