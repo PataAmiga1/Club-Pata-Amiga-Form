@@ -38,12 +38,16 @@ export const REIMBURSEMENT_CAPS_MXN = {
 } as const;
 
 export const REIMBURSEMENT_CATEGORY_LABELS: Record<
-  keyof typeof REIMBURSEMENT_CAPS_MXN,
+  keyof typeof REIMBURSEMENT_CAPS_MXN | "cuidados" | "emergencia" | "despedida",
   string
 > = {
   vet_expenses: "Gastos veterinarios",
   death: "Fallecimiento",
   vaccines: "Vacunas",
+  // Membresía $599 (sección 3, 17-sep-2026)
+  cuidados: "Cuidados cotidianos",
+  emergencia: "Emergencia veterinaria",
+  despedida: "Despedida",
 };
 
 /** Motivos predeterminados de rechazo de reintegros. */

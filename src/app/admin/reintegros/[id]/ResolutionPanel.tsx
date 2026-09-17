@@ -36,11 +36,17 @@ export function ResolutionPanel({
 
   const open = status === "pending" || status === "in_review";
 
-  function run(action: () => Promise<void>) {
+  function run(action: () => Promise<unknown>) {
     setError(null);
     startTransition(async () => {
       try {
-        await action();
+        const r = await action();
+        // Una regla de negocio (p. ej. el disponible del rubro del $599)
+        // regresa su motivo en lugar de tronar: se enseña tal cual.
+        if (r && typeof r === "object" && "error" in r && typeof r.error === "string") {
+          setError(r.error);
+          return;
+        }
         router.refresh();
       } catch {
         setError("No se pudo guardar la resolución. Intenta de nuevo.");

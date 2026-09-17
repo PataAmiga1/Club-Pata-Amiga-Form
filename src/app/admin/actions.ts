@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { formatDateEs } from "@/lib/dates";
+import { estadoDePeludo599, esRubro599 } from "@/lib/reintegros-599";
+import type { Rubro599 } from "@/lib/plans/montos";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMxn } from "@/lib/format";
@@ -92,10 +95,27 @@ export async function resolveReimbursement(
 
   const { data: req } = await admin
     .from("reimbursements")
-    .select("id, folio, user_id, amount_requested, pets(name)")
+    .select("id, folio, user_id, pet_id, category, amount_requested, due_business_date, pets(name)")
     .eq("id", id)
     .single();
   if (!req) throw new Error("Solicitud no encontrada");
+
+  // Membresía $599 (sección 3): lo aprobado no puede pasar del disponible del
+  // rubro de ESE peludo (sin contar esta misma solicitud). Se valida aquí, en el
+  // servidor: el panel lo enseña, pero no es quien decide.
+  const es599 = esRubro599(req.category);
+  if (es599 && resolution.action !== "reject") {
+    const monto =
+      resolution.action === "partial" ? resolution.amount : Number(req.amount_requested);
+    const estado = await estadoDePeludo599(admin, req.pet_id, { excluirReintegroId: req.id });
+    const rubro = estado?.rubros[req.category as Rubro599];
+    if (!estado || !rubro)
+      return { error: "Este peludo ya no tiene una membresía activa del $599." };
+    if (Math.round(monto * 100) > rubro.disponibleCentavos)
+      return {
+        error: `No se puede aprobar ${formatMxn(monto)}: a ${estado.nombre} le quedan ${formatMxn(rubro.disponibleCentavos / 100)} MXN en ${rubro.label.toLowerCase()} este año.`,
+      };
+  }
   const pet = Array.isArray(req.pets)
     ? (req.pets[0] as { name: string } | undefined)
     : (req.pets as { name: string } | null);
@@ -144,7 +164,9 @@ export async function resolveReimbursement(
       {
         type: "reimbursement_approved",
         title: `¡Tu reintegro ${req.folio} fue aprobado! 🎉`,
-        message: `Aprobamos ${formatMxn(amount)} MXN para ${petName}. Recibirás tu transferencia en máximo 72 horas.`,
+        message: es599 && req.due_business_date
+          ? `Aprobamos ${formatMxn(amount)} MXN para ${petName}. Te depositamos a más tardar el ${formatDateEs(req.due_business_date)}.`
+          : `Aprobamos ${formatMxn(amount)} MXN para ${petName}. Recibirás tu transferencia en máximo 72 horas.`,
       },
       {
         template: "reimbursement_approved",
@@ -160,6 +182,7 @@ export async function resolveReimbursement(
 
   revalidatePath("/admin");
   revalidatePath("/admin/reintegros");
+  return { ok: true as const };
 }
 
 export async function resolvePet(

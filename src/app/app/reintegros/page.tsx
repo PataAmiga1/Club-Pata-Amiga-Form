@@ -12,6 +12,8 @@ import {
 } from "@/lib/reimbursement-balance";
 import { formatMxn } from "@/lib/format";
 import { formatDateEs } from "@/lib/dates";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { estadoDePeludo599, esMiembro599 } from "@/lib/reintegros-599";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   pending: { text: "EN REVISIÓN", cls: "bg-warning-bg text-warning-text" },
@@ -69,6 +71,31 @@ export default async function ReintegrosPage({
   const beneficios = beneficiosDe(
     sub?.benefits_snapshot as Record<string, unknown> | null,
   );
+
+  // Membresía $599 (sección 3): el saldo es por peludo y por rubro.
+  const admin = createAdminClient();
+  const es599 = await esMiembro599(admin, user.id);
+  const estados599 = es599
+    ? (
+        await Promise.all(
+          (
+            (
+              await admin
+                .from("pets")
+                .select("id")
+                .eq("user_id", user.id)
+                .eq("is_active", true)
+                .order("created_at", { ascending: true })
+            ).data ?? []
+          ).map((p) => estadoDePeludo599(admin, p.id)),
+        )
+      ).filter((e) => e !== null)
+    : [];
+  const diasHabiles =
+    Number(estados599[0]?.beneficios.dias_habiles_reintegro) || 5;
+  const promesa = es599
+    ? `te depositamos en ${diasHabiles} días hábiles`
+    : `te respondemos en máximo ${REIMBURSEMENT_SLA_HOURS} horas`;
   const balances = calculateBalances(yearRows ?? [], topesDe(beneficios));
   const year = new Date().getFullYear();
 
@@ -76,8 +103,7 @@ export default async function ReintegrosPage({
     <div className="flex flex-col gap-4 px-5 py-6 md:gap-[22px] md:px-[34px] md:py-[30px]">
       {enviada && (
         <div className="rounded-[14px] bg-success-bg px-4 py-3 text-sm font-semibold text-success-text">
-          💚 Tu solicitud quedó registrada. El comité la revisa y te
-          respondemos en máximo {REIMBURSEMENT_SLA_HOURS} horas.
+          💚 Tu solicitud quedó registrada. El comité la revisa y {promesa}.
         </div>
       )}
       <div className="flex items-center justify-between gap-3">
@@ -86,8 +112,9 @@ export default async function ReintegrosPage({
             Reintegros
           </h1>
           <p className="text-[12.5px] text-ink-secondary md:text-sm">
-            Envías tu factura y te reintegramos en máximo{" "}
-            {REIMBURSEMENT_SLA_HOURS} horas tras la aprobación del comité.
+            {es599
+              ? `Subes tu factura y te depositamos en ${diasHabiles} días hábiles. Si nos tardamos más, ese mes es gratis.`
+              : `Envías tu factura y te reintegramos en máximo ${REIMBURSEMENT_SLA_HOURS} horas tras la aprobación del comité.`}
           </p>
         </div>
         <Link
@@ -98,7 +125,68 @@ export default async function ReintegrosPage({
         </Link>
       </div>
 
+      {/* Membresía $599: por peludo, tres rubros con su monto del año */}
+      {es599 &&
+        estados599.map((e) => (
+          <div key={e.petId} className="flex flex-col gap-2">
+            <span className="text-[13px] font-bold text-ink-title">
+              {e.especie === "dog" ? "🐕" : "🐈"} {e.nombre}
+              <span className="ml-2 text-[12px] font-normal text-ink-tertiary">
+                {e.aprobado
+                  ? `su año se renueva el ${formatDateEs(e.anioHasta)}`
+                  : "en revisión del comité"}
+              </span>
+            </span>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 md:gap-4">
+              {Object.values(e.rubros).map((r) => {
+                const monto = r.montoCentavos / 100;
+                const usado = r.gastadoCentavos / 100;
+                const pct = monto > 0 ? Math.min(100, (usado / monto) * 100) : 0;
+                return (
+                  <div
+                    key={r.rubro}
+                    className="flex flex-col gap-2 rounded-[16px] bg-white px-4 py-3.5 shadow-[var(--shadow-card)]"
+                  >
+                    <span className="text-[11.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                      {r.label.toUpperCase()}
+                    </span>
+                    {r.abierto ? (
+                      <>
+                        <span className="font-display text-[22px] leading-none text-ink-title">
+                          {formatMxn(r.disponibleCentavos / 100)}{" "}
+                          <span className="text-[13px] text-ink-tertiary">disponibles</span>
+                        </span>
+                        <div className="h-2 rounded-full bg-[#EFEAE0]">
+                          <div
+                            className={`h-full rounded-full ${r.disponibleCentavos === 0 ? "bg-orange" : "bg-teal"}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[11.5px] text-ink-tertiary">
+                          Usaste {formatMxn(usado)} de {formatMxn(monto)} MXN este año.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-display text-[20px] leading-none text-ink-title">
+                          {formatMxn(monto)}
+                        </span>
+                        <span className="text-[11.5px] text-ink-tertiary">
+                          {r.fechaApertura
+                            ? `Se abre el ${formatDateEs(r.fechaApertura)}`
+                            : "Se abre cuando el comité apruebe su perfil"}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
       {/* Saldos del año por categoría (usado / disponible; se renuevan en enero) */}
+      {!es599 && (
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 md:gap-4">
         {BALANCE_CARDS.map((c) => {
           const b = balances[c.key];
@@ -134,6 +222,7 @@ export default async function ReintegrosPage({
           );
         })}
       </div>
+      )}
 
       <div className="flex flex-col gap-2.5">
         {(rows ?? []).map((r) => {
