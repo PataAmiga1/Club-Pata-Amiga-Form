@@ -116,7 +116,6 @@ const PRECIOS_CON_REGISTRO_CERRADO = [
  */
 function respuestas599(o: OfertaPublica599): Record<string, string[]> {
   const p = o.principal;
-  const a = o.adicional;
   const $ = pesosDeOferta;
   return {
     "¿Qué es Pata Amiga?": [
@@ -129,7 +128,7 @@ function respuestas599(o: OfertaPublica599): Record<string, string[]> {
     "¿Cuántas membresías existen?": [
       "En Pata Amiga cada peludo tiene su propia membresía, con sus propios montos disponibles.",
       `Puedes elegir la modalidad que mejor se adapte a ti:\n• Mensual: ${$(p.mensualPesos)} al mes por peludo.\n• Anual: ${$(p.anualPesos)} en un solo pago, y te ahorras ${$(p.ahorroAnualPesos)}.`,
-      `Del segundo peludo en adelante, sin límite, tienes 15% de descuento: ${$(a.mensualPesos)} al mes o ${$(a.anualPesos)} al año.`,
+      "Del segundo peludo en adelante, sin límite, tienes 15% de descuento. El precio con descuento aparece cuando agregas a tu siguiente peludo desde tu cuenta.",
       "No hay plazo forzoso: cancelas cuando quieras.",
     ],
     "¿Con qué cuento al ser parte de la manada?": [
