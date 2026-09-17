@@ -209,7 +209,7 @@ export function MembershipManager({
                 <p className="text-[13px] leading-normal text-ink-body">
                   {other === "annual"
                     ? "El cambio aplica hoy: se abona lo que ya pagaste de tu mes en curso y se cobra la diferencia del plan Anual en tu tarjeta."
-                    : `El cambio aplica hoy sin reembolso: tu período Anual ya pagado sigue vigente${renewsLabel ? ` hasta el ${renewsLabel}` : ""} y a partir de entonces se cobra ${formatMxn(PLANS.monthly.amountMxn)} MXN al mes.`}
+                    : `El cambio aplica hoy: lo que no has usado de tu año queda como saldo a tu favor, y de ese saldo se pagan tus mensualidades de ${formatMxn(PLANS.monthly.amountMxn)} MXN hasta que se acabe.`}
                 </p>
                 <div className="flex gap-2.5">
                   <button
