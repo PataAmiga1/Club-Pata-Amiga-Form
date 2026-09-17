@@ -212,26 +212,42 @@ export function PlanSelector599({
             <span className="text-[13px] font-bold text-teal-deep">
               Cuidados cotidianos
             </span>
-            <span className="font-display text-[22px] text-ink-title">
-              {mxn(oferta.cuidados.inicial)} → {mxn(oferta.cuidados.tope)}
+            {/* Pablo, 17-sep: «$500 → $2,000» y «sube $125 por mes pagado» se
+                leía como jerga interna. Rango en palabras + nota sencilla. */}
+            <span className="font-display text-[22px] leading-tight text-ink-title">
+              <span className="font-sans text-[13px] font-semibold text-ink-tertiary">De </span>
+              {mxn(oferta.cuidados.inicial)}
+              <span className="font-sans text-[13px] font-semibold text-ink-tertiary"> a </span>
+              {mxn(oferta.cuidados.tope)}
+              <span className="font-sans text-[13px] font-semibold text-ink-tertiary"> al año</span>
             </span>
             <span className="text-[12.5px] leading-snug text-ink-secondary">
-              Consultas, vacunas, desparasitación y dental. Desde el día{" "}
-              {oferta.cuidados.aperturaDia}; sube {mxn(oferta.cuidados.incremento)}{" "}
-              por cada mes pagado.
+              Consultas, vacunas, desparasitación y dental.
+            </span>
+            <span className="text-[11.5px] leading-snug text-ink-tertiary">
+              Empiezas con {mxn(oferta.cuidados.inicial)} a partir del día{" "}
+              {oferta.cuidados.aperturaDia}, y tu monto disponible crece poco a poco
+              cada mes que pagas.
             </span>
           </div>
           <div className="flex flex-col gap-1.5 rounded-[14px] bg-cream p-4">
             <span className="text-[13px] font-bold text-teal-deep">
               Emergencia veterinaria
             </span>
-            <span className="font-display text-[22px] text-ink-title">
-              {mxn(oferta.emergencia.inicial)} → {mxn(oferta.emergencia.tope)}
+            <span className="font-display text-[22px] leading-tight text-ink-title">
+              <span className="font-sans text-[13px] font-semibold text-ink-tertiary">De </span>
+              {mxn(oferta.emergencia.inicial)}
+              <span className="font-sans text-[13px] font-semibold text-ink-tertiary"> a </span>
+              {mxn(oferta.emergencia.tope)}
+              <span className="font-sans text-[13px] font-semibold text-ink-tertiary"> al año</span>
             </span>
             <span className="text-[12.5px] leading-snug text-ink-secondary">
-              Hospital, cirugía, estudios y medicinas. Desde el mes{" "}
-              {oferta.emergencia.aperturaMes}; sube{" "}
-              {mxn(oferta.emergencia.incremento)} por cada mes pagado.
+              Hospital, cirugía, estudios y medicinas.
+            </span>
+            <span className="text-[11.5px] leading-snug text-ink-tertiary">
+              Empiezas con {mxn(oferta.emergencia.inicial)} a partir del mes{" "}
+              {oferta.emergencia.aperturaMes}, y tu monto disponible crece poco a poco
+              cada mes que pagas.
             </span>
           </div>
           <div className="flex flex-col gap-1.5 rounded-[14px] bg-cream p-4">
@@ -240,7 +256,7 @@ export function PlanSelector599({
               {mxn(oferta.despedida.monto)}
             </span>
             <span className="text-[12.5px] leading-snug text-ink-secondary">
-              Desde el día {oferta.despedida.aperturaDia}.
+              Disponible a partir del día {oferta.despedida.aperturaDia}.
             </span>
           </div>
         </div>
