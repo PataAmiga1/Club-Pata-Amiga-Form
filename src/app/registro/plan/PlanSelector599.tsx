@@ -16,6 +16,8 @@ import type { Oferta599 } from "@/lib/plans/oferta";
  */
 
 type Plan = "monthly" | "annual";
+/** El anual también se puede pagar a meses sin intereses (17-sep-2026). */
+type Cobro = Plan | "annual_msi";
 
 
 const CHECK = (
@@ -39,7 +41,7 @@ export function PlanSelector599({
   catalogo: GrupoCatalogo[];
 }) {
   const [selected, setSelected] = useState<Plan>("annual");
-  const [loading, setLoading] = useState<Plan | null>(null);
+  const [loading, setLoading] = useState<Cobro | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [catalogoAbierto, setCatalogoAbierto] = useState(false);
 
@@ -79,7 +81,7 @@ export function PlanSelector599({
     setEstadoRevisado(valid ? "valid" : "invalid");
   }
 
-  async function checkout(plan: Plan) {
+  async function checkout(plan: Cobro) {
     setError(null);
     setLoading(plan);
     const res = await fetch("/api/stripe/checkout", {
@@ -199,6 +201,22 @@ export function PlanSelector599({
           >
             {loading === "annual" ? "Un momento…" : "Elegir anual"}
           </button>
+          {/* Meses sin intereses (17-sep-2026): Stripe solo los permite en un
+              pago único, así que es un botón aparte, no un plan aparte. La
+              opción de 3 o 6 meses la muestra Stripe si la tarjeta la tiene. */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              checkout("annual_msi");
+            }}
+            className="grid h-[46px] place-items-center rounded-full border-2 border-teal px-4 text-[13.5px] font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+          >
+            {loading === "annual_msi" ? "Un momento…" : "Pagarlo a 3 o 6 meses sin intereses"}
+          </button>
+          <span className="text-center text-[11.5px] leading-snug text-ink-tertiary">
+            Con tarjetas de crédito participantes. Lo eliges en la pantalla de pago.
+          </span>
         </div>
       </div>
 

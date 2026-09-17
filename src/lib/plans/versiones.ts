@@ -7,6 +7,8 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 export type VersionVigente = {
   id: string;
+  /** El producto de Stripe del plan (lo comparten todas sus versiones). */
+  stripe_product_id: string | null;
   version: number;
   interval: "month" | "year";
   price_cents: number;
@@ -38,7 +40,7 @@ export async function versionVigente(
     const { data } = await admin
       .from("plan_versions")
       .select(
-        "id, version, interval, price_cents, stripe_price_id, additional_price_cents, stripe_additional_price_id, benefits, membership_plans!inner(slug, is_public, archived_at)",
+        "id, version, interval, price_cents, stripe_product_id, stripe_price_id, additional_price_cents, stripe_additional_price_id, benefits, membership_plans!inner(slug, is_public, archived_at)",
       )
       .eq("membership_plans.slug", planSlug)
       .is("membership_plans.archived_at", null)
@@ -50,6 +52,7 @@ export async function versionVigente(
     if (!data) return null;
     return {
       id: data.id,
+      stripe_product_id: data.stripe_product_id,
       version: data.version,
       interval: data.interval as "month" | "year",
       price_cents: data.price_cents,

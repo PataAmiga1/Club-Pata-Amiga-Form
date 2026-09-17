@@ -316,6 +316,7 @@ export default async function Home() {
               <li>
                 🐾 Reintegro en {oferta.principal.diasHabiles} días hábiles o tu mes es gratis
               </li>
+              <li>🐾 Anual a 3 o 6 meses sin intereses (tarjetas participantes)</li>
               <li>🐾 Garantía de {oferta.principal.garantiaDias} días · sin límite de edad</li>
             </ul>
             <Link

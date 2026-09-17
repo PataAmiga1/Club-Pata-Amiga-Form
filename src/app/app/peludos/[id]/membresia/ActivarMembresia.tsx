@@ -26,12 +26,12 @@ export function ActivarMembresia({
   const [hecho, setHecho] = useState(false);
   const precio = plan === "annual" ? oferta.anualPesos : oferta.mensualPesos;
 
-  async function conOtraTarjeta() {
+  async function conOtraTarjeta(cobro: "monthly" | "annual" | "annual_msi" = plan) {
     setError(null);
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan, petId }),
+      body: JSON.stringify({ plan: cobro, petId }),
     });
     const cuerpo = await res.json().catch(() => ({}));
     if (!res.ok) return setError(cuerpo.error ?? "No pudimos abrir el pago. Intenta de nuevo.");
@@ -126,7 +126,7 @@ export function ActivarMembresia({
           </button>
           <button
             type="button"
-            onClick={conOtraTarjeta}
+            onClick={() => conOtraTarjeta()}
             className="self-center text-[13px] font-bold text-teal-deep hover:underline"
           >
             Pagar con otra tarjeta
@@ -135,11 +135,27 @@ export function ActivarMembresia({
       ) : (
         <button
           type="button"
-          onClick={conOtraTarjeta}
+          onClick={() => conOtraTarjeta()}
           className="grid h-[52px] place-items-center rounded-full bg-teal text-[15px] font-bold text-white transition-colors hover:bg-teal-deep"
         >
           Pagar {mxn(precio)}
         </button>
+      )}
+      {/* Meses sin intereses (17-sep-2026): solo en el anual y como pago
+          único, que es lo único que Stripe permite. */}
+      {plan === "annual" && (
+        <>
+          <button
+            type="button"
+            onClick={() => conOtraTarjeta("annual_msi")}
+            className="grid h-[46px] place-items-center rounded-full border-2 border-teal text-[13.5px] font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+          >
+            Pagarlo a 3 o 6 meses sin intereses
+          </button>
+          <span className="-mt-2 text-center text-[11.5px] leading-snug text-ink-tertiary">
+            Con tarjetas de crédito participantes. Lo eliges en la pantalla de pago.
+          </span>
+        </>
       )}
       <span className="text-center text-[12px] text-ink-tertiary">
         Pago procesado por Stripe · Cancelas cuando quieras desde Mi cuenta

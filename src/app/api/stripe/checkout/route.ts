@@ -7,6 +7,7 @@ import { versionVigente } from "@/lib/plans/versiones";
 import { ALTAS_SON_599, PLAN_159, PLAN_DE_ALTAS } from "@/lib/plans/planes";
 import { ESTADOS_VIVOS, type NivelDePrecio } from "@/lib/plans/suscripciones";
 import { registroAbierto } from "@/lib/registro";
+import { anualParaMSI, sesionDePagoAnual } from "@/lib/plans/msi";
 
 const PRICE_BY_PLAN: Record<string, string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
@@ -46,8 +47,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const { plan, ambassadorCode, petId } = await request.json();
+  const { plan: planPedido, ambassadorCode, petId } = await request.json();
+  // «annual_msi» es el MISMO plan anual, pagado de una vez y a meses sin
+  // intereses (17-sep-2026). Stripe no admite MSI dentro de una suscripción,
+  // así que cambia CÓMO se cobra, no qué se contrata: de ahí `plan` para todo
+  // lo demás y `esMSI` solo para armar la sesión de pago.
+  const esMSI = planPedido === "annual_msi";
+  const plan = esMSI ? "annual" : planPedido;
   if (!PRICE_BY_PLAN[plan] && plan !== "monthly" && plan !== "annual") {
+    return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
+  }
+  if (esMSI && !ALTAS_SON_599) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
 
@@ -211,6 +221,53 @@ export async function POST(request: Request) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const stripe = getStripe();
+
+  // ===== Anual a meses sin intereses (17-sep-2026) =====
+  // Un pago único por el año, con MSI prendido; la suscripción que renueva se
+  // crea en el webhook, con el primer cobro a 12 meses.
+  if (esMSI) {
+    if (!peludo) return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
+    const anual = await anualParaMSI(guard, peludo.nivel);
+    if (!anual)
+      return NextResponse.json(
+        { error: "La membresía anual no está disponible en este momento." },
+        { status: 400 },
+      );
+    const url = await sesionDePagoAnual({
+      anual,
+      clienteStripe: peludo.customerId,
+      correo: user.email ?? null,
+      descripcion: "Membresía Pata Amiga · un año",
+      metadata: {
+        user_id: user.id,
+        plan: "annual",
+        plan_slug: PLAN_DE_ALTAS,
+        pet_id: peludo.id,
+        price_tier: peludo.nivel,
+        plan_version_id: anual.planVersionId,
+        msi: "1",
+        ...(validCode ? { ambassador_code: validCode } : {}),
+      },
+      successUrl:
+        peludo.nivel === "adicional"
+          ? `${siteUrl}/app/peludos?membresia=1`
+          : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl:
+        peludo.nivel === "adicional"
+          ? `${siteUrl}/app/peludos/${peludo.id}/membresia`
+          : `${siteUrl}/registro/plan`,
+    });
+    if (!url) return NextResponse.json({ error: "No pudimos abrir el pago." }, { status: 502 });
+    await crmEventoDeUsuario(guard, {
+      userId: user.id,
+      kind: "checkout_abierto",
+      summary: "Abrió el checkout del plan anual a meses sin intereses",
+      stageKey: "registro_iniciado",
+      interval: "year",
+      payload: { plan: "annual_msi", petId: peludo.id, nivel: peludo.nivel },
+    });
+    return NextResponse.json({ url });
+  }
 
   // Membresía $599 (sección 9): un checkout nuevo reemplaza a los que esta
   // persona dejó abiertos. Una sesión de Stripe vive 24 horas y se puede pagar

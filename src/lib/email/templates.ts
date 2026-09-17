@@ -323,6 +323,8 @@ ${BOTON("{{siteUrl}}/embajador", "Ir a mi perfil de embajador")}`),
       monto: "Importe del cobro con su moneda",
       plan: "Mensual o Anual",
       cuentaUrl: "URL de Mi cuenta",
+      msiLine:
+        "Párrafo con la opción de renovar a meses sin intereses (solo en el anual pagado por adelantado; vacío en los demás)",
     },
     sample: {
       firstName: "Cipatli",
@@ -331,11 +333,13 @@ ${BOTON("{{siteUrl}}/embajador", "Ir a mi perfil de embajador")}`),
       monto: "$159.00 MXN",
       plan: "Mensual",
       cuentaUrl: "https://pataamiga.mx/app/cuenta",
+      msiLine: "",
     },
     subject: "Tu membresía se renueva en {{dias}} 🐾",
     html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
 <p>Te avisamos que tu membresía <strong>{{plan}}</strong> se renueva el <strong>{{fecha}}</strong>, en {{dias}}.</p>
 <p>El cobro es de <strong>{{monto}}</strong> y se hace solo, con la tarjeta que tienes guardada. No tienes que hacer nada.</p>
+{{msiLine}}
 <p><strong>Solo por si acaso:</strong> si cambiaste de tarjeta o está por vencer, actualízala antes de esa fecha para que tus peludos no se queden sin cobertura de reintegros.</p>
 ${BOTON("{{cuentaUrl}}", "Revisar mi tarjeta")}`),
   },

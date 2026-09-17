@@ -129,6 +129,7 @@ function respuestas599(o: OfertaPublica599): Record<string, string[]> {
       "En Pata Amiga cada peludo tiene su propia membresía, con sus propios montos disponibles.",
       `Puedes elegir la modalidad que mejor se adapte a ti:\n• Mensual: ${$(p.mensualPesos)} al mes por peludo.\n• Anual: ${$(p.anualPesos)} en un solo pago, y te ahorras ${$(p.ahorroAnualPesos)}.`,
       "Del segundo peludo en adelante, sin límite, tienes 15% de descuento. El precio con descuento aparece cuando agregas a tu siguiente peludo desde tu cuenta.",
+      "El anual lo puedes pagar a 3 o 6 meses sin intereses con tarjetas de crédito participantes; la opción aparece al escribir tu tarjeta en la pantalla de pago.",
       "No hay plazo forzoso: cancelas cuando quieras.",
     ],
     "¿Con qué cuento al ser parte de la manada?": [
