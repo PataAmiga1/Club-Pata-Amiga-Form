@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { crmEventoDeUsuario } from "@/lib/crm/sync";
 import { versionVigente } from "@/lib/plans/versiones";
+import { registroAbierto } from "@/lib/registro";
 
 const PRICE_BY_PLAN: Record<string, string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
@@ -17,6 +18,20 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  // Registro cerrado (17-sep-2026): no se abre ningún cobro nuevo, aunque
+  // alguien llegue directo a esta ruta o traiga la página vieja en caché.
+  // Los miembros actuales no pasan por aquí: cambian de plan desde Mi cuenta.
+  if (!(await registroAbierto())) {
+    return NextResponse.json(
+      {
+        error:
+          "Estamos preparando la nueva membresía y por ahora no hay registro. Déjanos tus datos y te avisamos en cuanto abra.",
+        motivo: "registro_cerrado",
+      },
+      { status: 403 },
+    );
   }
 
   const { plan, ambassadorCode } = await request.json();

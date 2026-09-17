@@ -16,6 +16,12 @@ export type Campaign = {
   name: string;
   /** Si está inactiva, la landing responde 404 y deja de captar leads. */
   active: boolean;
+  /**
+   * `regalo`: manda el correo con cupón y PDF (lo de siempre).
+   * `lista_espera`: solo apunta a la persona y le confirma por correo; sin
+   * cupón ni PDF. Nació el 17-sep-2026 para el registro cerrado.
+   */
+  tipo: "regalo" | "lista_espera";
   /** Copy de la página. */
   headline: string;
   subheadline: string;
@@ -30,6 +36,7 @@ export const CAMPAIGNS: Campaign[] = [
     slug: "regalo",
     name: "Regalo de bienvenida (patrocinador)",
     active: true,
+    tipo: "regalo",
     headline: "Tu regalo para consentir a tu peludo 🎁",
     subheadline:
       "Regístrate gratis y recibe en tu correo un descuento para la membresía Club Pata Amiga y una guía de cuidado para tu peludo.",
@@ -39,6 +46,24 @@ export const CAMPAIGNS: Campaign[] = [
       { emoji: "💬", text: "Orientación veterinaria 24/7 al unirte a la manada" },
     ],
     emailSubject: "🎁 Obtén tu regalo — Club Pata Amiga",
+  },
+  {
+    // A donde manda /registro mientras el registro está cerrado
+    // (src/lib/registro.ts). Sin precios ni montos: la membresía nueva todavía
+    // no tiene sus textos legales.
+    slug: "nueva-membresia",
+    name: "Lista de espera — nueva membresía",
+    active: true,
+    tipo: "lista_espera",
+    headline: "La nueva membresía Pata Amiga llega muy pronto 🐾",
+    subheadline:
+      "Estamos preparando la nueva membresía para cuidar a tu peludo. Déjanos tus datos y te avisamos primero en cuanto abra el registro.",
+    perks: [
+      { emoji: "🔔", text: "Te avisamos antes que a nadie cuando abra" },
+      { emoji: "🩺", text: "Mantienes a tu veterinario de confianza" },
+      { emoji: "💬", text: "Orientación veterinaria 24/7 para la manada" },
+    ],
+    emailSubject: "🐾 Ya estás en la lista — Club Pata Amiga",
   },
 ];
 

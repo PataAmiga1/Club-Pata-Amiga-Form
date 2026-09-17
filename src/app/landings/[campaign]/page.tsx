@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getCampaign } from "@/lib/landings";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
+import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
 import { LeadForm } from "./LeadForm";
 
 /**
@@ -81,8 +82,11 @@ export default async function CampaignLandingPage({
             ))}
           </div>
 
+          {/* Links de embajador redirigidos desde /registro?codigo=… */}
+          <StashAmbassadorCode />
           <LeadForm
             campaign={campaign.slug}
+            tipo={campaign.tipo}
             utm={{
               source: utm_source,
               medium: utm_medium,
@@ -92,12 +96,18 @@ export default async function CampaignLandingPage({
 
           <p className="max-w-[420px] text-[11.5px] leading-relaxed text-white/60">
             Membresía de salud para tu peludo — no es un seguro. Tus datos solo
-            se usan para enviarte tu regalo y novedades de Club Pata Amiga.
+            se usan para{" "}
+            {campaign.tipo === "lista_espera"
+              ? "avisarte cuando abra el registro"
+              : "enviarte tu regalo"}{" "}
+            y novedades de Club Pata Amiga.
           </p>
         </div>
       </main>
 
-      <BenefitsMarquee />
+      {/* La banda dice «hasta 3 peludos», que ya no aplica a la membresía
+          nueva: en la lista de espera no se muestra. */}
+      {campaign.tipo !== "lista_espera" && <BenefitsMarquee />}
     </div>
   );
 }

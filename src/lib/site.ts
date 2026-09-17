@@ -38,6 +38,14 @@ export const SITE_SETTINGS = [
     label: "Recordatorios de renovación (días antes, separados por coma)",
     default: "7,1",
   },
+  {
+    // 17-sep-2026: el $159 dejó de venderse y el $599 aún no está listo.
+    // Cerrado, /registro manda a la lista de interesados y el checkout no
+    // cobra. Ver src/lib/registro.ts.
+    key: "registro_abierto",
+    label: "Registro de nuevos miembros abierto («si» o «no»)",
+    default: "no",
+  },
 ] as const;
 
 /**
