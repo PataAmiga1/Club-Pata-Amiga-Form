@@ -52,8 +52,15 @@ async function getOwnSubscription() {
  * Switch plan on the live Stripe subscription.
  * - Upgrade to annual: applies now; Stripe credits unused monthly time and
  *   invoices the difference immediately.
- * - Downgrade to monthly: applies now with no refund; the already-paid
- *   period stays covered and the next renewal bills monthly.
+ * - Downgrade to monthly: applies now with proration; Stripe credits the
+ *   unused part of the year as CUSTOMER BALANCE, and the monthly charges are
+ *   paid from that balance until it runs out.
+ *
+ * 17-sep-2026: antes a mensual iba con `proration_behavior: "none"`. Al
+ * cambiar de intervalo Stripe reinicia el ciclo, así que quien pagó $1,699 por
+ * el año recibía el cobro mensual al mes siguiente y perdía lo que no había
+ * usado. Comprobado en Stripe test (el siguiente cobro pasaba del próximo año
+ * al próximo mes).
  *
  * Sección 3, punto 6.3: además de prorratear, el snapshot de beneficios se
  * actualiza EN ESE MOMENTO, con el antes y el después escritos en la línea de
@@ -80,7 +87,7 @@ export async function switchPlan(target: "monthly" | "annual") {
 
   const updated = await stripe.subscriptions.update(sub.stripe_subscription_id, {
     items: [{ id: item.id, price }],
-    proration_behavior: target === "annual" ? "always_invoice" : "none",
+    proration_behavior: "always_invoice",
     metadata: { ...current.metadata, plan: target },
   });
 
@@ -121,7 +128,7 @@ export async function switchPlan(target: "monthly" | "annual") {
     message:
       target === "annual"
         ? "Cambiaste al plan Anual. Se cobró la diferencia proporcional y tu protección sigue sin interrupciones."
-        : "Cambiaste al plan Mensual. Tu período ya pagado sigue vigente; la próxima renovación será mensual.",
+        : "Cambiaste al plan Mensual. Lo que no usaste de tu año quedó como saldo a tu favor y de ahí se pagan tus siguientes mensualidades.",
   });
 
   revalidatePath("/app/cuenta");
