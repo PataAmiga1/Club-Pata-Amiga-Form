@@ -73,8 +73,21 @@ export default async function NuevaSolicitudPage() {
   // disponible calculado en el servidor. El $159 sigue abajo, sin cambios.
   const admin = createAdminClient();
   if (await esMiembro599(admin, user.id)) {
+    // También los que fallecieron y ya se dieron de baja: su despedida sigue
+    // disponible mientras su membresía esté vigente.
+    const { data: fallecidos } = await admin
+      .from("pets")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_active", false)
+      .like("deactivation_reason", "Falleció%");
+    const idsFallecidos = new Set((fallecidos ?? []).map((p) => p.id));
     const [estados, catalogo] = await Promise.all([
-      Promise.all((pets ?? []).map((p) => estadoDePeludo599(admin, p.id))),
+      Promise.all(
+        [...(pets ?? []).map((p) => p.id), ...idsFallecidos].map((id) =>
+          estadoDePeludo599(admin, id),
+        ),
+      ),
       leerCatalogo(admin),
     ]);
     const peludos: PeludoParaSolicitud[] = estados
@@ -87,15 +100,18 @@ export default async function NuevaSolicitudPage() {
         puedePedir: e.puedePedir,
         anioHasta: e.anioHasta,
         diasHabiles: Number(e.beneficios.dias_habiles_reintegro) || 5,
-        rubros: Object.values(e.rubros).map((r) => ({
-          rubro: r.rubro,
-          label: r.label,
-          abierto: r.abierto,
-          fechaApertura: r.fechaApertura,
-          monto: r.montoCentavos / 100,
-          gastado: r.gastadoCentavos / 100,
-          disponible: r.disponibleCentavos / 100,
-        })),
+        rubros: Object.values(e.rubros)
+          // Del que falleció, solo la despedida.
+          .filter((r) => !idsFallecidos.has(e.petId) || r.rubro === "despedida")
+          .map((r) => ({
+            rubro: r.rubro,
+            label: r.label,
+            abierto: r.abierto,
+            fechaApertura: r.fechaApertura,
+            monto: r.montoCentavos / 100,
+            gastado: r.gastadoCentavos / 100,
+            disponible: r.disponibleCentavos / 100,
+          })),
       }));
     return (
       <div className="mx-auto flex w-full max-w-[640px] flex-col gap-[22px] px-5 py-6 md:py-10">

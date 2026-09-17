@@ -409,3 +409,123 @@ export async function marcarCuentaPorOmision(id: string) {
   revalidatePath("/app/reintegros/nueva");
   return { ok: true as const };
 }
+
+// ===========================================================================
+// Membresía $599: una suscripción por peludo (sección 4, 17-sep-2026)
+// ===========================================================================
+
+/** La suscripción de un peludo, solo si es de quien la pide. */
+async function suscripcionPropiaDePeludo(subscriptionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const admin = createAdminClient();
+  const { data: sub } = await admin
+    .from("subscriptions")
+    .select("id, user_id, pet_id, status, plan, price_tier, stripe_subscription_id, cancel_at_period_end, pets(name)")
+    .eq("id", subscriptionId)
+    .maybeSingle();
+  if (!sub || sub.user_id !== user.id || !sub.pet_id || !sub.stripe_subscription_id) return null;
+  const pet = (Array.isArray(sub.pets) ? sub.pets[0] : sub.pets) as { name?: string } | null;
+  return { admin, userId: user.id, sub, petName: pet?.name ?? "tu peludo" };
+}
+
+/** Cancela al corte la membresía de UN peludo; los demás siguen igual. */
+export async function cancelarMembresiaDePeludo(subscriptionId: string, reason: string) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  const { cancelarAlCorte } = await import("@/lib/plans/peludos-599");
+  const r = await cancelarAlCorte(ctx.admin, ctx.sub.id);
+  if (!r) return { error: "No pudimos cancelar. Intenta de nuevo." };
+
+  await ctx.admin.from("cancellations").insert({
+    user_id: ctx.userId,
+    reason: reason || "Sin motivo",
+    survey: { membresia_599: true, peludo: ctx.petName, subscription_id: ctx.sub.id },
+    coverage_end_date: r.hasta?.slice(0, 10) ?? null,
+  });
+  await notifyTeam(
+    "notify_memberships",
+    `Cancelación de la membresía de ${ctx.petName}`,
+    `<p>Un miembro canceló la membresía de <strong>${ctx.petName}</strong> al final de su período${r.hasta ? ` (${new Date(r.hasta).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: ZONA_MX })})` : ""}.</p><p>Motivo: ${reason || "—"}</p>`,
+  );
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/peludos");
+  return { ok: true as const, hasta: r.hasta };
+}
+
+/** Deshace la cancelación de un peludo antes de que termine su período. */
+export async function reactivarMembresiaDePeludo(subscriptionId: string) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  await getStripe().subscriptions.update(ctx.sub.stripe_subscription_id!, {
+    cancel_at_period_end: false,
+  });
+  await ctx.admin
+    .from("subscriptions")
+    .update({ cancel_at_period_end: false })
+    .eq("id", ctx.sub.id);
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/peludos");
+  return { ok: true as const };
+}
+
+/**
+ * Mensual ↔ anual de UN peludo, dentro del $599 y conservando su nivel
+ * (principal o adicional). Mismo criterio de prorrateo que el $159: a anual se
+ * cobra la diferencia hoy; a mensual rige desde el siguiente cobro.
+ */
+export async function cambiarIntervaloDePeludo(
+  subscriptionId: string,
+  target: "monthly" | "annual",
+) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  if (ctx.sub.plan === target) return { ok: true as const };
+  if (ctx.sub.status !== "active")
+    return { error: "Esta membresía tiene un pago pendiente; primero actualiza tu método de pago." };
+
+  const { PLAN_599 } = await import("@/lib/plans/planes");
+  const version = await versionVigente(ctx.admin, target === "annual" ? "year" : "month", PLAN_599);
+  const price =
+    ctx.sub.price_tier === "adicional"
+      ? version?.stripe_additional_price_id
+      : version?.stripe_price_id;
+  if (!version || !price) return { error: "Ese plan no está disponible en este momento." };
+
+  const stripe = getStripe();
+  const actual = await stripe.subscriptions.retrieve(ctx.sub.stripe_subscription_id!);
+  const item = actual.items.data[0];
+  const nueva = await stripe.subscriptions.update(ctx.sub.stripe_subscription_id!, {
+    items: [{ id: item.id, price }],
+    proration_behavior: target === "annual" ? "always_invoice" : "none",
+    metadata: { ...actual.metadata, plan: target, plan_version_id: version.id },
+  });
+  const nuevoItem = nueva.items.data[0];
+  await ctx.admin
+    .from("subscriptions")
+    .update({
+      plan: target,
+      plan_name: target === "annual" ? "Anual" : "Mensual",
+      amount: nuevoItem.price.unit_amount != null ? nuevoItem.price.unit_amount / 100 : null,
+      current_period_start: nuevoItem.current_period_start
+        ? new Date(nuevoItem.current_period_start * 1000).toISOString()
+        : null,
+      current_period_end: nuevoItem.current_period_end
+        ? new Date(nuevoItem.current_period_end * 1000).toISOString()
+        : null,
+    })
+    .eq("id", ctx.sub.id);
+  await reemplazarSnapshot(ctx.admin, {
+    subscriptionId: ctx.sub.id,
+    userId: ctx.userId,
+    planVersionId: version.id,
+    kind: "plan_cambiado",
+    motivo: `${ctx.petName} cambió al plan ${target === "annual" ? "Anual" : "Mensual"} (v${version.version})`,
+  });
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/peludos");
+  return { ok: true as const };
+}

@@ -25,7 +25,17 @@ export async function POST(request: Request) {
   // Registro cerrado (17-sep-2026): no se abre ningún cobro nuevo, aunque
   // alguien llegue directo a esta ruta o traiga la página vieja en caché.
   // Los miembros actuales no pasan por aquí: cambian de plan desde Mi cuenta.
-  if (!(await registroAbierto())) {
+  // Quien ya paga por un peludo del $599 no es un alta: agregar otro peludo
+  // sigue permitido aunque el registro de gente nueva esté cerrado.
+  const { data: vivasDelMiembro } = await createAdminClient()
+    .from("subscriptions")
+    .select("status")
+    .eq("user_id", user.id)
+    .not("pet_id", "is", null);
+  const yaEsMiembro599 = (vivasDelMiembro ?? []).some((s) =>
+    ESTADOS_VIVOS.includes(s.status ?? ""),
+  );
+  if (!yaEsMiembro599 && !(await registroAbierto())) {
     return NextResponse.json(
       {
         error:
@@ -210,8 +220,16 @@ export async function POST(request: Request) {
     // Campo "código de promoción" en el checkout — aquí viven los cupones
     // de las landings (se crean manualmente en Stripe → Promotion codes)
     allow_promotion_codes: true,
-    success_url: `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/registro/plan`,
+    // Un peludo adicional se paga desde la cuenta: vuelve a sus peludos, no
+    // a la bienvenida del alta.
+    success_url:
+      peludo?.nivel === "adicional"
+        ? `${siteUrl}/app/peludos?membresia=1`
+        : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:
+      peludo?.nivel === "adicional"
+        ? `${siteUrl}/app/peludos/${peludo.id}/membresia`
+        : `${siteUrl}/registro/plan`,
     metadata: {
       user_id: user.id,
       plan,

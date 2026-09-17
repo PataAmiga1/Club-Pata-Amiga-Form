@@ -192,10 +192,27 @@ export async function resolvePet(
   const { adminId, admin } = await requireAdmin();
   const { data: pet } = await admin
     .from("pets")
-    .select("id, name, user_id")
+    .select("id, name, user_id, is_senior, vet_certificate_url")
     .eq("id", petId)
     .single();
   if (!pet) throw new Error("Peludo no encontrado");
+
+  // Membresía $599 (sección 4): el senior se inscribe CON certificado médico.
+  // El formulario ya lo exige; aquí se asegura que tampoco se apruebe sin él.
+  if (decision.approve && pet.is_senior && !pet.vet_certificate_url) {
+    const { data: suya } = await admin
+      .from("subscriptions")
+      .select("benefits_snapshot, status")
+      .eq("pet_id", petId)
+      .in("status", ["active", "past_due", "trialing"])
+      .limit(1);
+    const exige = (suya?.[0]?.benefits_snapshot as Record<string, unknown> | null)
+      ?.certificado_senior_al_inscribir;
+    if (exige === true)
+      return {
+        error: `${pet.name} es senior y su membresía exige el certificado médico para aprobarlo. Pídeselo con «Solicitar información».`,
+      };
+  }
 
   await admin
     .from("pets")
@@ -221,12 +238,16 @@ export async function resolvePet(
   // (es la plataforma), así que respeta cualquier tarjeta que ventas haya
   // fijado a mano.
   if (decision.approve) {
-    const { data: sub } = await admin
+    // `.limit(1)`: con una suscripción por peludo ($599) `maybeSingle()` daba
+    // error con dos o más, y la tarjeta del CRM nunca llegaba a «Miembro activo».
+    const { data: subs } = await admin
       .from("subscriptions")
       .select("id, plan")
       .eq("user_id", pet.user_id)
       .eq("status", "active")
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const sub = subs?.[0] ?? null;
     if (sub) {
       await crmEventoDeUsuario(admin, {
         userId: pet.user_id,

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { waitingProgress } from "@/lib/dates";
@@ -25,6 +27,15 @@ export default async function PetFichaPage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/iniciar-sesion?next=/app/peludos");
+  // Membresía $599: el peludo tiene su propia suscripción viva.
+  const { data: suyaDelPeludo } = await createAdminClient()
+    .from("subscriptions")
+    .select("status")
+    .eq("pet_id", id)
+    .eq("user_id", user.id);
+  const tieneMembresia599 = (suyaDelPeludo ?? []).some((s) =>
+    ESTADOS_VIVOS.includes(s.status ?? ""),
+  );
 
   const [{ data: pet }, { data: messages }] = await Promise.all([
     supabase
@@ -171,6 +182,7 @@ export default async function PetFichaPage({
         }}
         thread={(messages ?? []) as ThreadMessage[]}
         adjuntosDelHilo={adjuntosDelHilo}
+        tieneMembresia599={tieneMembresia599}
       />
     </div>
   );

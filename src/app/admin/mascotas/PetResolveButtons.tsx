@@ -14,10 +14,17 @@ export function PetResolveButtons({ petId }: { petId: string }) {
   const [pending, startTransition] = useTransition();
   const [rejecting, setRejecting] = useState(false);
   const [notes, setNotes] = useState("");
+  const [aviso, setAviso] = useState<string | null>(null);
 
   function run(decision: Parameters<typeof resolvePet>[1]) {
     startTransition(async () => {
-      await resolvePet(petId, decision);
+      setAviso(null);
+      const r = await resolvePet(petId, decision);
+      // Una regla (p. ej. el certificado senior del $599) regresa su motivo.
+      if (r && typeof r === "object" && "error" in r && typeof r.error === "string") {
+        setAviso(r.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -50,6 +57,12 @@ export function PetResolveButtons({ petId }: { petId: string }) {
   }
 
   return (
+    <div className="flex flex-col gap-2">
+    {aviso && (
+      <span className="max-w-[420px] rounded-[10px] bg-warning-bg px-3 py-2 text-[12.5px] font-semibold text-warning-text">
+        {aviso}
+      </span>
+    )}
     <div className="flex gap-2">
       <button
         type="button"
@@ -67,6 +80,7 @@ export function PetResolveButtons({ petId }: { petId: string }) {
       >
         Denegar…
       </button>
+    </div>
     </div>
   );
 }

@@ -58,14 +58,17 @@ export async function solicitarReintegro599(
 
   const { data: pet } = await admin
     .from("pets")
-    .select("id, user_id, is_active")
+    .select("id, user_id, is_active, deactivation_reason")
     .eq("id", input.petId)
     .maybeSingle();
-  if (!pet || pet.user_id !== user.id || !pet.is_active)
-    return { error: "Elige a tu peludo." };
-
   if (!esRubro599(input.rubro)) return { error: "Elige el tipo de reintegro." };
   const rubro = input.rubro;
+  // Un peludo que falleció y ya se dio de baja todavía puede pedir su
+  // despedida mientras su membresía siga vigente (sección 4).
+  const fallecido =
+    !!pet && !pet.is_active && (pet.deactivation_reason ?? "").startsWith("Falleció");
+  if (!pet || pet.user_id !== user.id || (!pet.is_active && !(fallecido && rubro === "despedida")))
+    return { error: "Elige a tu peludo." };
 
   const estado = await estadoDePeludo599(admin, pet.id);
   if (!estado) return { error: "Ese peludo no tiene la membresía nueva." };

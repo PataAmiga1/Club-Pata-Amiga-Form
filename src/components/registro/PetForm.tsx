@@ -48,7 +48,19 @@ const AGE_OPTIONS: {
  * un valor libre si no aparece), edad por rangos, aviso senior a los
  * SENIOR_PET_AGE_YEARS o más (8 desde el 11-ago-2026).
  */
-export function PetForm({ mode }: { mode: "registro" | "member" }) {
+export function PetForm({
+  mode,
+  modelo599 = false,
+}: {
+  mode: "registro" | "member";
+  /**
+   * Membresía $599 (sección 4, 17-sep-2026): cada peludo tiene su propia
+   * membresía, así que no hay tope de 3 ni peludos «extra» en el alta (se
+   * agregan desde la cuenta, cada uno con su pago); y el certificado del senior
+   * es OBLIGATORIO al inscribir, no se puede dejar para después.
+   */
+  modelo599?: boolean;
+}) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +93,8 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
   const [extras, setExtras] = useState<
     { name: string; species: Species; ageKey: string }[]
   >([]);
-  const puedeAgregarOtro = mode === "registro" && extras.length + 1 < MAX_ACTIVE_PETS;
+  const puedeAgregarOtro =
+    mode === "registro" && !modelo599 && extras.length + 1 < MAX_ACTIVE_PETS;
   const cambiarExtra = (
     i: number,
     campo: "name" | "species" | "ageKey",
@@ -141,6 +154,13 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
         species === "dog"
           ? "Cuéntanos su raza (o elige Mestizo)."
           : "Cuéntanos su raza (o elige Doméstico).",
+      );
+      return;
+    }
+    // $599: sin certificado no hay alta de un senior (decisión del equipo, 17-sep).
+    if (modelo599 && showsSeniorNote && !cert) {
+      setError(
+        `Como tu ${comoLeDicen(species)} tiene ${SENIOR_PET_AGE_YEARS} años o más, sube su certificado médico para inscribirlo.`,
       );
       return;
     }
@@ -206,12 +226,13 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
     if (mode === "member") {
       // Miembro activo: solo se valida el cupo; el tiempo de espera (incluido
       // el caso de reemplazo) lo determina el comité al aprobar el perfil.
+      // En el $599 no hay cupo: cada peludo paga su propia membresía.
       const { count: activeCount } = await supabase
         .from("pets")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("is_active", true);
-      if ((activeCount ?? 0) >= MAX_ACTIVE_PETS) {
+      if (!modelo599 && (activeCount ?? 0) >= MAX_ACTIVE_PETS) {
         setError(`Ya tienes ${MAX_ACTIVE_PETS} peludos activos en tu membresía.`);
         setLoading(false);
         return;
@@ -219,13 +240,21 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       // La espera arranca cuando el COMITÉ APRUEBA el perfil (PM, 11-ago), no
       // al registrar: la fecha la fija resolvePet vía iniciarEsperaDeMascota.
       // Mientras el perfil está en revisión no corre ningún conteo.
-      const { error: saveError } = await supabase.from("pets").insert(petData);
+      const { data: nuevo, error: saveError } = await supabase
+        .from("pets")
+        .insert(petData)
+        .select("id")
+        .single();
       if (saveError) {
         setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
         setLoading(false);
         return;
       }
-      window.location.assign("/app/peludos?registrado=1");
+      // $599: el peludo recién registrado todavía no tiene membresía; lo
+      // siguiente es activarla.
+      window.location.assign(
+        modelo599 && nuevo ? `/app/peludos/${nuevo.id}/membresia` : "/app/peludos?registrado=1",
+      );
       return;
     }
 
@@ -407,10 +436,36 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
             </button>
           )}
           <span className="text-[12.5px] leading-normal text-ink-tertiary">
-            Si tienes más de un peludo, puedes registrarlo ahora o más adelante
-            desde tu cuenta (hasta {MAX_ACTIVE_PETS}). Los demás datos —raza,
-            sexo, colores y su foto— te los pedimos después del pago.
+            {modelo599
+              ? "A tus otros peludos los agregas después del pago desde tu cuenta, cada uno con 15% de descuento. Los demás datos —raza, sexo, colores y su foto— te los pedimos después del pago."
+              : `Si tienes más de un peludo, puedes registrarlo ahora o más adelante desde tu cuenta (hasta ${MAX_ACTIVE_PETS}). Los demás datos —raza, sexo, colores y su foto— te los pedimos después del pago.`}
           </span>
+          {/* $599: el certificado del senior se pide YA en el alta. */}
+          {modelo599 && showsSeniorNote && (
+            <div className="flex flex-col gap-2.5 rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
+              <span>
+                Como tu {comoLeDicen(species)} tiene {SENIOR_PET_AGE_YEARS} años o
+                más, para inscribirlo necesitamos su certificado médico. 🐾
+              </span>
+              <input
+                ref={certRef}
+                type="file"
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={(e) => setCert(e.target.files?.[0] ?? null)}
+              />
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => certRef.current?.click()}
+                  className="rounded-full border-[1.5px] border-[#8A5A12] px-4 py-1.5 text-[12.5px] font-bold text-[#8A5A12] transition-colors hover:bg-white/50"
+                >
+                  {cert ? "Cambiar certificado" : "📄 Subir certificado médico"}
+                </button>
+                {cert && <span className="text-[12px] font-semibold">{cert.name} ✓</span>}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -584,9 +639,9 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
       {showsSeniorNote && (
         <div className="flex flex-col gap-2.5 rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
           <span>
-            Como tu peludo tiene {SENIOR_PET_AGE_YEARS} años o más, te pedimos
-            un certificado veterinario para conocer su estado de salud. Puedes
-            subirlo aquí mismo o después desde su perfil. 🐾
+            {modelo599
+              ? `Como tu peludo tiene ${SENIOR_PET_AGE_YEARS} años o más, para inscribirlo necesitamos su certificado médico. 🐾`
+              : `Como tu peludo tiene ${SENIOR_PET_AGE_YEARS} años o más, te pedimos un certificado veterinario para conocer su estado de salud. Puedes subirlo aquí mismo o después desde su perfil. 🐾`}
           </span>
           <input
             ref={certRef}
@@ -633,7 +688,9 @@ export function PetForm({ mode }: { mode: "registro" | "member" }) {
           {loading
             ? "Guardando…"
             : mode === "member"
-              ? "Guardar peludo"
+              ? modelo599
+                ? "Guardar y activar su membresía"
+                : "Guardar peludo"
               : "Elegir mi plan"}
         </Button>
       </div>

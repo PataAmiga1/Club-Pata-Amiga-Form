@@ -18,6 +18,7 @@ import {
   queEsEstePrecio,
   recalcularEstadoDelMiembro,
 } from "@/lib/plans/suscripciones";
+import { reacomodarPrecioPrincipal, registrarCobro } from "@/lib/plans/peludos-599";
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
@@ -268,9 +269,22 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .from("subscriptions")
     .update({ status: "canceled" })
     .eq("stripe_subscription_id", subscription.id)
-    .select("user_id")
+    .select("user_id, pet_id")
     .maybeSingle();
   if (subRow?.user_id) {
+    // Membresía $599 (sección 4): si terminó la del peludo que pagaba el
+    // precio principal, el siguiente más antiguo sube a principal desde su
+    // próximo cobro. Si falla, no se detiene la baja: se reporta.
+    if (subRow.pet_id) {
+      try {
+        await reacomodarPrecioPrincipal(supabase, subRow.user_id);
+      } catch (e) {
+        await reportError("reacomodar-precio-principal", e, {
+          userId: subRow.user_id,
+          stripeSubscriptionId: subscription.id,
+        });
+      }
+    }
     // Con varios peludos, dar de baja a uno no cancela la membresía: solo si
     // ya no le queda ninguna suscripción viva.
     const estado = await recalcularEstadoDelMiembro(supabase, subRow.user_id);
@@ -349,35 +363,9 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
  * mandar el evento más de una vez.
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  const subId =
-    typeof invoice.parent?.subscription_details?.subscription === "string"
-      ? invoice.parent.subscription_details.subscription
-      : null;
-  if (!subId || !invoice.id) return;
-
-  // El período de la línea de la suscripción: un mes o un año.
-  const linea =
-    invoice.lines?.data?.find((l) => l.period?.start && l.period?.end) ?? null;
-  const supabase = createAdminClient();
-  await supabase.from("subscription_payments").upsert(
-    {
-      stripe_invoice_id: invoice.id,
-      stripe_subscription_id: subId,
-      amount_paid_cents: invoice.amount_paid ?? 0,
-      currency: (invoice.currency ?? "mxn").toUpperCase(),
-      period_start: linea?.period?.start
-        ? new Date(linea.period.start * 1000).toISOString()
-        : null,
-      period_end: linea?.period?.end
-        ? new Date(linea.period.end * 1000).toISOString()
-        : null,
-      billing_reason: invoice.billing_reason ?? null,
-      paid_at: invoice.status_transitions?.paid_at
-        ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
-        : new Date().toISOString(),
-    },
-    { onConflict: "stripe_invoice_id", ignoreDuplicates: true },
-  );
+  // La lógica vive en peludos-599 porque la activación con tarjeta guardada
+  // (sección 4) asienta el mismo cobro sin esperar al webhook.
+  await registrarCobro(createAdminClient(), invoice);
 }
 
 export async function POST(request: Request) {
