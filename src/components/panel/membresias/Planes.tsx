@@ -13,6 +13,8 @@ export type VersionFila = {
   version: number;
   interval: "month" | "year";
   precioPesos: number;
+  /** Cada peludo después del primero (membresía $599). null = no cobra por peludo. */
+  precioAdicionalPesos: number | null;
   estado: string;
   diferencias: { label: string; valor: string; vinculante: boolean }[];
   tienePrecioStripe: boolean;
@@ -264,6 +266,12 @@ export function Planes({
               <span className="text-[13.5px] font-bold text-ink-title">
                 v{v.version} · {INTERVALO[v.interval]} · $
                 {v.precioPesos.toLocaleString("es-MX")} MXN
+                {v.precioAdicionalPesos != null && (
+                  <span className="font-semibold text-ink-secondary">
+                    {" "}
+                    · peludo adicional ${v.precioAdicionalPesos.toLocaleString("es-MX")}
+                  </span>
+                )}
               </span>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${

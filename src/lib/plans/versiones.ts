@@ -88,7 +88,7 @@ export async function publicarVersion(
   const { data: version } = await admin
     .from("plan_versions")
     .select(
-      "id, version, interval, price_cents, currency, benefits, status, stripe_product_id, stripe_price_id, legal_confirmed_at, membership_plans(id, name, slug)",
+      "id, version, interval, price_cents, additional_price_cents, currency, benefits, status, stripe_product_id, stripe_price_id, legal_confirmed_at, membership_plans(id, name, slug)",
     )
     .eq("id", input.versionId)
     .maybeSingle();
@@ -100,6 +100,17 @@ export async function publicarVersion(
     ? version.membership_plans[0]
     : version.membership_plans;
   if (!plan) return { ok: false, error: "La versión no tiene plan" };
+
+  // Candado de la sección 1 del $599 (17-sep-2026): publicar hoy crearía en
+  // Stripe solo el precio del primer peludo, sin el del adicional ($509), y la
+  // versión quedaría «publicada» a medias. Se quita en la sección 2, cuando
+  // publicar cree los dos precios.
+  if (version.additional_price_cents != null)
+    return {
+      ok: false,
+      error:
+        "Esta versión cobra por peludo y el cobro por peludo todavía no está construido (sección 2). No se puede publicar aún.",
+    };
 
   // --- Compuerta legal ---------------------------------------------------
   // Cambiar un beneficio VINCULANTE exige el reglamento que ya lo refleje y la

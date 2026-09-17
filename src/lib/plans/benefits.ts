@@ -37,7 +37,7 @@ export type DefinicionBeneficio = {
    * Ojo con los que se leen al revés: en los tiempos de espera y en las horas
    * de compromiso, MENOS es mejor.
    */
-  mejorSi: "mayor" | "menor" | "verdadero";
+  mejorSi: "mayor" | "menor" | "verdadero" | "falso";
   porOmision: number | boolean;
 };
 
@@ -191,6 +191,178 @@ export const CATALOGO_BENEFICIOS = {
     mejorSi: "mayor",
     porOmision: BENEFICIOS_PLAN_159.comision_embajador_anual_mxn,
   },
+
+  // --- Membresía $599 (17-sep-2026, juntas/64 §4d) --------------------------
+  // Todo es POR PELUDO y ANUAL, no acumulable: el año de cada peludo empieza
+  // el día que entró. Los montos crecen por mes PAGADO; las aperturas cuentan
+  // desde que el comité aprueba al peludo. En el $159 valen 0 / false.
+  // Los cálculos viven en src/lib/plans/montos.ts.
+  montos_crecientes: {
+    label: "Montos que crecen por peludo (membresía $599)",
+    tipo: "booleano",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "verdadero",
+    porOmision: BENEFICIOS_PLAN_159.montos_crecientes,
+  },
+  cuidados_apertura_dias: {
+    label: "Cuidados cotidianos — se abren el día",
+    tipo: "entero",
+    unidad: "días desde la aprobación",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "menor",
+    porOmision: BENEFICIOS_PLAN_159.cuidados_apertura_dias,
+  },
+  cuidados_monto_inicial_mxn: {
+    label: "Cuidados cotidianos — monto al abrir",
+    tipo: "dinero",
+    unidad: "MXN",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.cuidados_monto_inicial_mxn,
+  },
+  cuidados_tope_anual_mxn: {
+    label: "Cuidados cotidianos — tope anual",
+    tipo: "dinero",
+    unidad: "MXN por año",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.cuidados_tope_anual_mxn,
+  },
+  cuidados_meses_al_tope: {
+    // El incremento mensual sale de aquí: (tope − inicial) / meses. Se guarda
+    // así y no como «$125 al mes» para que los centavos cuadren exactos.
+    label: "Cuidados cotidianos — meses pagados para llegar al tope",
+    tipo: "entero",
+    unidad: "meses",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "menor",
+    porOmision: BENEFICIOS_PLAN_159.cuidados_meses_al_tope,
+  },
+  emergencia_apertura_mes: {
+    label: "Emergencia veterinaria — se abre en el mes",
+    tipo: "entero",
+    unidad: "mes desde la aprobación",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "menor",
+    porOmision: BENEFICIOS_PLAN_159.emergencia_apertura_mes,
+  },
+  emergencia_monto_inicial_mxn: {
+    label: "Emergencia veterinaria — monto al abrir",
+    tipo: "dinero",
+    unidad: "MXN",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.emergencia_monto_inicial_mxn,
+  },
+  emergencia_tope_anual_mxn: {
+    label: "Emergencia veterinaria — tope anual",
+    tipo: "dinero",
+    unidad: "MXN por año",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.emergencia_tope_anual_mxn,
+  },
+  emergencia_meses_al_tope: {
+    // Con 30,000 → 60,000 en 36 meses sale $833.33… exacto: al mes 36 de
+    // crecimiento son $60,000 completos, sin los 12 centavos del redondeo.
+    label: "Emergencia veterinaria — meses pagados para llegar al tope",
+    tipo: "entero",
+    unidad: "meses",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "menor",
+    porOmision: BENEFICIOS_PLAN_159.emergencia_meses_al_tope,
+  },
+  despedida_monto_anual_mxn: {
+    label: "Despedida — monto anual",
+    tipo: "dinero",
+    unidad: "MXN por año",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.despedida_monto_anual_mxn,
+  },
+  despedida_apertura_dias: {
+    label: "Despedida — se abre el día",
+    tipo: "entero",
+    unidad: "días desde la aprobación",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "menor",
+    porOmision: BENEFICIOS_PLAN_159.despedida_apertura_dias,
+  },
+  dias_habiles_reintegro: {
+    // 0 = el plan usa las horas de compromiso. Si nos pasamos, mes gratis.
+    label: "Compromiso de depósito (días hábiles)",
+    tipo: "entero",
+    unidad: "días hábiles",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "menor",
+    porOmision: BENEFICIOS_PLAN_159.dias_habiles_reintegro,
+  },
+  garantia_dias: {
+    label: "Garantía de satisfacción",
+    tipo: "entero",
+    unidad: "días",
+    consumidoPor: ["membresía"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.garantia_dias,
+  },
+  certificado_senior_al_inscribir: {
+    label: "Certificado médico senior obligatorio al inscribir",
+    tipo: "booleano",
+    consumidoPor: ["alta de peludo"],
+    editablePor: "super_admin",
+    vinculante: true,
+    mejorSi: "falso",
+    porOmision: BENEFICIOS_PLAN_159.certificado_senior_al_inscribir,
+  },
+  aviso_reintegro_mayor_a_mxn: {
+    // Control interno: avisa al equipo, no le pide nada al miembro. 0 = sin aviso.
+    label: "Avisar al equipo si un reintegro pasa de",
+    tipo: "dinero",
+    unidad: "MXN",
+    consumidoPor: ["reintegros"],
+    editablePor: "super_admin",
+    vinculante: false,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.aviso_reintegro_mayor_a_mxn,
+  },
+  comision_embajador_porcentaje: {
+    // Solo sobre el PRIMER peludo del referido (equipo, 17-sep). 0 = el plan
+    // paga los montos fijos de arriba.
+    label: "Comisión de embajador — % mensual del primer peludo",
+    tipo: "entero",
+    unidad: "%",
+    consumidoPor: ["embajadores"],
+    editablePor: "gerente_ventas",
+    vinculante: false,
+    mejorSi: "mayor",
+    porOmision: BENEFICIOS_PLAN_159.comision_embajador_porcentaje,
+  },
 } as const satisfies Record<string, DefinicionBeneficio>;
 
 export type LlaveBeneficio = keyof typeof CATALOGO_BENEFICIOS;
@@ -220,6 +392,8 @@ export function comparaParaElMiembro(
   if (!def || antes === despues) return 0;
 
   if (def.mejorSi === "verdadero") return despues ? 1 : -1;
+  // Un requisito nuevo (p. ej. el certificado senior obligatorio) empeora.
+  if (def.mejorSi === "falso") return despues ? -1 : 1;
 
   const a = Number(antes);
   const d = Number(despues);

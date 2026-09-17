@@ -15,6 +15,13 @@ type Admin = ReturnType<typeof createAdminClient>;
 export const PLAN_159 = "membresia";
 
 /**
+ * La membresía nueva (sección 1, 17-sep-2026). Su producto vive en la base:
+ * `membership_plans` + sus versiones con los montos, y el catálogo de
+ * cuidados. La especificación es juntas/64 §4d.
+ */
+export const PLAN_599 = "membresia-599";
+
+/**
  * El plan que contrata quien se registra hoy. El día del lanzamiento cambia al
  * slug del $599 — y en ese mismo despliegue tiene que haber versión publicada
  * con precio en Stripe, porque el respaldo de las variables de entorno es
@@ -51,6 +58,26 @@ export const BENEFICIOS_PLAN_159 = Object.freeze({
   orientacion_vet_24_7: true,
   comision_embajador_mensual_mxn: 16,
   comision_embajador_anual_mxn: 170,
+
+  // Llaves que nacieron con la membresía $599 (17-sep-2026). En el $159 NO
+  // aplican: por eso valen 0 / false aquí, y como el catálogo las toma de
+  // este objeto, ningún miembro de $159 recibe algo nuevo por tenerlas.
+  montos_crecientes: false,
+  cuidados_apertura_dias: 0,
+  cuidados_monto_inicial_mxn: 0,
+  cuidados_tope_anual_mxn: 0,
+  cuidados_meses_al_tope: 0,
+  emergencia_apertura_mes: 0,
+  emergencia_monto_inicial_mxn: 0,
+  emergencia_tope_anual_mxn: 0,
+  emergencia_meses_al_tope: 0,
+  despedida_monto_anual_mxn: 0,
+  despedida_apertura_dias: 0,
+  dias_habiles_reintegro: 0,
+  garantia_dias: 0,
+  certificado_senior_al_inscribir: false,
+  aviso_reintegro_mayor_a_mxn: 0,
+  comision_embajador_porcentaje: 0,
 } as const);
 
 /**

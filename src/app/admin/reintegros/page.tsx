@@ -55,6 +55,12 @@ export default async function AdminReintegrosPage({
           {/* Cuando hay centros, el gasto sale como pago directo, no como
               reintegro — acceso pedido por el equipo (5-ago). */}
           <Link
+            href="/admin/reintegros/catalogo"
+            className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+          >
+            📋 Catálogo de cuidados →
+          </Link>
+          <Link
             href="/admin/centros/pagos"
             className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
           >

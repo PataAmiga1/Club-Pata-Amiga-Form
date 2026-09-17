@@ -40,7 +40,7 @@ export default async function MembresiasPage() {
       admin
         .from("plan_versions")
         .select(
-          "id, plan_id, version, interval, price_cents, benefits, status, stripe_price_id, legal_confirmed_at, notes",
+          "id, plan_id, version, interval, price_cents, additional_price_cents, benefits, status, stripe_price_id, legal_confirmed_at, notes",
         )
         .order("version", { ascending: false }),
       admin
@@ -71,6 +71,7 @@ export default async function MembresiasPage() {
         (miembrosPorVersion.get(s.plan_version_id) ?? 0) + 1,
       );
 
+  const ORDEN_CATALOGO = Object.keys(CATALOGO_BENEFICIOS);
   const beneficios: BeneficioEditable[] = Object.entries(CATALOGO_BENEFICIOS).map(
     ([llave, def]) => ({
       llave,
@@ -93,15 +94,28 @@ export default async function MembresiasPage() {
           version: v.version,
           interval: v.interval as "month" | "year",
           precioPesos: v.price_cents / 100,
+          precioAdicionalPesos:
+            v.additional_price_cents == null ? null : v.additional_price_cents / 100,
           estado: v.status,
-          diferencias: Object.entries(dif).map(([llave, valor]) => {
-            const def = CATALOGO_BENEFICIOS[llave as keyof typeof CATALOGO_BENEFICIOS];
-            return {
-              label: def?.label ?? llave,
-              valor: String(valor),
-              vinculante: def?.vinculante ?? false,
-            };
-          }),
+          // En el orden del catálogo (el jsonb no guarda orden) y legibles.
+          diferencias: Object.entries(dif)
+            .sort(
+              ([a], [b]) =>
+                ORDEN_CATALOGO.indexOf(a) - ORDEN_CATALOGO.indexOf(b),
+            )
+            .map(([llave, valor]) => {
+              const def = CATALOGO_BENEFICIOS[llave as keyof typeof CATALOGO_BENEFICIOS];
+              return {
+                label: def?.label ?? llave,
+                valor:
+                  typeof valor === "boolean"
+                    ? valor
+                      ? "sí"
+                      : "no"
+                    : `${Number(valor).toLocaleString("es-MX")}${def && "unidad" in def && def.unidad ? ` ${def.unidad}` : ""}`,
+                vinculante: def?.vinculante ?? false,
+              };
+            }),
           tienePrecioStripe: !!v.stripe_price_id,
           legalConfirmado: !!v.legal_confirmed_at,
           miembros: miembrosPorVersion.get(v.id) ?? 0,
