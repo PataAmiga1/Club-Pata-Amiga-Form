@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { corteDeComisiones } from "@/lib/comisiones";
 import { requireAdminRoute } from "@/lib/admin-guard";
 import { bankFromClabe, csvCell } from "@/lib/banks";
 import { inicioDelMes } from "@/lib/zona-horaria";
@@ -39,29 +40,21 @@ export async function GET() {
   const { data } = await ctx.admin
     .from("ambassadors")
     .select(
-      "first_name, last_name, email, bank_name, clabe, referral_code, status, deactivated_at, referrals(commission_amount, status, created_at)",
+      "id, first_name, last_name, email, bank_name, clabe, referral_code, status, deactivated_at",
     )
     .in("status", ["approved", "canceled"]);
 
+  // Las dos fuentes (comisión única del $159 y mensual del $599), con la regla
+  // del corte y de la baja en un solo lugar: src/lib/comisiones.
+  const { porEmbajador } = await corteDeComisiones(ctx.admin, monthStart);
   const rows = (data ?? [])
-    .map((a) => {
-      // Tope por la baja: la comisión cuenta si el pago entró antes de que la
-      // persona dejara de ser embajadora.
-      const corteBaja = a.deactivated_at ? new Date(a.deactivated_at) : null;
-      const total = (a.referrals ?? [])
-        .filter(
-          (r: { status: string; created_at: string }) =>
-            r.status === "pending" &&
-            new Date(r.created_at) < monthStart &&
-            (!corteBaja || new Date(r.created_at) <= corteBaja),
-        )
-        .reduce(
-          (sum: number, r: { commission_amount: number | null }) =>
-            sum + Number(r.commission_amount ?? 0),
-          0,
-        );
-      return { a, total };
-    })
+    .map((a) => ({
+      a,
+      total:
+        Math.round(
+          (porEmbajador.get(a.id) ?? []).reduce((s, i) => s + i.monto, 0) * 100,
+        ) / 100,
+    }))
     .filter(({ total }) => total > 0);
 
   const header = "CLABE,BENEFICIARIO,BANCO,MONTO,CONCEPTO,CORREO";

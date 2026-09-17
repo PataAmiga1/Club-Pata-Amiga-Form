@@ -8,6 +8,7 @@ import {
   recalcularEstadoDelMiembro,
   type NivelDePrecio,
 } from "@/lib/plans/suscripciones";
+import { acumularComisionDeCobro } from "@/lib/comisiones";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -49,6 +50,8 @@ export async function registrarCobro(admin: Admin, invoice: Stripe.Invoice) {
     },
     { onConflict: "stripe_invoice_id", ignoreDuplicates: true },
   );
+  // Sección 5: el 3% mensual del embajador sale de cada cobro del principal.
+  await acumularComisionDeCobro(admin, invoice);
 }
 
 /**

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { corteDeComisiones } from "@/lib/comisiones";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { REIMBURSEMENT_CATEGORY_LABELS, REIMBURSEMENT_SLA_HOURS } from "@/lib/constants";
@@ -107,11 +108,7 @@ export default async function AdminHome() {
         .from("referrals")
         .select("id", { count: "exact", head: true })
         .gte("created_at", monthStart.toISOString()),
-      admin
-        .from("referrals")
-        .select("commission_amount")
-        .eq("status", "pending")
-        .lt("created_at", monthStart.toISOString()),
+      corteDeComisiones(admin, monthStart),
       admin
         .from("wellness_centers")
         .select("id", { count: "exact", head: true })
@@ -228,10 +225,9 @@ export default async function AdminHome() {
   const petOf = (p: unknown) =>
     (Array.isArray(p) ? p[0] : p) as { name: string; species: string } | null;
 
-  const payableCommissions = (payableReferrals.data ?? []).reduce(
-    (acc, r) => acc + Number(r.commission_amount ?? 0),
-    0,
-  );
+  // Antes este total no aplicaba la regla de la baja y no cuadraba con el
+  // corte; ahora sale del mismo cálculo (src/lib/comisiones).
+  const payableCommissions = payableReferrals.total;
 
   const monthLabel = new Intl.DateTimeFormat("es-MX", {
     month: "long",

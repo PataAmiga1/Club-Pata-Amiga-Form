@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { corteDeComisiones } from "@/lib/comisiones";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
@@ -54,11 +55,9 @@ export default async function AdminFinanzasPage() {
     // solo mira el mes: a quien se dio de baja se le paga hasta SU fecha de
     // baja (Pablo, 16-ago). Sin ese filtro este total no cuadraría con el
     // archivo del banco ni con el panel de embajadores.
-    admin
-      .from("referrals")
-      .select("commission_amount, created_at, ambassadors(deactivated_at)")
-      .eq("status", "pending")
-      .lt("created_at", monthStart.toISOString()),
+    // Comisión única del $159 + mensual del $599, con la regla del corte en
+    // src/lib/comisiones (la misma del botón y del archivo del banco).
+    corteDeComisiones(admin, monthStart),
     // Miembros activos TOTALES: el MRR solo puede sumar a quienes tienen
     // suscripción registrada aquí. Sin este contraste, el tablero daría a
     // entender que el MRR es todo el negocio.
@@ -169,15 +168,7 @@ export default async function AdminFinanzasPage() {
     (acc, r) => acc + Number(r.amount_approved ?? 0),
     0,
   );
-  const commissionsOut = (payableReferrals.data ?? [])
-    .filter((r) => {
-      // PostgREST devuelve el embebido como objeto o como arreglo según la
-      // relación; se normaliza para no depender de eso.
-      const emb = Array.isArray(r.ambassadors) ? r.ambassadors[0] : r.ambassadors;
-      const baja = emb?.deactivated_at;
-      return !baja || new Date(r.created_at) <= new Date(baja);
-    })
-    .reduce((acc, r) => acc + Number(r.commission_amount ?? 0), 0);
+  const commissionsOut = payableReferrals.total;
 
   // Cobros desde Stripe (facturas pagadas recientes + total del mes)
   let payments: PaymentRow[] = [];
@@ -318,8 +309,8 @@ export default async function AdminFinanzasPage() {
       detail: (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <DetailItem
-            label="REFERIDOS POR PAGAR"
-            value={`${(payableReferrals.data ?? []).length}`}
+            label="COMISIONES POR PAGAR"
+            value={`${payableReferrals.pagables.length}`}
           />
           <DetailItem
             label="MONTO"

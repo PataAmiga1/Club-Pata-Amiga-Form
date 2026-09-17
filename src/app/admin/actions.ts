@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { corteDeComisiones } from "@/lib/comisiones";
 import { formatDateEs } from "@/lib/dates";
 import { estadoDePeludo599, esRubro599 } from "@/lib/reintegros-599";
 import type { Rubro599 } from "@/lib/plans/montos";
@@ -916,11 +917,6 @@ export async function payAmbassadorCut(ambassadorId: string) {
   const { admin } = await requireAdmin();
 
   const monthStart = inicioDelMes();
-  const { data: amb } = await admin
-    .from("ambassadors")
-    .select("deactivated_at")
-    .eq("id", ambassadorId)
-    .maybeSingle();
   // Un día antes del arranque del mes cae siempre en el mes anterior, y
   // `inicioDelMes` lo lleva a su día 1. El corte se etiqueta con ESE mes,
   // que es el que se está liquidando.
@@ -928,21 +924,12 @@ export async function payAmbassadorCut(ambassadorId: string) {
     inicioDelMes(new Date(monthStart.getTime() - 24 * 60 * 60 * 1000)),
   );
 
-  let consulta = admin
-    .from("referrals")
-    .select("id, commission_amount")
-    .eq("ambassador_id", ambassadorId)
-    .eq("status", "pending")
-    .lt("created_at", monthStart.toISOString());
-  if (amb?.deactivated_at)
-    consulta = consulta.lte("created_at", amb.deactivated_at);
-  const { data: pending } = await consulta;
-  if (!pending?.length) throw new Error("Sin comisiones por pagar");
-
-  const total = pending.reduce(
-    (sum, r) => sum + Number(r.commission_amount ?? 0),
-    0,
-  );
+  // Las dos fuentes —la comisión única del $159 y la mensual del $599— con
+  // la MISMA regla que el archivo del banco y Finanzas (src/lib/comisiones).
+  const { pagables: pending, total } = await corteDeComisiones(admin, monthStart, [
+    ambassadorId,
+  ]);
+  if (!pending.length) throw new Error("Sin comisiones por pagar");
 
   const { data: payout, error } = await admin
     .from("ambassador_payouts")
@@ -957,13 +944,18 @@ export async function payAmbassadorCut(ambassadorId: string) {
     .single();
   if (error || !payout) throw new Error("No se pudo registrar el pago");
 
-  await admin
-    .from("referrals")
-    .update({ status: "paid", payout_id: payout.id })
-    .in(
-      "id",
-      pending.map((r) => r.id),
-    );
+  const deReferidos = pending.filter((r) => r.fuente === "referido").map((r) => r.id);
+  const mensuales = pending.filter((r) => r.fuente === "mensual").map((r) => r.id);
+  if (deReferidos.length)
+    await admin
+      .from("referrals")
+      .update({ status: "paid", payout_id: payout.id })
+      .in("id", deReferidos);
+  if (mensuales.length)
+    await admin
+      .from("referral_commissions")
+      .update({ status: "paid", payout_id: payout.id })
+      .in("id", mensuales);
 
   revalidatePath("/admin/embajadores");
 }

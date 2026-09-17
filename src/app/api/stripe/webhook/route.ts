@@ -110,6 +110,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // leer. Detectado el 11-ago comparando la BD contra Stripe.
   let periodoInicio: string | null = null;
   let periodoFin: string | null = null;
+  let facturaInicial: string | null = null;
   if (session.subscription) {
     try {
       const suscripcion = await getStripe().subscriptions.retrieve(
@@ -120,6 +121,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         periodoInicio = new Date(item.current_period_start * 1000).toISOString();
       if (item?.current_period_end)
         periodoFin = new Date(item.current_period_end * 1000).toISOString();
+      facturaInicial =
+        typeof suscripcion.latest_invoice === "string"
+          ? suscripcion.latest_invoice
+          : (suscripcion.latest_invoice?.id ?? null);
     } catch (e) {
       // Si Stripe no responde, la fila se crea igual: el pago ya ocurrió y no
       // se puede perder. Las fechas las rellenará el evento de renovación.
@@ -192,6 +197,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
           },
           { onConflict: "referred_user_id", ignoreDuplicates: true },
         );
+    }
+  }
+
+  // 4b. Membresía $599 (sección 5): la factura inicial se vuelve a asentar AQUÍ,
+  //     ya con la fila y el referido creados. Si `invoice.paid` llegó antes
+  //     que este evento, en ese momento no había a quién ligar el cobro ni la
+  //     comisión del primer mes. Las dos cosas son idempotentes.
+  if (es599 && facturaInicial) {
+    try {
+      const factura = await getStripe().invoices.retrieve(facturaInicial);
+      await registrarCobro(supabase, factura);
+    } catch (e) {
+      console.error("[webhook] no se pudo asentar la factura inicial", e);
     }
   }
 
