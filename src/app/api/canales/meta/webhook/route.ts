@@ -13,6 +13,7 @@ import { notifyTeam, reportError } from "@/lib/alerts";
 import { resolveContact } from "@/lib/crm/contacts";
 import { splitFullName } from "@/lib/crm/normalize";
 import { emitEvent } from "@/lib/crm/events";
+import { registroAbierto } from "@/lib/registro";
 import { ensureOpportunity } from "@/lib/crm/opportunities";
 import {
   escalarConversacion,
@@ -269,9 +270,10 @@ async function handleIncoming(msg: IncomingMessage) {
       content: m.content,
     }));
 
-  const [{ data: extraRow }, promosText] = await Promise.all([
+  const [{ data: extraRow }, promosText, abierto] = await Promise.all([
     admin.from("site_settings").select("value").eq("key", "sales_extra_prompt").maybeSingle(),
     fetchActivePromosText("sales"),
+    registroAbierto(),
   ]);
 
   const reply = await getLLMProvider().completeWithTools({
@@ -279,6 +281,7 @@ async function handleIncoming(msg: IncomingMessage) {
     system: buildSalesSystemPrompt({
       contactName: conv.display_name ?? msg.displayName,
       extraPrompt: [extraRow?.value, promosText].filter(Boolean).join("\n\n") || undefined,
+      registroAbierto: abierto,
     }),
     tools: [CLASSIFY_TOOL],
     executeTool: async (name, input) => {

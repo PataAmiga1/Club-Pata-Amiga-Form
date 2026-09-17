@@ -16,6 +16,8 @@ export type LeadInput = {
   phone: string;
   consent: boolean;
   utm?: { source?: string; medium?: string; campaign?: string };
+  /** Código de embajador con el que llegó (link ?codigo=…), si lo trae. */
+  ambassadorCode?: string;
 };
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -70,7 +72,18 @@ export async function registerLead(input: LeadInput) {
   if (!phone || phone.replace(/\D/g, "").length < 10)
     return { error: "Escribe un teléfono válido (10 dígitos)." };
   if (!input.consent)
-    return { error: "Necesitamos tu consentimiento para enviarte el regalo." };
+    return {
+      error:
+        campaign.tipo === "lista_espera"
+          ? "Necesitamos tu consentimiento para avisarte."
+          : "Necesitamos tu consentimiento para enviarte el regalo.",
+    };
+
+  // Se guarda tal cual llegó, solo si parece un código: al abrir la membresía
+  // nueva sirve para darle su referido al embajador.
+  const codigo = input.ambassadorCode?.trim().toUpperCase();
+  const ambassadorCode =
+    codigo && /^[A-Z0-9-]{3,30}$/.test(codigo) ? codigo : null;
 
   const admin = createAdminClient();
   const { data: lead, error } = await admin
@@ -84,6 +97,8 @@ export async function registerLead(input: LeadInput) {
       utm_source: input.utm?.source?.slice(0, 100) || null,
       utm_medium: input.utm?.medium?.slice(0, 100) || null,
       utm_campaign: input.utm?.campaign?.slice(0, 100) || null,
+      // Solo si viene: así la landing de regalo no depende de la columna.
+      ...(ambassadorCode ? { ambassador_code: ambassadorCode } : {}),
     })
     .select("id")
     .single();
@@ -93,7 +108,9 @@ export async function registerLead(input: LeadInput) {
     if (error.code === "23505")
       return {
         error:
-          "¡Ya estás registrado! Revisa tu correo (y la carpeta de spam) — ahí está tu regalo.",
+          campaign.tipo === "lista_espera"
+            ? "¡Ya estás en la lista! Te avisaremos a este correo en cuanto abra el registro."
+            : "¡Ya estás registrado! Revisa tu correo (y la carpeta de spam) — ahí está tu regalo.",
       };
     return { error: "No pudimos registrarte. Intenta de nuevo." };
   }
@@ -110,13 +127,15 @@ export async function sendGiftEmail(
   firstName: string,
 ) {
   const admin = createAdminClient();
-  const { couponBlock, pdfBlock } = await buildGiftBlocks(slug);
-  const sent = await sendTemplatedEmail("campaign_gift", email, {
-    firstName,
-    couponBlock,
-    pdfBlock,
-    registroUrl: `${SITE_URL}/registro`,
-  });
+  // La lista de espera no lleva cupón ni PDF: solo confirma que quedó apuntada.
+  const sent =
+    getCampaign(slug)?.tipo === "lista_espera"
+      ? await sendTemplatedEmail("lista_espera", email, { firstName })
+      : await sendTemplatedEmail("campaign_gift", email, {
+          firstName,
+          ...(await buildGiftBlocks(slug)),
+          registroUrl: `${SITE_URL}/registro`,
+        });
   await admin
     .from("campaign_leads")
     .update(

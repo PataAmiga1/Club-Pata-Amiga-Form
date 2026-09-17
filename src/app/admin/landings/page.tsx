@@ -118,6 +118,14 @@ export default async function AdminLandingsPage({
                 registros
               </span>
 
+              {camp.tipo === "lista_espera" ? (
+                <span className="text-[12.5px] leading-snug text-ink-secondary">
+                  Lista de espera: quien se apunta recibe un correo de
+                  confirmación (plantilla «Lista de espera» en Comunicados). Sin
+                  cupón ni PDF.
+                </span>
+              ) : (
+              <>
               <form
                 action={updateSiteSettings}
                 className="flex items-end gap-2"
@@ -179,6 +187,8 @@ export default async function AdminLandingsPage({
                   </button>
                 </form>
               </div>
+              </>
+              )}
             </div>
           );
         })}

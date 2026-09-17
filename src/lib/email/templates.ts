@@ -111,7 +111,7 @@ const CAMPAIGN_GIFT_HTML = `<!-- Correo "Obtén tu regalo" · Club Pata Amiga --
             <a href="{{registroUrl}}" style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:bold;color:#FFFFFF;text-decoration:none;">Unirme a la manada</a>
           </td></tr>
         </table>
-        <p style="margin:14px 0 0;font-size:12px;color:#8A9490;">Membresía desde $159 MXN al mes · No es un seguro</p>
+        <p style="margin:14px 0 0;font-size:12px;color:#8A9490;">Membresía de salud para tu peludo · No es un seguro</p>
       </td></tr>
 
       <!-- Pie -->
@@ -478,6 +478,19 @@ ${BOTON("{{siteUrl}}/embajador/cuenta", "Ver mi cuenta")}`),
     html: CAMPAIGN_GIFT_HTML,
   },
   {
+    key: "lista_espera",
+    name: "Lista de espera — nueva membresía",
+    description:
+      "Se envía al dejar sus datos en /landings/nueva-membresia mientras el registro está cerrado (17-sep-2026).",
+    variables: { firstName: "Nombre de quien se apuntó" },
+    sample: { firstName: "Cipatli" },
+    subject: "🐾 Ya estás en la lista — Club Pata Amiga",
+    html: WRAP(`<h2 style="color:#1E5350">¡Ya estás en la lista, {{firstName}}!</h2>
+<p>Estamos preparando la nueva membresía Pata Amiga para cuidar a tu peludo, y serás de las primeras personas en saber cuando abra el registro.</p>
+<p>Te escribiremos a este mismo correo. No tienes que hacer nada más.</p>
+<p>Gracias por querer ser parte de la manada 🐾</p>`),
+  },
+  {
     key: "appeal_received",
     name: "Apelación recibida",
     description: "Acuse al presentar una apelación (reintegro o peludo).",
@@ -739,6 +752,7 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   center_rejected: "centros",
   center_info_request: "centros",
   campaign_gift: "campanas",
+  lista_espera: "campanas",
   birthday_member: "celebraciones",
   birthday_pet: "celebraciones",
 };

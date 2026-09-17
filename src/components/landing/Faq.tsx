@@ -96,12 +96,32 @@ const FAQ: Category[] = [
   },
 ];
 
-export function Faq() {
+/**
+ * Con el registro cerrado (17-sep-2026) la respuesta de precios no puede
+ * ofrecer el $159, que ya no se vende. El resto describe beneficios que siguen
+ * siendo ciertos para quien ya es miembro.
+ */
+const PRECIOS_CON_REGISTRO_CERRADO = [
+  "Estamos preparando la nueva membresía Pata Amiga. Por ahora el registro está cerrado: déjanos tus datos y te avisamos en cuanto abra.",
+  "Si ya eres miembro, tu membresía sigue igual, con todos sus beneficios.",
+];
+
+export function Faq({ registroAbierto = true }: { registroAbierto?: boolean }) {
   const [open, setOpen] = useState<string | null>(FAQ[0].title);
+  const faq = registroAbierto
+    ? FAQ
+    : FAQ.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) =>
+          item.q === "¿Cuántas membresías existen?"
+            ? { ...item, a: PRECIOS_CON_REGISTRO_CERRADO }
+            : item,
+        ),
+      }));
 
   return (
     <div className="flex flex-col gap-3">
-      {FAQ.map((cat) => {
+      {faq.map((cat) => {
         const isOpen = open === cat.title;
         return (
           <div
