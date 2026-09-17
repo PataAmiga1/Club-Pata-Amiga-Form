@@ -130,7 +130,12 @@ export function sumarMeses(dia: string, meses: number): string {
 /**
  * Primer día en que el rubro se puede usar, contando el día de la aprobación
  * como el día 1. Cuidados «día 31» → aprobación + 30 días. Emergencia «mes 7»
- * → aprobación + 6 meses de calendario. `null` si el plan no tiene el rubro.
+ * → aprobación + 7 meses de calendario. `null` si el plan no tiene el rubro.
+ *
+ * Emergencia: el equipo lo confirmó el 17-sep-2026 (Pablo). En la tabla del
+ * equipo el «Mes 1» va del día 31 al 60, así que el «Mes k» empieza a los k
+ * meses de la aprobación: aprobado el 20-ago → emergencia el 20-mar. Antes
+ * abría a los 6 meses (20-feb), un mes antes de lo acordado.
  */
 export function fechaDeApertura(
   b: Beneficios,
@@ -139,7 +144,7 @@ export function fechaDeApertura(
 ): string | null {
   if (!esModelo599(b)) return null;
   if (rubro === "emergencia")
-    return sumarMeses(diaDeAprobacion, Math.max(1, Number(b.emergencia_apertura_mes)) - 1);
+    return sumarMeses(diaDeAprobacion, Math.max(1, Number(b.emergencia_apertura_mes)));
   const dias =
     rubro === "cuidados"
       ? Number(b.cuidados_apertura_dias)
