@@ -275,7 +275,7 @@ export default async function Home() {
               </div>
               <div className="relative flex-1 rounded-[16px] border-2 border-teal p-4">
                 <span className="absolute -top-2.5 right-3 rounded-full bg-pink px-2.5 py-1 text-[10px] font-extrabold text-white">
-                  AHORRA {$(oferta.principal.ahorroAnualPesos)}
+                  AHORRAS {$(oferta.principal.ahorroAnualPesos)} AL AÑO
                 </span>
                 <div className="text-[13px] font-bold text-teal-deep">
                   ANUAL
@@ -286,12 +286,18 @@ export default async function Home() {
                     MXN/año
                   </span>
                 </div>
+                {/* Pablo, 17-sep: el anual se leía como si fuera el precio con
+                    descuento. Es el mismo peludo pagando el año por adelantado. */}
+                <div className="text-[12px] text-ink-tertiary">
+                  Equivale a {$(Math.round(oferta.principal.anualPesos / 12))} al mes
+                </div>
               </div>
             </div>
             <p className="rounded-[12px] bg-cream-light px-4 py-3 text-[13.5px] leading-[1.5] text-ink-body">
-              <strong>Segundo peludo en adelante: 15% de descuento</strong> —{" "}
-              {$(oferta.adicional.mensualPesos)} al mes o{" "}
-              {$(oferta.adicional.anualPesos)} al año.
+              {/* El precio con descuento NO se enseña aquí (Pablo, 17-sep): solo lo
+                  ve quien ya tiene un peludo con membresía, al agregar el segundo. */}
+              <strong>Segundo peludo en adelante: 15% de descuento.</strong>{" "}
+              Lo ves al agregarlo desde tu cuenta.
             </p>
             <ul className="flex flex-col gap-1.5 text-[13.5px] leading-[1.5] text-ink-secondary">
               <li>
