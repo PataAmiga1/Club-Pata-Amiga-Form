@@ -4,7 +4,7 @@ import { AnthropicProvider } from "./anthropic";
 
 export type { AgentParams, AgentTool, ChatMessage, LLMProvider, VetContext } from "./types";
 export { isUrgent } from "./urgency";
-export { SUPPORT_TOOLS, executeSupportTool } from "./support-tools";
+export { SUPPORT_TOOLS, executeSupportTool, herramientasDeSoporte } from "./support-tools";
 export { buildSupportSystemPrompt } from "./support-prompt";
 
 /** Provider selection via env — swap without touching callers. */

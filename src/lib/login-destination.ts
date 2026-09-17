@@ -32,6 +32,8 @@ export async function loginDestination(user: {
       .select("id")
       .eq("user_id", user.id)
       .eq("status", "active")
+      // Una suscripción por peludo en el $599: sin limit(1), dos filas = null.
+      .limit(1)
       .maybeSingle(),
   ]);
 

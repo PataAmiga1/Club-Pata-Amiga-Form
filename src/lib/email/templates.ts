@@ -96,7 +96,7 @@ const CAMPAIGN_GIFT_HTML = `<!-- Correo "Obtén tu regalo" · Club Pata Amiga --
             <p style="margin:0;font-size:13.5px;line-height:2;color:#3D524F;">
               🐾 Disponible en todo México<br>
               🐾 Mantienes a tu veterinario<br>
-              🐾 Incluye hasta 3 peludos<br>
+              🐾 {{terceraCaracteristica}}<br>
               🐾 Orientación veterinaria 24/7<br>
               🐾 100% digital
             </p>
@@ -184,15 +184,18 @@ ${BOTON("{{siteUrl}}/app/cuenta", "Reactivar mi membresía")}`),
       amount: "Monto aprobado con formato (ej. $1,250)",
       petName: "Nombre del peludo",
       reintegroUrl: "URL del reintegro",
+      plazoLine:
+        "Cuándo llega la transferencia: «en un máximo de 72 horas» ($159) o «a más tardar el …» ($599, 5 días hábiles)",
     },
     sample: {
       folio: "R-0001", amount: "$1,250", petName: "Max",
       reintegroUrl: "https://pataamiga.mx/app/reintegros/xxx",
+      plazoLine: "a más tardar el <strong>24 de septiembre de 2026</strong>",
     },
     subject: "¡Tu reintegro {{folio}} fue aprobado! 🎉",
     html: WRAP(`<h2 style="color:#1E5350">¡Tu reintegro {{folio}} fue aprobado! 🎉</h2>
 <p>Aprobamos <strong>{{amount}} MXN</strong> para <strong>{{petName}}</strong>.</p>
-<p>Recibirás tu transferencia bancaria en un máximo de <strong>72 horas</strong>.</p>
+<p>Recibirás tu transferencia bancaria {{plazoLine}}.</p>
 ${BOTON("{{reintegroUrl}}", "Ver mi reintegro")}`),
   },
   {
@@ -465,6 +468,8 @@ ${BOTON("{{siteUrl}}/embajador/cuenta", "Ver mi cuenta")}`),
       couponBlock: "Caja con la palabra cupón (o aviso de que se activará pronto)",
       pdfBlock: "Botón de descarga de la guía PDF (vacío si aún no se sube)",
       registroUrl: "URL del registro de la membresía",
+      terceraCaracteristica:
+        "La tercera de las 5 características: «Incluye hasta 3 peludos» ($159) o «Segunda mascota con 15% de descuento» ($599)",
     },
     sample: {
       firstName: "Cipatli",
@@ -473,6 +478,7 @@ ${BOTON("{{siteUrl}}/embajador/cuenta", "Ver mi cuenta")}`),
       pdfBlock:
         '<p style="text-align:center;margin:16px 0"><a href="#" style="background:#1CBCAD;color:#fff;padding:14px 28px;border-radius:999px;font-weight:700;text-decoration:none">📘 Descargar tu guía de cuidado</a></p>',
       registroUrl: "https://pataamiga.mx/registro",
+      terceraCaracteristica: "Segunda mascota con 15% de descuento",
     },
     subject: "🎁 Obtén tu regalo — Club Pata Amiga",
     html: CAMPAIGN_GIFT_HTML,

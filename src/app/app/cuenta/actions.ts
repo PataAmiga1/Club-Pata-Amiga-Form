@@ -35,6 +35,10 @@ async function getOwnSubscription() {
     .eq("user_id", user.id)
     .eq("status", "active")
     .not("stripe_subscription_id", "is", null)
+    // Solo la membresía de $159 (una por persona). Las del $599 son por
+    // peludo y se cambian desde `cambiarIntervaloDePeludo`.
+    .is("pet_id", null)
+    .limit(1)
     .maybeSingle();
   if (!sub?.stripe_subscription_id) {
     // Miembro heredado de Memberstack: su cobro no vive aquí, así que no hay
@@ -170,7 +174,24 @@ export async function cancelMembership(reason: string, comments: string) {
     .eq("user_id", userId)
     .eq("status", "active")
     .not("stripe_subscription_id", "is", null)
+    .is("pet_id", null)
+    .limit(1)
     .maybeSingle();
+
+  // Miembro del $599: cancela peludo por peludo (`cancelarMembresiaDePeludo`).
+  // Sin este freno caía en la rama de «cobro heredado» y avisaba al equipo de
+  // algo que no pasó.
+  if (!sub) {
+    const { data: porPeludo } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", userId)
+      .not("pet_id", "is", null)
+      .eq("status", "active")
+      .limit(1);
+    if (porPeludo?.length)
+      throw new Error("Tu membresía es por peludo: cancélala desde la tarjeta de cada peludo en Mi cuenta.");
+  }
 
   let coverageEnd: Date | null = null;
 

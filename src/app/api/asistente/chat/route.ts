@@ -5,13 +5,16 @@ import {
   getLLMProvider,
   buildSupportSystemPrompt,
   executeSupportTool,
-  SUPPORT_TOOLS,
+  herramientasDeSoporte,
   type ChatMessage,
 } from "@/lib/llm";
 import { puedeResponderIA, registrarUso } from "@/lib/llm/gobierno";
 import { fetchActivePromosText } from "@/lib/llm/promos";
 import { fetchSiteSettings } from "@/lib/site";
 import { reportError } from "@/lib/alerts";
+import { esMiembro599 } from "@/lib/reintegros-599";
+import { ofertaPublica599 } from "@/lib/plans/oferta";
+import { leerCatalogo } from "@/lib/catalogo-cuidados";
 
 const HISTORY_LIMIT = 20;
 
@@ -94,10 +97,18 @@ export async function POST(request: Request) {
     );
   }
 
+  // Cada miembro oye las reglas de SU membresía (sección 7 del $599).
+  const es599 = await esMiembro599(admin, user.id);
+  const [oferta599, catalogo] = es599
+    ? await Promise.all([ofertaPublica599(admin), leerCatalogo(admin)])
+    : [null, []];
   const system = buildSupportSystemPrompt({
     memberName: profile?.first_name ?? null,
     contactEmail: settings.contact_email,
     extraPrompt: [extraRow?.value, promosText].filter(Boolean).join("\n\n") || undefined,
+    es599,
+    oferta599,
+    catalogo,
   });
 
   let reply: string;
@@ -105,8 +116,8 @@ export async function POST(request: Request) {
     reply = await getLLMProvider().completeWithTools({
       messages: [...history, { role: "user", content: message }],
       system,
-      tools: SUPPORT_TOOLS,
-      executeTool: (name) => executeSupportTool(supabase, user.id, name),
+      tools: herramientasDeSoporte(es599),
+      executeTool: (name) => executeSupportTool(supabase, user.id, name, es599),
     });
   } catch (e) {
     await reportError("asistente-chat", e, { conversationId: convId });

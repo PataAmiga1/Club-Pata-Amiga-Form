@@ -212,3 +212,28 @@ export async function esMiembro599(admin: Admin, userId: string): Promise<boolea
     .not("pet_id", "is", null);
   return (data ?? []).some((s) => ESTADOS_VIVOS.includes(s.status ?? ""));
 }
+
+/**
+ * Para las tarjetas de peludo (sección 7): por cada peludo con membresía $599,
+ * sus tres montos con la fecha en que se abren. Los peludos sin membresía $599
+ * no aparecen en el mapa y su tarjeta sigue como siempre.
+ */
+export async function aperturasDePeludos(
+  admin: Admin,
+  petIds: string[],
+): Promise<Map<string, { label: string; abierto: boolean; fechaApertura: string | null }[]>> {
+  const estados = await Promise.all(petIds.map((id) => estadoDePeludo599(admin, id)));
+  const mapa = new Map<string, { label: string; abierto: boolean; fechaApertura: string | null }[]>();
+  for (const e of estados) {
+    if (!e) continue;
+    mapa.set(
+      e.petId,
+      RUBROS_599.map(({ rubro }) => ({
+        label: e.rubros[rubro].label,
+        abierto: e.rubros[rubro].abierto,
+        fechaApertura: e.rubros[rubro].fechaApertura,
+      })),
+    );
+  }
+  return mapa;
+}

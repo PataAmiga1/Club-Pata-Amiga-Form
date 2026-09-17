@@ -5,7 +5,7 @@ import {
   archivarPlantilla,
   guardarPlantilla,
 } from "@/app/ventas/plantillas/actions";
-import { VARIABLES } from "@/lib/crm/plantillas";
+import { VARIABLES } from "@/lib/crm/plantillas-variables";
 
 export type PlantillaFila = {
   id: string;

@@ -7,6 +7,7 @@ import type {
   VetContext,
 } from "./types";
 import { REIMBURSEMENT_CAPS_MXN } from "@/lib/constants";
+import { recordatorioDeReintegro } from "./types";
 
 /**
  * Deterministic dev provider — keeps the product buildable and demoable
@@ -28,14 +29,16 @@ export class MockProvider implements LLMProvider {
         `Entiendo tu preocupación y me alegra que me escribas. ${petIntro}te comparto algunas señales a observar:\n\n` +
         `• ¿Ha vomitado o tiene diarrea?\n• ¿Toma agua con normalidad?\n• ¿Está más decaído de lo habitual?\n\n` +
         `Por lo que describes, te recomiendo acudir hoy mismo con tu veterinario de confianza para que lo revise. ` +
-        `Recuerda que tu membresía reintegra hasta $${REIMBURSEMENT_CAPS_MXN.vet_expenses.toLocaleString("es-MX")} MXN en gastos veterinarios.`
+        `Recuerda que ${recordatorioDeReintegro(context.es599, REIMBURSEMENT_CAPS_MXN.vet_expenses, "tu")}.`
       );
     }
 
     if (/vacun/i.test(text)) {
       return (
         `¡Qué bien que estés al pendiente del esquema de vacunación de ${petName}! 🐾 Tu veterinario de confianza es quien mejor puede indicarte qué vacunas tocan según su edad y estilo de vida. ` +
-        `Y no olvides: tu membresía reintegra hasta $${REIMBURSEMENT_CAPS_MXN.vaccines} MXN en vacunas.`
+        (context.es599
+          ? "Y no olvides: las vacunas del catálogo de cuidados cotidianos se reintegran con el monto de tu peludo."
+          : `Y no olvides: tu membresía reintegra hasta $${REIMBURSEMENT_CAPS_MXN.vaccines} MXN en vacunas.`)
       );
     }
 

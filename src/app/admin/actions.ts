@@ -177,6 +177,10 @@ export async function resolveReimbursement(
           petName,
           amount: formatMxn(amount),
           reintegroUrl: `${SITE_URL}/app/reintegros/${id}`,
+          plazoLine:
+            es599 && req.due_business_date
+              ? `a más tardar el <strong>${formatDateEs(req.due_business_date)}</strong>`
+              : "en un máximo de <strong>72 horas</strong>",
         },
       },
     );
@@ -1334,14 +1338,16 @@ export async function deactivateMemberAccount(userId: string, reason: string) {
     .single();
   if (!profile) return { error: "Miembro no encontrado." };
 
-  // Cancela la suscripción activa en Stripe (inmediato, no al corte)
-  const { data: sub } = await admin
+  // Cancela las suscripciones activas en Stripe (inmediato, no al corte). En el
+  // $599 hay una por peludo: antes se leía UNA con maybeSingle(), que con dos
+  // filas devuelve null, y los cobros de todos los peludos seguían corriendo.
+  const { data: activas } = await admin
     .from("subscriptions")
     .select("id, stripe_subscription_id")
     .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (sub?.stripe_subscription_id) {
+    .in("status", ["active", "past_due", "unpaid", "trialing"]);
+  for (const sub of activas ?? []) {
+    if (!sub.stripe_subscription_id) continue;
     try {
       const stripe = getStripe();
       await stripe.subscriptions.cancel(sub.stripe_subscription_id);

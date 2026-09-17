@@ -117,6 +117,19 @@ export const MEMBERSHIP_FEATURES = [
   "100% digital",
 ] as const;
 
+/**
+ * Las 5 características de la membresía $599 (juntas/64 §4d, 17-sep-2026):
+ * la tercera, «hasta 3 peludos», es del $159 y pasa a «segunda mascota con 15%
+ * de descuento». Mismo orden vinculante.
+ */
+export const MEMBERSHIP_FEATURES_599 = [
+  "Disponible en todo México",
+  "Mantienes a tu veterinario",
+  "Segunda mascota con 15% de descuento",
+  "Orientación veterinaria 24/7",
+  "100% digital",
+] as const;
+
 /** Disclaimer permanente del bot de orientación veterinaria. */
 export const VET_BOT_DISCLAIMER =
   "Acompañamiento y guía — no sustituye una consulta ni un diagnóstico veterinario";

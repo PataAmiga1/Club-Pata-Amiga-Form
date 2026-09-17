@@ -79,6 +79,10 @@ export default async function AdminMiembroDetailPage({
         .select("plan, amount, status, cancel_at_period_end, current_period_end")
         .eq("user_id", id)
         .eq("status", "active")
+        // $599: una por peludo. La tarjeta enseña la más antigua (sección 7;
+        // el desglose por peludo es de la sección 8).
+        .order("created_at", { ascending: true })
+        .limit(1)
         .maybeSingle(),
     ]);
 

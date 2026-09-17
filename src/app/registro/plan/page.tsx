@@ -74,13 +74,10 @@ export default async function PlanPage({
   return (
     <div className="flex min-h-dvh flex-col bg-cream">
       <RegistroHeader step={3} />
-      {/* Banda de beneficios — refuerzo en móvil como en la app anterior. Dice
-          «hasta 3 peludos», así que no va con el $599. */}
-      {!ALTAS_SON_599 && (
-        <div className="sm:hidden">
-          <BenefitsMarquee variant="light" />
-        </div>
-      )}
+      {/* Banda de beneficios — refuerzo en móvil como en la app anterior. */}
+      <div className="sm:hidden">
+        <BenefitsMarquee variant="light" es599={ALTAS_SON_599} />
+      </div>
       <div className="flex-1 pb-14 pt-4 sm:pt-11">
         <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 px-5 sm:gap-7 sm:px-0">
           {!ALTAS_SON_599 ? (

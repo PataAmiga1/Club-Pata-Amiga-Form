@@ -7,6 +7,7 @@ import { APPEAL_MAX_PER_SUBJECT, MAX_ACTIVE_PETS } from "@/lib/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
 import { formatDateEs } from "@/lib/dates";
+import { aperturasDePeludos } from "@/lib/reintegros-599";
 
 export default async function PeludosPage({
   searchParams,
@@ -46,9 +47,13 @@ export default async function PeludosPage({
     .eq("user_id", user.id);
   const vivas = (subsDelMiembro ?? []).filter((s) => ESTADOS_VIVOS.includes(s.status ?? ""));
   const modelo599 = vivas.some((s) => s.pet_id) && !vivas.some((s) => !s.pet_id);
-  const membresiaDe = (petId: string) => vivas.find((s) => s.pet_id === petId) ?? null;
   // Las dadas de baja quedan al final, como recuerdo — no cuentan en el límite
   const active = petList.filter((p) => p.is_active !== false);
+  const membresiaDe = (petId: string) => vivas.find((s) => s.pet_id === petId) ?? null;
+  // Sección 7: la tarjeta de un peludo del $599 dice cuándo se abre cada monto.
+  const aperturas = modelo599
+    ? await aperturasDePeludos(createAdminClient(), active.map((p) => p.id))
+    : new Map();
   const inactive = petList.filter((p) => p.is_active === false);
   const appealsFor = (petId: string) =>
     (appeals ?? []).filter((a) => a.pet_id === petId);
@@ -100,7 +105,7 @@ export default async function PeludosPage({
           const pending = mine.find((a) => a.status === "pending");
           return (
             <div key={pet.id} className="flex flex-col gap-2">
-              <PetCard pet={pet} />
+              <PetCard pet={pet} montos599={aperturas.get(pet.id)} />
               {modelo599 &&
                 (() => {
                   const m = membresiaDe(pet.id);

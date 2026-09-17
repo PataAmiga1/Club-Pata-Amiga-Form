@@ -3,6 +3,10 @@ import type { AgentTool } from "./types";
 import { beneficiosDe } from "@/lib/plans/resolve";
 import { CATALOGO_BENEFICIOS, type LlaveBeneficio } from "@/lib/plans/benefits";
 import { hoyEnMexico } from "@/lib/zona-horaria";
+import { ALTAS_SON_599, PLAN_DE_ALTAS } from "@/lib/plans/planes";
+import { ofertaPublica599 } from "@/lib/plans/oferta";
+import { pesosDeOferta, renglonesDeLaOferta599 } from "@/lib/plans/oferta-texto";
+import { leerCatalogo } from "@/lib/catalogo-cuidados";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -88,9 +92,18 @@ export async function executeDemoTool(
 ): Promise<string> {
   switch (name) {
     case "planes_vigentes": {
+      // Membresía $599 (sección 7): se describe la oferta completa, con los
+      // dos precios y el catálogo. El plan de $159 ya no se vende, así que su
+      // versión publicada no se enseña aunque siga existiendo.
+      if (ALTAS_SON_599) {
+        const [oferta, catalogo] = await Promise.all([ofertaPublica599(admin), leerCatalogo(admin)]);
+        if (!oferta) return "No hay planes publicados en este momento.";
+        return ["Membresía Pata Amiga (una por peludo):", ...renglonesDeLaOferta599(oferta, catalogo)].join("\n");
+      }
       const { data } = await admin
         .from("plan_versions")
-        .select("version, interval, price_cents, benefits, membership_plans!plan_id(name, is_public)")
+        .select("version, interval, price_cents, benefits, membership_plans!inner(name, is_public, slug)")
+        .eq("membership_plans.slug", PLAN_DE_ALTAS)
         .eq("status", "publicada");
 
       const filas = (data ?? []).filter((v) => {
@@ -116,6 +129,18 @@ export async function executeDemoTool(
     }
 
     case "periodos_de_espera": {
+      if (ALTAS_SON_599) {
+        const oferta = await ofertaPublica599(admin);
+        if (!oferta) return "No hay planes publicados en este momento.";
+        const p = oferta.principal;
+        return [
+          "Contratante: sin tiempo de espera — la membresía queda activa al pagar.",
+          "Cada peludo cuenta desde que el comité aprueba su perfil:",
+          `Cuidados cotidianos y despedida: se abren el día ${p.cuidados.aperturaDia}.`,
+          `Emergencia veterinaria: se abre en el mes ${p.emergencia.aperturaMes}.`,
+          "Es igual para todos los peludos: adoptados, de raza o con código de embajador.",
+        ].join("\n");
+      }
       const b = beneficiosDe(null); // los valores vigentes del catálogo
       return [
         `Contratante: sin tiempo de espera — la membresía queda activa al pagar.`,
@@ -129,6 +154,20 @@ export async function executeDemoTool(
     }
 
     case "reglas_de_reintegro": {
+      if (ALTAS_SON_599) {
+        const oferta = await ofertaPublica599(admin);
+        if (!oferta) return "No hay planes publicados en este momento.";
+        const p = oferta.principal;
+        const $ = pesosDeOferta;
+        return [
+          `Cuidados cotidianos (solo lo del catálogo): desde ${$(p.cuidados.inicial)}, hasta ${$(p.cuidados.tope)} al año.`,
+          `Emergencia veterinaria: desde ${$(p.emergencia.inicial)}, hasta ${$(p.emergencia.tope)} al año.`,
+          `Despedida: ${$(p.despedida.monto)}.`,
+          "Los montos son por peludo, crecen por mes pagado y se renuevan cada año; lo que no se usa no se acumula.",
+          `Reintegro en máximo ${p.diasHabiles} días hábiles; si nos tardamos más, ese mes de ese peludo es gratis.`,
+          "Para solicitar se sube la factura o el recibo del veterinario y los datos bancarios del titular.",
+        ].join("\n");
+      }
       const b = beneficiosDe(null);
       const tope = (llave: LlaveBeneficio) =>
         `${CATALOGO_BENEFICIOS[llave].label}: ${pesos(Number(b[llave]))} al año`;

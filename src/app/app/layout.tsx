@@ -43,6 +43,9 @@ export default async function AppLayout({
         .select("plan")
         .eq("user_id", user.id)
         .eq("status", "active")
+        // Con el $599 hay una suscripción activa POR PELUDO: sin limit(1),
+        // dos filas hacen que maybeSingle() devuelva null (sección 7).
+        .limit(1)
         .maybeSingle(),
       supabase
         .from("ambassadors")

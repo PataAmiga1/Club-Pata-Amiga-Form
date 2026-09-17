@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { VetChat } from "./VetChat";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { esMiembro599 } from "@/lib/reintegros-599";
 
 export default async function VetPage() {
   const supabase = await createClient();
@@ -23,6 +25,7 @@ export default async function VetPage() {
       .order("created_at", { ascending: true }),
   ]);
 
+  const es599 = await esMiembro599(createAdminClient(), user.id);
   const petNames = (pets ?? []).map((p) => p.name);
   const greeting = `¡Hola${profile?.first_name ? `, ${profile.first_name}` : ""}! 🐾 Soy tu guía veterinaria. ¿Cómo ${
     petNames.length > 1
@@ -36,6 +39,7 @@ export default async function VetPage() {
     <VetChat
       active={profile?.membership_status === "active"}
       greeting={greeting}
+      es599={es599}
     />
   );
 }
