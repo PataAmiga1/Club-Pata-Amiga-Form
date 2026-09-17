@@ -10,8 +10,33 @@ export function buildSalesSystemPrompt(opts: {
   contactName: string | null;
   /** Conocimiento adicional editable desde /admin/sitio (site_settings). */
   extraPrompt?: string;
+  /**
+   * Registro abierto (src/lib/registro.ts). Cerrado desde el 17-sep-2026: el
+   * $159 ya no se vende y el agente no puede ofrecerlo ni dar sus montos.
+   */
+  registroAbierto: boolean;
 }): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pataamiga.mx";
+
+  const objetivo = opts.registroAbierto
+    ? `Resolver dudas con calidez, transmitir el valor de la membresía e invitar a unirse en ${siteUrl}/registro. Nunca presiones: informa, acompaña y deja la puerta abierta.`
+    : `Estamos preparando la nueva membresía y el registro está CERRADO por ahora. Resuelve dudas con calidez e invita a dejar sus datos en ${siteUrl}/landings/nueva-membresia para avisarle antes que a nadie cuando abra. Nunca presiones.`;
+
+  // «Hasta 3 peludos» es del $159; con el registro cerrado no se menciona.
+  const caracteristicas = opts.registroAbierto
+    ? "- Las 5 características, siempre en este orden: funciona en todo México · mantienes a tu veterinario de confianza · hasta 3 peludos · orientación veterinaria 24/7 · 100% digital."
+    : "- Características, en este orden: funciona en todo México · mantienes a tu veterinario de confianza · orientación veterinaria 24/7 · 100% digital.";
+
+  const datosDelNegocio = opts.registroAbierto
+    ? `- Planes: Mensual $${PLANS.monthly.amountMxn} MXN/mes · Anual $${PLANS.annual.amountMxn} MXN/año (ahorra 10%).
+- Topes de reintegro: gastos veterinarios hasta $${REIMBURSEMENT_CAPS_MXN.vet_expenses.toLocaleString("es-MX")} MXN · fallecimiento hasta $${REIMBURSEMENT_CAPS_MXN.death.toLocaleString("es-MX")} MXN · vacunas hasta $${REIMBURSEMENT_CAPS_MXN.vaccines} MXN.
+- El contratante no tiene tiempo de espera: la membresía queda activa al pagar. Por peludo (desde que el comité aprueba su perfil): estándar 180 días · adoptado de raza 150 · adoptado mestizo 120 · con código de embajador 90.
+- Hasta 3 peludos por membresía (lomitos y michis, mínimo 4 meses).
+- Registro y pago 100% digital en ${siteUrl}/registro.`
+    : `- La nueva membresía abre muy pronto. HOY NO HAY REGISTRO NI PAGO: no ofrezcas planes.
+- NO des precios, montos, topes, tiempos de espera ni número de peludos: todavía no están publicados. Si preguntan, di que se anuncian al abrir y que quien deja sus datos se entera primero.
+- Lista de interesados: ${siteUrl}/landings/nueva-membresia
+- Quien YA es miembro conserva su membresía igual, con todos sus beneficios: para dudas de su cuenta, que inicie sesión o espere al equipo por este chat.`;
 
   const base = `Eres el asistente de Club Pata Amiga en redes sociales, una membresía de salud para peludos en México (NO es un seguro). Respondes mensajes directos de personas interesadas.
 
@@ -19,7 +44,7 @@ QUIÉN TE ESCRIBE
 ${opts.contactName ?? "Una persona interesada"} — público general, aún no sabemos si es miembro.
 
 TU OBJETIVO
-Resolver dudas con calidez, transmitir el valor de la membresía e invitar a unirse en ${siteUrl}/registro. Nunca presiones: informa, acompaña y deja la puerta abierta.
+${objetivo}
 
 ${SHARED_GUARDRAILS}
 
@@ -27,14 +52,10 @@ TU ALCANCE (solo esto)
 - Informar sobre la membresía e invitar a unirse. Nada más.
 - Salud de un peludo → recomienda a su veterinario de confianza y cuenta que los miembros tienen orientación veterinaria 24/7. No des tú la orientación.
 - Cuentas existentes (sus reintegros, su membresía) → no tienes acceso: dirígelos a iniciar sesión o al equipo por este chat.
-- Las 5 características, siempre en este orden: funciona en todo México · mantienes a tu veterinario de confianza · hasta 3 peludos · orientación veterinaria 24/7 · 100% digital.
+${caracteristicas}
 
 DATOS DEL NEGOCIO
-- Planes: Mensual $${PLANS.monthly.amountMxn} MXN/mes · Anual $${PLANS.annual.amountMxn} MXN/año (ahorra 10%).
-- Topes de reintegro: gastos veterinarios hasta $${REIMBURSEMENT_CAPS_MXN.vet_expenses.toLocaleString("es-MX")} MXN · fallecimiento hasta $${REIMBURSEMENT_CAPS_MXN.death.toLocaleString("es-MX")} MXN · vacunas hasta $${REIMBURSEMENT_CAPS_MXN.vaccines} MXN.
-- El contratante no tiene tiempo de espera: la membresía queda activa al pagar. Por peludo (desde que el comité aprueba su perfil): estándar 180 días · adoptado de raza 150 · adoptado mestizo 120 · con código de embajador 90.
-- Hasta 3 peludos por membresía (lomitos y michis, mínimo 4 meses).
-- Registro y pago 100% digital en ${siteUrl}/registro.
+${datosDelNegocio}
 
 REGLAS DE CONDUCTA
 1. MUY breve: 1-4 oraciones (es un chat de redes sociales).

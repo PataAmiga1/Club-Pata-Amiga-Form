@@ -10,6 +10,7 @@ import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { SocialIcon } from "@/components/landing/SocialIcons";
 import { PhoneMockup } from "@/components/landing/PhoneMockup";
 import { ConfigurarCookies } from "@/components/analytics/ConfigurarCookies";
+import { RUTA_LISTA_DE_ESPERA, valorAbierto } from "@/lib/registro";
 
 export const metadata: Metadata = {
   title: "Club Pata Amiga — Protección para tu manada",
@@ -38,7 +39,9 @@ const BENEFITS = [
     emoji: "🐾",
     bg: "bg-warning-bg",
     title: "Reintegros",
-    text: "Hasta $3,000 MXN en gastos veterinarios, $2,000 para momentos de despedida y $300 en vacunas. Proceso de reintegro en solo 72 hrs.",
+    // Sin montos ni horas (17-sep-2026): eran los del $159, que ya no se
+    // vende. Los de la membresía nueva entran cuando tenga sus legales.
+    text: "Reintegros para gastos veterinarios, emergencias y momentos de despedida, con el veterinario que tú elijas.",
   },
   {
     emoji: "📍",
@@ -51,7 +54,7 @@ const BENEFITS = [
 const HOW_IT_WORKS = [
   "Vas a tu veterinario de confianza",
   "Subes la foto de la factura",
-  "Transferimos tu reintegro en 72 hrs",
+  "Recibes tu reintegro por transferencia",
 ];
 
 const NAV_LINKS = [
@@ -88,6 +91,10 @@ export default async function Home() {
     { network: "facebook", label: "Facebook", href: settings.social_facebook },
     { network: "tiktok", label: "TikTok", href: settings.social_tiktok },
   ].filter((s) => s.href);
+  // Registro cerrado (src/lib/registro.ts): sin precios y los botones llevan a
+  // la lista de interesados. Los links a /registro igual los redirige el proxy.
+  const abierto = valorAbierto(settings.registro_abierto);
+  const alta = abierto ? "/registro" : RUTA_LISTA_DE_ESPERA;
 
   return (
     <div className="flex min-h-dvh flex-col bg-cream">
@@ -120,11 +127,13 @@ export default async function Home() {
             Iniciar sesión
           </Link>
           <Link
-            href="/registro"
+            href={alta}
             className="whitespace-nowrap rounded-full bg-teal px-4 py-2.5 font-bold text-white transition-colors hover:bg-teal-deep sm:px-[22px]"
           >
-            <span className="hidden sm:inline">Únete a la manada</span>
-            <span className="sm:hidden">Únete</span>
+            <span className="hidden sm:inline">
+              {abierto ? "Únete a la manada" : "Nueva membresía"}
+            </span>
+            <span className="sm:hidden">{abierto ? "Únete" : "Avísame"}</span>
           </Link>
         </nav>
       </header>
@@ -146,16 +155,18 @@ export default async function Home() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/registro"
+              href={alta}
               className="grid h-[54px] place-items-center rounded-full bg-white px-[30px] text-base font-bold text-teal-deep transition-colors hover:bg-cream-light"
             >
-              Obtener mi membresía
+              {abierto ? "Obtener mi membresía" : "Quiero que me avisen"}
             </Link>
             <Link
               href="/#planes"
               className="grid h-[54px] place-items-center px-2 text-[15px] font-semibold text-white underline underline-offset-4 sm:px-6"
             >
-              Desde ${PLANS.monthly.amountMxn} MXN al mes
+              {abierto
+                ? `Desde $${PLANS.monthly.amountMxn} MXN al mes`
+                : "Nueva membresía, muy pronto"}
             </Link>
           </div>
         </div>
@@ -221,6 +232,7 @@ export default async function Home() {
           id="planes"
           className="grid items-center gap-[18px] rounded-[24px] bg-white p-6 shadow-[0_2px_12px_rgba(30,83,80,.06)] sm:p-8 lg:grid-cols-2"
         >
+          {abierto ? (
           <div className="flex flex-col gap-3">
             <h2 className="font-display text-[26px] leading-tight text-ink-title sm:text-[30px]">
               Planes simples,
@@ -261,6 +273,29 @@ export default async function Home() {
               Ver planes completos
             </Link>
           </div>
+          ) : (
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-[26px] leading-tight text-ink-title sm:text-[30px]">
+              La nueva membresía
+              <br />
+              llega muy pronto
+            </h2>
+            <p className="text-[15px] leading-[1.55] text-ink-secondary">
+              Estamos preparando la nueva membresía Pata Amiga. Déjanos tus
+              datos y te avisamos antes que a nadie en cuanto abra el registro.
+            </p>
+            <p className="text-[13px] leading-[1.5] text-ink-tertiary">
+              ¿Ya eres miembro? Tu membresía sigue igual, con todos sus
+              beneficios.
+            </p>
+            <Link
+              href={alta}
+              className="grid h-[52px] place-items-center rounded-full bg-teal text-[15px] font-bold text-white transition-colors hover:bg-teal-deep"
+            >
+              Quiero que me avisen
+            </Link>
+          </div>
+          )}
           <AssetOrPlaceholder
             url={assets["landing-planes"]}
             alt="Tutora abrazando a su perro"
@@ -310,10 +345,10 @@ export default async function Home() {
               ))}
             </ol>
             <Link
-              href="/registro"
+              href={alta}
               className="grid h-[52px] place-items-center self-start rounded-full bg-orange px-8 text-[15px] font-bold text-white transition-opacity hover:opacity-90"
             >
-              Únete a la manada
+              {abierto ? "Únete a la manada" : "Quiero que me avisen"}
             </Link>
           </div>
         </div>
@@ -330,7 +365,7 @@ export default async function Home() {
           </p>
         </div>
         <div className="mx-auto w-full max-w-[860px]">
-          <Faq />
+          <Faq registroAbierto={abierto} />
         </div>
       </section>
 
