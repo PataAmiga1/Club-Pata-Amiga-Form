@@ -11,27 +11,37 @@ export type VersionVigente = {
   interval: "month" | "year";
   price_cents: number;
   stripe_price_id: string | null;
+  /** Membresía $599: precio de cada peludo después del primero. */
+  additional_price_cents: number | null;
+  stripe_additional_price_id: string | null;
   benefits: Record<string, unknown>;
 };
 
 /**
- * La versión publicada más reciente de un intervalo. Es la que contrata quien
- * se registra hoy.
+ * La versión publicada más reciente de un intervalo DENTRO DE UN PLAN.
  *
- * Nunca lanza: si algo falla devuelve null y el checkout usa el precio de las
- * variables de entorno. El cobro no se queda sin funcionar por el motor de
- * planes.
+ * El plan es obligatorio (sección 0 del $599, 16-sep-2026). Antes la consulta
+ * traía «la última versión publicada» de CUALQUIER plan: en cuanto existiera
+ * el $599, un miembro de $159 que cambiara de mensual a anual habría quedado
+ * cobrado a $599 con las reglas nuevas, y el checkout habría vendido el plan
+ * equivocado según cuál se publicó al último.
+ *
+ * Nunca lanza: si algo falla devuelve null y quien llama decide el respaldo
+ * (las variables de entorno, que son SOLO del plan de $159).
  */
 export async function versionVigente(
   admin: Admin,
   interval: "month" | "year",
+  planSlug: string,
 ): Promise<VersionVigente | null> {
   try {
     const { data } = await admin
       .from("plan_versions")
       .select(
-        "id, version, interval, price_cents, stripe_price_id, benefits, membership_plans!inner(slug, is_public, archived_at)",
+        "id, version, interval, price_cents, stripe_price_id, additional_price_cents, stripe_additional_price_id, benefits, membership_plans!inner(slug, is_public, archived_at)",
       )
+      .eq("membership_plans.slug", planSlug)
+      .is("membership_plans.archived_at", null)
       .eq("interval", interval)
       .eq("status", "publicada")
       .order("version", { ascending: false })
@@ -44,6 +54,8 @@ export async function versionVigente(
       interval: data.interval as "month" | "year",
       price_cents: data.price_cents,
       stripe_price_id: data.stripe_price_id,
+      additional_price_cents: data.additional_price_cents,
+      stripe_additional_price_id: data.stripe_additional_price_id,
       benefits: (data.benefits as Record<string, unknown>) ?? {},
     };
   } catch (err) {
@@ -81,7 +93,7 @@ export async function publicarVersion(
   const { data: version } = await admin
     .from("plan_versions")
     .select(
-      "id, version, interval, price_cents, currency, benefits, status, stripe_product_id, stripe_price_id, legal_confirmed_at, membership_plans(id, name, slug)",
+      "id, version, interval, price_cents, additional_price_cents, currency, benefits, status, stripe_product_id, stripe_price_id, stripe_additional_price_id, legal_confirmed_at, membership_plans(id, name, slug)",
     )
     .eq("id", input.versionId)
     .maybeSingle();
@@ -93,6 +105,7 @@ export async function publicarVersion(
     ? version.membership_plans[0]
     : version.membership_plans;
   if (!plan) return { ok: false, error: "La versión no tiene plan" };
+
 
   // --- Compuerta legal ---------------------------------------------------
   // Cambiar un beneficio VINCULANTE exige el reglamento que ya lo refleje y la
@@ -111,6 +124,7 @@ export async function publicarVersion(
   // --- Stripe -------------------------------------------------------------
   let productId = version.stripe_product_id;
   let priceId = version.stripe_price_id;
+  let adicionalId = version.stripe_additional_price_id;
   let creadoEnStripe = false;
 
   try {
@@ -151,6 +165,25 @@ export async function publicarVersion(
       priceId = precio.id;
       creadoEnStripe = true;
     }
+
+    // Membresía $599 (sección 2): el peludo adicional tiene su propio precio.
+    // Se crean los DOS o la versión no se publica: una versión a medias
+    // cobraría $599 a cada peludo.
+    if (version.additional_price_cents != null && !adicionalId) {
+      const adicional = await stripe.prices.create({
+        product: productId,
+        currency: (version.currency ?? "MXN").toLowerCase(),
+        unit_amount: version.additional_price_cents,
+        recurring: { interval: version.interval as "month" | "year" },
+        metadata: {
+          plan_version_id: version.id,
+          version: String(version.version),
+          nivel: "adicional",
+        },
+      });
+      adicionalId = adicional.id;
+      creadoEnStripe = true;
+    }
   } catch (err) {
     const mensaje = err instanceof Error ? err.message : "Stripe rechazó la publicación";
     await admin
@@ -166,6 +199,7 @@ export async function publicarVersion(
       status: "publicada",
       stripe_product_id: productId,
       stripe_price_id: priceId,
+      stripe_additional_price_id: adicionalId,
       published_by: input.publishedBy,
       published_at: new Date().toISOString(),
     })

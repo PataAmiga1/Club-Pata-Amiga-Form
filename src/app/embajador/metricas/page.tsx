@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { comisionesDeEmbajadores } from "@/lib/comisiones";
 import { formatMxn } from "@/lib/format";
 import { getAmbassadorContext } from "../shared";
 
@@ -112,21 +113,21 @@ export default async function EmbajadorMetricasPage() {
         keyOf(r.subscriptions.updated_at) === key,
     ).length,
   }));
+  // Por mes en que se GANÓ: la única del $159 en su alta, la del $599 en cada
+  // mes pagado (src/lib/comisiones).
+  const items = await comisionesDeEmbajadores(admin, [ambassador.id]);
   const comisiones = keys.map((key) => ({
     key,
-    value: referrals
-      .filter((r) => keyOf(r.created_at) === key)
-      .reduce((sum, r) => sum + Number(r.commission_amount ?? 0), 0),
+    value: items
+      .filter((c) => keyOf(c.fecha) === key)
+      .reduce((sum, c) => sum + c.monto, 0),
   }));
 
   const activos = referrals.filter(
     (r) => !r.subscriptions?.status || r.subscriptions.status === "active",
   ).length;
   const totalBajas = referrals.length - activos;
-  const totalComisiones = referrals.reduce(
-    (sum, r) => sum + Number(r.commission_amount ?? 0),
-    0,
-  );
+  const totalComisiones = items.reduce((sum, c) => sum + c.monto, 0);
 
   const kpis = [
     { label: "REFERIDOS TOTALES", value: String(referrals.length) },

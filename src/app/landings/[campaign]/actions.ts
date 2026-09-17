@@ -2,6 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
+import { MEMBERSHIP_FEATURES, MEMBERSHIP_FEATURES_599 } from "@/lib/constants";
 import {
   getCampaign,
   campaignCouponKey,
@@ -135,6 +137,9 @@ export async function sendGiftEmail(
           firstName,
           ...(await buildGiftBlocks(slug)),
           registroUrl: `${SITE_URL}/registro`,
+          terceraCaracteristica: ALTAS_SON_599
+            ? MEMBERSHIP_FEATURES_599[2]
+            : MEMBERSHIP_FEATURES[2],
         });
   await admin
     .from("campaign_leads")

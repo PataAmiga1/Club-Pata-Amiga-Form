@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
 import { formatMxn, hoursSince } from "@/lib/format";
 import { FilterChips } from "@/components/panel/FilterChips";
+import { formatDateEs } from "@/lib/dates";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pendiente",
@@ -27,7 +28,7 @@ export default async function AdminReintegrosPage({
   let rowsQuery = admin
     .from("reimbursements")
     .select(
-      "id, folio, category, amount_requested, amount_approved, status, created_at, pets(name, species), profiles!user_id(first_name, last_name, email)",
+      "id, folio, category, amount_requested, amount_approved, status, created_at, due_business_date, sla_breached_at, pets(name, species), profiles!user_id(first_name, last_name, email)",
     )
     .order("created_at", { ascending: masAntiguos })
     .limit(100);
@@ -54,6 +55,12 @@ export default async function AdminReintegrosPage({
         <div className="flex flex-wrap gap-2">
           {/* Cuando hay centros, el gasto sale como pago directo, no como
               reintegro — acceso pedido por el equipo (5-ago). */}
+          <Link
+            href="/admin/reintegros/catalogo"
+            className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+          >
+            📋 Catálogo de cuidados →
+          </Link>
           <Link
             href="/admin/centros/pagos"
             className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
@@ -140,8 +147,22 @@ export default async function AdminReintegrosPage({
                 {formatMxn(Number(r.amount_approved ?? r.amount_requested))}
               </span>
               <span>{STATUS_LABEL[r.status] ?? r.status}</span>
-              <span className="text-ink-tertiary">
-                {open ? `${hoursSince(r.created_at)} hrs` : "—"}
+              <span
+                className={
+                  r.sla_breached_at
+                    ? "font-bold text-error-text"
+                    : "text-ink-tertiary"
+                }
+              >
+                {r.due_business_date
+                  ? r.status === "paid" || r.status === "rejected"
+                    ? "—"
+                    : r.sla_breached_at
+                      ? "vencido"
+                      : `vence ${formatDateEs(r.due_business_date)}`
+                  : open
+                    ? `${hoursSince(r.created_at)} hrs`
+                    : "—"}
               </span>
             </Link>
           );

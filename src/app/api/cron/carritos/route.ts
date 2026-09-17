@@ -66,6 +66,9 @@ export async function GET(request: Request) {
         .select("id")
         .eq("user_id", contacto.profile_id)
         .eq("status", "active")
+        // Una suscripción por peludo en el $599: sin limit(1), dos filas =
+        // null y un miembro que paga se marcaba como carrito abandonado.
+        .limit(1)
         .maybeSingle();
       if (sub) continue;
     }

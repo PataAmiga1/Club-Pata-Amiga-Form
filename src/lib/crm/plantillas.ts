@@ -1,5 +1,8 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS } from "@/lib/constants";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
+import { ofertaPublica599 } from "@/lib/plans/oferta";
+import { pesosDeOferta } from "@/lib/plans/oferta-texto";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -10,18 +13,7 @@ type Admin = ReturnType<typeof createAdminClient>;
  * mostrarle el texto a la persona, para que nadie mande un "Hola {{nombre}}".
  */
 
-/** Variables disponibles, con lo que significan (se muestran en el editor). */
-export const VARIABLES = [
-  { clave: "nombre", que: "Nombre del contacto" },
-  { clave: "apellido", que: "Apellidos del contacto" },
-  { clave: "correo", que: "Su correo principal" },
-  { clave: "telefono", que: "Su teléfono principal" },
-  { clave: "etapa", que: "Etapa de su oportunidad" },
-  { clave: "plan_mensual", que: `Precio mensual ($${PLANS.monthly.amountMxn})` },
-  { clave: "plan_anual", que: `Precio anual ($${PLANS.annual.amountMxn})` },
-  { clave: "asesor", que: "Nombre de quien escribe" },
-  { clave: "liga_registro", que: "Liga para registrarse" },
-] as const;
+export { VARIABLES } from "./plantillas-variables";
 
 export type ValoresPlantilla = Record<string, string>;
 
@@ -35,14 +27,23 @@ export async function valoresDelContacto(
   asesor: string,
 ): Promise<ValoresPlantilla> {
   const sitio = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pataamiga.mx";
+  const oferta = ALTAS_SON_599 ? await ofertaPublica599(admin) : null;
   const base: ValoresPlantilla = {
     nombre: "",
     apellido: "",
     correo: "",
     telefono: "",
     etapa: "",
-    plan_mensual: `$${PLANS.monthly.amountMxn} MXN`,
-    plan_anual: `$${PLANS.annual.amountMxn} MXN`,
+    plan_mensual: oferta
+      ? `${pesosDeOferta(oferta.principal.mensualPesos)} MXN`
+      : ALTAS_SON_599
+        ? ""
+        : `$${PLANS.monthly.amountMxn} MXN`,
+    plan_anual: oferta
+      ? `${pesosDeOferta(oferta.principal.anualPesos)} MXN`
+      : ALTAS_SON_599
+        ? ""
+        : `$${PLANS.annual.amountMxn} MXN`,
     asesor,
     liga_registro: `${sitio}/registro`,
   };

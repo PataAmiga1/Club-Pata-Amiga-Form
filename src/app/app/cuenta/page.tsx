@@ -11,6 +11,8 @@ import { BankingCard } from "./BankingCard";
 import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
 import { fetchSiteSettings } from "@/lib/site";
 import { LogoutButton } from "@/components/app/LogoutButton";
+import { MembresiasPorPeludo, type MembresiaDePeludo } from "./MembresiasPorPeludo";
+import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
 
 export default async function CuentaPage() {
   const supabase = await createClient();
@@ -42,10 +44,52 @@ export default async function CuentaPage() {
   ]);
 
   const settings = await fetchSiteSettings();
+
+  // Membresía $599 (sección 4): una suscripción por peludo, cada una con su
+  // propio corte, cancelación y plan.
+  const { data: porPeludo } = await createAdminClient()
+    .from("subscriptions")
+    .select("id, pet_id, plan, price_tier, amount, status, cancel_at_period_end, current_period_end, created_at, pets(name)")
+    .eq("user_id", user.id)
+    .not("pet_id", "is", null)
+    .order("created_at", { ascending: true });
+  const vivas599 = (porPeludo ?? []).filter((s) => ESTADOS_VIVOS.includes(s.status ?? ""));
+  const { estadoDeGarantia } = await import("@/lib/garantia");
+  const garantias = new Map(
+    await Promise.all(
+      vivas599.map(async (s) => [s.id, await estadoDeGarantia(createAdminClient(), s.id)] as const),
+    ),
+  );
+  const membresias599: MembresiaDePeludo[] = vivas599.map((s) => ({
+    id: s.id,
+    petId: s.pet_id!,
+    petName:
+      ((Array.isArray(s.pets) ? s.pets[0] : s.pets) as { name?: string } | null)?.name ??
+      "Tu peludo",
+    plan: s.plan === "annual" ? "annual" : "monthly",
+    nivel: (s.price_tier as "principal" | "adicional" | null) ?? null,
+    monto: Number(s.amount ?? 0),
+    estado: s.status ?? "",
+    cancelaAlCorte: !!s.cancel_at_period_end,
+    corte: s.current_period_end ? formatDateEs(s.current_period_end) : null,
+    garantia: (() => {
+      const g = garantias.get(s.id);
+      if (!g?.aplica) return null;
+      return {
+        dentroDelPlazo: g.dentroDelPlazo,
+        venceEl: g.venceEl ? formatDateEs(g.venceEl) : null,
+        reembolsoCents: g.solicitud?.status === "pendiente" ? g.solicitud.refundCents : g.reembolsoCents,
+        solicitud: g.solicitud?.status ?? null,
+      };
+    })(),
+  }));
   // `.limit(1)` devuelve arreglo. Con `maybeSingle()`, un miembro con dos
   // suscripciones vivas veía otra vez su cuenta como si no tuviera membresía.
   const sub = subs?.[0] ?? null;
-  const enMora = sub?.status === "past_due" || sub?.status === "unpaid";
+  const enMora =
+    sub?.status === "past_due" ||
+    sub?.status === "unpaid" ||
+    vivas599.some((s) => s.status === "past_due" || s.status === "unpaid");
   // A `situacionDeCobro` se le sigue pasando solo la activa: lo que pinta para
   // una membresía sana no cambia. La mora se resuelve con su propia tarjeta.
   const situacion = situacionDeCobro(
@@ -108,7 +152,9 @@ export default async function CuentaPage() {
       {/* Tres casos, no dos: con Stripe, heredado de Memberstack, o sin
           membresía. Antes un heredado (60 de 63 activos) caía en el aviso
           amarillo de "no tienes membresía" con un botón para volver a pagar. */}
-      {situacion.tipo === "stripe" ? (
+      {membresias599.length > 0 ? (
+        <MembresiasPorPeludo membresias={membresias599} />
+      ) : situacion.tipo === "stripe" ? (
         <MembershipManager
           plan={situacion.plan}
           cancelAtPeriodEnd={situacion.cancelaAlCorte}

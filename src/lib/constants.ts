@@ -2,8 +2,16 @@
  * Business constants — Club Pata Amiga.
  * Terminology is BINDING (see CLAUDE.md): "reintegro", "tiempo de espera",
  * "orientación veterinaria 24/7". Never: seguro, póliza, cobertura, carencia.
+ *
+ * ⚠ PLAN DE $159 (16-sep-2026). Varias pantallas todavía leen estos valores
+ * directo. NO se cambian para la membresía $599: cambiarlos aquí les cambia lo
+ * que ven (y en algunos casos lo que se les aplica) a los miembros de $159.
+ * El $599 lleva sus valores en su propio plan — ver src/lib/plans/planes.ts.
+ * Marcados con [PLAN $159]: PLANS, REIMBURSEMENT_CAPS_MXN, MAX_ACTIVE_PETS,
+ * REIMBURSEMENT_SLA_HOURS, APPEAL_MAX_PER_SUBJECT, AMBASSADOR_COMMISSION_MXN.
  */
 
+/** [PLAN $159] Precios del plan de $159. No es el precio que se vende. */
 export const PLANS = {
   monthly: { name: "Mensual", amountMxn: 159, interval: "month" as const },
   annual: { name: "Anual", amountMxn: 1699, interval: "year" as const, badge: "AHORRA 10%" },
@@ -22,7 +30,7 @@ export const PLANS = {
  * viejas; ya nadie la escribe ni la lee.
  */
 
-/** Topes de reintegro en MXN por categoría. */
+/** [PLAN $159] Topes de reintegro en MXN por categoría. */
 export const REIMBURSEMENT_CAPS_MXN = {
   vet_expenses: 3000, // urgencias, análisis/estudios, cirugía y hospitalización
   death: 2000, // gastos funerarios
@@ -30,12 +38,16 @@ export const REIMBURSEMENT_CAPS_MXN = {
 } as const;
 
 export const REIMBURSEMENT_CATEGORY_LABELS: Record<
-  keyof typeof REIMBURSEMENT_CAPS_MXN,
+  keyof typeof REIMBURSEMENT_CAPS_MXN | "cuidados" | "emergencia" | "despedida",
   string
 > = {
   vet_expenses: "Gastos veterinarios",
   death: "Fallecimiento",
   vaccines: "Vacunas",
+  // Membresía $599 (sección 3, 17-sep-2026)
+  cuidados: "Cuidados cotidianos",
+  emergencia: "Emergencia veterinaria",
+  despedida: "Despedida",
 };
 
 /** Motivos predeterminados de rechazo de reintegros. */
@@ -72,10 +84,11 @@ export const PET_REQUEST_MESSAGES = [
   "La edad registrada no coincide con la foto.",
 ] as const;
 
+/** [PLAN $159] Peludos activos por membresía. */
 export const MAX_ACTIVE_PETS = 3;
 /** Fotos adicionales por mascota (además de la foto principal). */
 export const PET_GALLERY_MAX = 5;
-/** Apelaciones máximas por sujeto (regla del sistema anterior). */
+/** [PLAN $159] Apelaciones máximas por sujeto (regla del sistema anterior). */
 export const APPEAL_MAX_PER_SUBJECT = 2;
 /**
  * Centros de bienestar: UNA sola apelación (junta 10-ago 01:37:40, confirmado
@@ -91,7 +104,7 @@ export const CENTER_APPEAL_MAX = 1;
  * `is_senior` guardado — no se recalculan.
  */
 export const SENIOR_PET_AGE_YEARS = 8;
-export const REIMBURSEMENT_SLA_HOURS = 72; // compromiso de transferencia
+export const REIMBURSEMENT_SLA_HOURS = 72; // [PLAN $159] compromiso de transferencia
 
 /** Las 5 características de la membresía — SIEMPRE en este orden. */
 export const MEMBERSHIP_FEATURES = [
@@ -100,6 +113,19 @@ export const MEMBERSHIP_FEATURES = [
   // "peludos" en vez de "mascotas" en la banda (equipo, 11-ago) — mismo
   // orden vinculante de las 5 características.
   "Incluye hasta 3 peludos",
+  "Orientación veterinaria 24/7",
+  "100% digital",
+] as const;
+
+/**
+ * Las 5 características de la membresía $599 (juntas/64 §4d, 17-sep-2026):
+ * la tercera, «hasta 3 peludos», es del $159 y pasa a «segunda mascota con 15%
+ * de descuento». Mismo orden vinculante.
+ */
+export const MEMBERSHIP_FEATURES_599 = [
+  "Disponible en todo México",
+  "Mantienes a tu veterinario",
+  "Segunda mascota con 15% de descuento",
   "Orientación veterinaria 24/7",
   "100% digital",
 ] as const;
@@ -138,7 +164,7 @@ export const DOG_BREEDS = [
 ] as const;
 
 /**
- * Comisión por suscripción referida (código de embajador), en MXN.
+ * [PLAN $159] Comisión por suscripción referida (código de embajador), en MXN.
  * ~10% del plan según los diseños 6a ($16 mensual / $170 anual).
  * Corte mensual: se paga el día 5 del mes siguiente.
  */

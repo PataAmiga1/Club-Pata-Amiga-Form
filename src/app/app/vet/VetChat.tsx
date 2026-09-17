@@ -13,9 +13,12 @@ type Bubble =
 export function VetChat({
   active,
   greeting,
+  es599 = false,
 }: {
   active: boolean;
   greeting: string;
+  /** Membresía por peludo: el recordatorio no cita el tope de $3,000 del $159. */
+  es599?: boolean;
 }) {
   const router = useRouter();
   const [bubbles, setBubbles] = useState<Bubble[]>([
@@ -128,10 +131,10 @@ export function VetChat({
                 key={i}
                 className="max-w-[300px] self-start rounded-[14px] bg-warning-bg px-3.5 py-3 text-[12.5px] leading-normal text-[#8A5A12]"
               >
-                💡 Recuerda: si tu peludo necesita atención, tu membresía
-                reintegra hasta{" "}
-                {formatMxn(REIMBURSEMENT_CAPS_MXN.vet_expenses)} MXN en gastos
-                veterinarios.
+                💡 Recuerda: si tu peludo necesita atención,{" "}
+                {es599
+                  ? "tu membresía tiene un monto disponible para emergencia veterinaria."
+                  : `tu membresía reintegra hasta ${formatMxn(REIMBURSEMENT_CAPS_MXN.vet_expenses)} MXN en gastos veterinarios.`}
                 <br />
                 <Link
                   href="/app/reintegros/nueva"

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { etiquetaDePlanDelMiembro } from "@/lib/plans/ingresos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cuentasPorOmisionDe } from "@/lib/cuentas-bancarias";
 import { reportError } from "@/lib/alerts";
@@ -15,6 +16,7 @@ const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
 
 type Sub = {
   plan: string | null;
+  pet_id: string | null;
   status: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean | null;
@@ -107,7 +109,7 @@ export default async function AdminMiembrosPage({
   // miembros" (reporte de la PM en producción, 12-ago). Ahora, si la consulta
   // rica falla, se reintenta con lo indispensable y se DICE qué pasó.
   const COLUMNAS_COMPLETAS =
-    "id, first_name, last_name, mother_last_name, email, phone, membership_status, member_since, created_at, birth_date, nationality, bank_name, clabe, cfdi_requested, profile_completed, pets!user_id(id, name, is_active), subscriptions(plan, status, current_period_end, cancel_at_period_end)";
+    "id, first_name, last_name, mother_last_name, email, phone, membership_status, member_since, created_at, birth_date, nationality, bank_name, clabe, cfdi_requested, profile_completed, pets!user_id(id, name, is_active), subscriptions(plan, status, current_period_end, cancel_at_period_end, pet_id)";
   const COLUMNAS_MINIMAS =
     "id, first_name, last_name, email, phone, membership_status, member_since, created_at";
 
@@ -199,10 +201,14 @@ export default async function AdminMiembrosPage({
     "Sin nombre";
   const fecha = (iso: string | null | undefined, conHora = false) =>
     iso ? formatDateEs(new Date(conHora ? iso : iso.slice(0, 10) + "T12:00:00")) : "—";
-  const activeSub = (m: Row) =>
-    (m.subscriptions ?? []).find((s) => s.status === "active");
-  const planLabel = (s?: Sub) =>
-    s?.plan === "annual" ? "Anual" : s?.plan === "monthly" ? "Mensual" : "—";
+  // $599: una suscripción por peludo. El próximo pago es el más cercano, y el
+  // plan se resume por persona (src/lib/plans/ingresos.ts).
+  const activas = (m: Row) =>
+    (m.subscriptions ?? [])
+      .filter((s) => s.status === "active")
+      .sort((a, b) => String(a.current_period_end ?? "9").localeCompare(String(b.current_period_end ?? "9")));
+  const activeSub = (m: Row) => activas(m)[0];
+  const planDelMiembro = (m: Row) => etiquetaDePlanDelMiembro(activas(m)) ?? "—";
 
   /* ---- Celdas reutilizadas entre vistas ---- */
   const cMiembro: Col = {
@@ -229,7 +235,7 @@ export default async function AdminMiembrosPage({
       );
     },
   };
-  const cPlan: Col = { h: "PLAN", w: "72px", render: (m) => planLabel(activeSub(m)) };
+  const cPlan: Col = { h: "PLAN", w: "96px", render: (m) => planDelMiembro(m) };
   const cProximoPago: Col = {
     h: "PRÓXIMO PAGO",
     w: "110px",

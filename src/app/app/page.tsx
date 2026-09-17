@@ -10,6 +10,8 @@ import { NotificationsBell } from "@/components/app/NotificationsBell";
 import { MAX_ACTIVE_PETS } from "@/lib/constants";
 import { formatDateEs, renewalDate, waitingProgress } from "@/lib/dates";
 import { situacionDeCobro, etiquetaDeCobro } from "@/lib/membresia";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { aperturasDePeludos, esMiembro599 } from "@/lib/reintegros-599";
 
 export default async function AppHome() {
   const supabase = await createClient();
@@ -20,7 +22,7 @@ export default async function AppHome() {
 
   const [
     { data: profile },
-    { data: sub },
+    { data: subs },
     { data: pets },
     { data: notifications },
     { data: docs },
@@ -37,7 +39,7 @@ export default async function AppHome() {
       .select("plan, amount, current_period_end, created_at")
       .eq("user_id", user.id)
       .eq("status", "active")
-      .maybeSingle(),
+      .order("current_period_end", { ascending: true }),
     supabase
       .from("pets")
       .select(
@@ -57,6 +59,14 @@ export default async function AppHome() {
     supabase.from("documents").select("document_type").eq("user_id", user.id),
   ]);
 
+  // $159: una sola suscripción. $599: una por peludo; la tarjeta enseña el
+  // cobro más próximo.
+  const sub = (subs ?? [])[0] ?? null;
+  const admin = createAdminClient();
+  const es599 = await esMiembro599(admin, user.id);
+  const aperturas = es599
+    ? await aperturasDePeludos(admin, (pets ?? []).map((p) => p.id))
+    : new Map();
   const active = profile?.membership_status === "active";
   // NO se cae al correo. Desde que el registro se acorto (16-ago) el nombre se
   // captura al completar el perfil, ya pagado, asi que entre el pago y ese
@@ -100,12 +110,13 @@ export default async function AppHome() {
   const availablePet = petList.find(
     (p) =>
       p.approval_status === "approved" &&
+      (es599 ? aperturas.get(p.id)?.some((m: { abierto: boolean }) => m.abierto) ?? false :
       waitingProgress(
         p.created_at,
         p.waiting_period_end_date,
         p.waiting_period_bypassed,
         p.waiting_period_start_date,
-      ).done,
+      ).done),
   );
 
   // Activity feed derived from real records — cronológico, de lo más
@@ -296,14 +307,14 @@ export default async function AppHome() {
             MIS PELUDOS
           </span>
           <span className="font-display text-[26px] text-ink-title">
-            {petList.length} de {MAX_ACTIVE_PETS}
+            {es599 ? petList.length : `${petList.length} de ${MAX_ACTIVE_PETS}`}
           </span>
-          {petList.length < MAX_ACTIVE_PETS && (
+          {(es599 || petList.length < MAX_ACTIVE_PETS) && (
             <Link
               href="/app/peludos"
               className="text-[12.5px] font-semibold text-teal-deep"
             >
-              + Registrar otro peludo
+              {es599 ? "+ Otro peludo con 15% de descuento" : "+ Registrar otro peludo"}
             </Link>
           )}
         </div>
@@ -323,7 +334,7 @@ export default async function AppHome() {
             </Link>
           ) : (
             <span className="text-[12.5px] text-ink-tertiary">
-              Al cumplirse los tiempos de espera
+              {es599 ? "Al abrirse sus montos" : "Al cumplirse los tiempos de espera"}
             </span>
           )}
         </div>
@@ -339,12 +350,12 @@ export default async function AppHome() {
             href="/app/peludos"
             className="text-[12.5px] font-bold text-teal-deep md:text-[13px]"
           >
-            {petList.length < MAX_ACTIVE_PETS ? "+ Agregar" : "Ver todos →"}
+            {es599 || petList.length < MAX_ACTIVE_PETS ? "+ Agregar" : "Ver todos →"}
           </Link>
         </div>
         <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-4">
           {petList.map((pet) => (
-            <PetCard key={pet.id} pet={pet} />
+            <PetCard key={pet.id} pet={pet} montos599={aperturas.get(pet.id)} />
           ))}
           {petList.length === 0 && (
             <div className="rounded-[20px] bg-white p-6 text-sm text-ink-secondary shadow-[var(--shadow-card)]">

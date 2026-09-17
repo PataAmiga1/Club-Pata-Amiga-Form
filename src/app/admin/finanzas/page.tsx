@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { corteDeComisiones } from "@/lib/comisiones";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
@@ -9,6 +10,7 @@ import { MiniBarChart } from "@/components/panel/MiniBarChart";
 import { sexoDeMiembro } from "@/lib/sexo";
 import { cargarBajas } from "@/lib/bajas";
 import { DetailModal, DetailItem } from "@/components/panel/DetailModal";
+import { resumenDeIngresos } from "@/lib/plans/ingresos";
 
 type PaymentRow = {
   id: string;
@@ -44,7 +46,7 @@ export default async function AdminFinanzasPage() {
 
   const [subsQ, monthReimbs, payableReferrals, activosQ, bajasQ, cfdiQ] =
     await Promise.all([
-    admin.from("subscriptions").select("plan, amount").eq("status", "active"),
+    admin.from("subscriptions").select("user_id, plan, amount, pet_id, price_tier").eq("status", "active"),
     admin
       .from("reimbursements")
       .select("amount_approved, status")
@@ -54,11 +56,9 @@ export default async function AdminFinanzasPage() {
     // solo mira el mes: a quien se dio de baja se le paga hasta SU fecha de
     // baja (Pablo, 16-ago). Sin ese filtro este total no cuadraría con el
     // archivo del banco ni con el panel de embajadores.
-    admin
-      .from("referrals")
-      .select("commission_amount, created_at, ambassadors(deactivated_at)")
-      .eq("status", "pending")
-      .lt("created_at", monthStart.toISOString()),
+    // Comisión única del $159 + mensual del $599, con la regla del corte en
+    // src/lib/comisiones (la misma del botón y del archivo del banco).
+    corteDeComisiones(admin, monthStart),
     // Miembros activos TOTALES: el MRR solo puede sumar a quienes tienen
     // suscripción registrada aquí. Sin este contraste, el tablero daría a
     // entender que el MRR es todo el negocio.
@@ -157,27 +157,18 @@ export default async function AdminFinanzasPage() {
       ? `${b.profiles.first_name} ${b.profiles.last_name ?? ""}`.trim()
       : (b.profiles?.email ?? "Miembro");
   const activosTotales = activosQ.count ?? 0;
-  const sinCobroAqui = Math.max(0, activosTotales - subs.length);
-  const mrr = subs.reduce(
-    (acc, s) =>
-      acc + (s.plan === "annual" ? Number(s.amount ?? 0) / 12 : Number(s.amount ?? 0)),
-    0,
-  );
-  const annualCount = subs.filter((s) => s.plan === "annual").length;
-  const monthlyCount = subs.filter((s) => s.plan === "monthly").length;
+  // Sección 8 del $599: una suscripción por peludo. Las personas con cobro se
+  // cuentan distintas; antes `subs.length` eran personas y con el $599 ya no.
+  const ingresos = resumenDeIngresos(subs);
+  const sinCobroAqui = Math.max(0, activosTotales - ingresos.miembrosConCobro);
+  const mrr = ingresos.mrr;
+  const annualCount = ingresos.anual.n;
+  const monthlyCount = ingresos.mensual.n;
   const reimbOut = (monthReimbs.data ?? []).reduce(
     (acc, r) => acc + Number(r.amount_approved ?? 0),
     0,
   );
-  const commissionsOut = (payableReferrals.data ?? [])
-    .filter((r) => {
-      // PostgREST devuelve el embebido como objeto o como arreglo según la
-      // relación; se normaliza para no depender de eso.
-      const emb = Array.isArray(r.ambassadors) ? r.ambassadors[0] : r.ambassadors;
-      const baja = emb?.deactivated_at;
-      return !baja || new Date(r.created_at) <= new Date(baja);
-    })
-    .reduce((acc, r) => acc + Number(r.commission_amount ?? 0), 0);
+  const commissionsOut = payableReferrals.total;
 
   // Cobros desde Stripe (facturas pagadas recientes + total del mes)
   let payments: PaymentRow[] = [];
@@ -216,10 +207,8 @@ export default async function AdminFinanzasPage() {
     timeZone: ZONA_MX,
   }).format(new Date());
 
-  const monthlyMrr = subs
-    .filter((s) => s.plan === "monthly")
-    .reduce((acc, s) => acc + Number(s.amount ?? 0), 0);
-  const annualMrr = mrr - monthlyMrr;
+  const monthlyMrr = ingresos.mensual.mrr;
+  const annualMrr = ingresos.anual.mrr;
 
   const kpis = [
     {
@@ -227,7 +216,7 @@ export default async function AdminFinanzasPage() {
       value: `${formatMxn(Math.round(mrr))}`,
       note:
         sinCobroAqui > 0
-          ? `solo ${subs.length} de ${activosTotales} miembros activos ⚠`
+          ? `solo ${ingresos.miembrosConCobro} de ${activosTotales} miembros activos ⚠`
           : "lo que suman las membresías activas cada mes",
       noteCls: sinCobroAqui > 0 ? "text-warning-text font-semibold" : undefined,
       detail: (
@@ -245,8 +234,22 @@ export default async function AdminFinanzasPage() {
             value={`${formatMxn(Math.round(mrr))} MXN`}
           />
           <DetailItem
+            label="MEMBRESÍA $159"
+            value={`${ingresos.plan159.n} · ${formatMxn(Math.round(ingresos.plan159.mrr))} MXN/mes`}
+          />
+          <DetailItem
+            label="MEMBRESÍA $599 (POR PELUDO)"
+            value={`${ingresos.plan599.n} peludos de ${ingresos.plan599.miembros} miembros · ${formatMxn(Math.round(ingresos.plan599.mrr))} MXN/mes`}
+          />
+          {ingresos.plan599.n > 0 && (
+            <DetailItem
+              label="$599 · PRECIO COMPLETO / CON 15%"
+              value={`${ingresos.plan599.principal.n} · ${formatMxn(Math.round(ingresos.plan599.principal.mrr))} MXN — ${ingresos.plan599.adicional.n} · ${formatMxn(Math.round(ingresos.plan599.adicional.mrr))} MXN`}
+            />
+          )}
+          <DetailItem
             label="MIEMBROS ACTIVOS"
-            value={`${activosTotales} en total · ${subs.length} con cobro en la plataforma`}
+            value={`${activosTotales} en total · ${ingresos.miembrosConCobro} con cobro en la plataforma`}
           />
           {sinCobroAqui > 0 && (
             <DetailItem
@@ -318,8 +321,8 @@ export default async function AdminFinanzasPage() {
       detail: (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <DetailItem
-            label="REFERIDOS POR PAGAR"
-            value={`${(payableReferrals.data ?? []).length}`}
+            label="COMISIONES POR PAGAR"
+            value={`${payableReferrals.pagables.length}`}
           />
           <DetailItem
             label="MONTO"
@@ -339,6 +342,14 @@ export default async function AdminFinanzasPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-[26px] text-ink-title">Finanzas</h1>
         <div className="flex flex-wrap gap-2">
+          {isSuper && (
+            <Link
+              href="/admin/garantias"
+              className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+            >
+              🛡️ Garantías de 90 días →
+            </Link>
+          )}
           {isSuper && (
             <Link
               href="/admin/costos"

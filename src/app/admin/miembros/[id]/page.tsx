@@ -48,7 +48,7 @@ export default async function AdminMiembroDetailPage({
   const isSuper = myProfile?.role === "super_admin";
   const admin = createAdminClient();
 
-  const [{ data: m }, { data: pets }, { data: reimbs }, { data: appeals }, { data: sub }] =
+  const [{ data: m }, { data: pets }, { data: reimbs }, { data: appeals }, { data: subsActivas }] =
     await Promise.all([
       admin
         .from("profiles")
@@ -76,11 +76,16 @@ export default async function AdminMiembroDetailPage({
         .order("created_at", { ascending: false }),
       admin
         .from("subscriptions")
-        .select("plan, amount, status, cancel_at_period_end, current_period_end")
+        .select("plan, amount, status, cancel_at_period_end, current_period_end, pet_id, price_tier, pets(name)")
         .eq("user_id", id)
         .eq("status", "active")
-        .maybeSingle(),
+        .order("created_at", { ascending: true }),
     ]);
+
+  // $159: una suscripción. $599: una por peludo, y la tarjeta las desglosa
+  // (sección 8). `sub` sigue siendo «la» del $159 para lo de siempre.
+  const porPeludo = (subsActivas ?? []).filter((x) => x.pet_id);
+  const sub = porPeludo.length ? null : ((subsActivas ?? [])[0] ?? null);
 
   // Historial de cancelaciones con su motivo (equipo, 5-ago)
   const { data: cancelaciones } = await admin
@@ -274,6 +279,24 @@ export default async function AdminMiembroDetailPage({
             Miembro desde:{" "}
             {m.member_since ? formatDateEs(new Date(m.member_since)) : "—"}
           </span>
+          {porPeludo.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              <span>Membresía $599 · {porPeludo.length} {porPeludo.length === 1 ? "peludo" : "peludos"}:</span>
+              {porPeludo.map((x, i) => {
+                const pet = (Array.isArray(x.pets) ? x.pets[0] : x.pets) as { name?: string } | null;
+                return (
+                  <span key={i} className="pl-3 text-[12.5px]">
+                    🐾 <strong>{pet?.name ?? "Peludo"}</strong> ·{" "}
+                    {x.plan === "annual" ? "Anual" : "Mensual"} ·{" "}
+                    {formatMxn(Number(x.amount ?? 0))} MXN
+                    {x.price_tier === "adicional" ? " (15% menos)" : ""}
+                    {x.current_period_end ? ` · cobra el ${formatDateEs(new Date(x.current_period_end))}` : ""}
+                    {x.cancel_at_period_end ? " · CANCELA AL CORTE" : ""}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
           <span>
             Plan:{" "}
             {sub
@@ -282,9 +305,10 @@ export default async function AdminMiembroDetailPage({
                 ? "cobro heredado (plataforma anterior)"
                 : "sin suscripción activa"}
           </span>
+          )}
           {/* Sin esta nota el comité leía "sin suscripción activa" y creía que
               la persona no tenía membresía (auditoría 11-ago). */}
-          {!sub && m.membership_status === "active" && (
+          {!sub && porPeludo.length === 0 && m.membership_status === "active" && (
             <span className="rounded-[10px] bg-info-bg px-3 py-2 text-[12px] leading-relaxed text-info-text">
               {NOTA_HEREDADO_ADMIN}
             </span>

@@ -8,6 +8,9 @@ import {
 } from "@/lib/channels/meta";
 import { getLLMProvider, type AgentTool, type ChatMessage } from "@/lib/llm";
 import { buildSalesSystemPrompt } from "@/lib/llm/sales-prompt";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
+import { ofertaPublica599 } from "@/lib/plans/oferta";
+import { leerCatalogo } from "@/lib/catalogo-cuidados";
 import { fetchActivePromosText } from "@/lib/llm/promos";
 import { notifyTeam, reportError } from "@/lib/alerts";
 import { resolveContact } from "@/lib/crm/contacts";
@@ -270,10 +273,12 @@ async function handleIncoming(msg: IncomingMessage) {
       content: m.content,
     }));
 
-  const [{ data: extraRow }, promosText, abierto] = await Promise.all([
+  const [{ data: extraRow }, promosText, abierto, oferta599, catalogo] = await Promise.all([
     admin.from("site_settings").select("value").eq("key", "sales_extra_prompt").maybeSingle(),
     fetchActivePromosText("sales"),
     registroAbierto(),
+    ALTAS_SON_599 ? ofertaPublica599(admin) : Promise.resolve(null),
+    ALTAS_SON_599 ? leerCatalogo(admin) : Promise.resolve([]),
   ]);
 
   const reply = await getLLMProvider().completeWithTools({
@@ -281,7 +286,10 @@ async function handleIncoming(msg: IncomingMessage) {
     system: buildSalesSystemPrompt({
       contactName: conv.display_name ?? msg.displayName,
       extraPrompt: [extraRow?.value, promosText].filter(Boolean).join("\n\n") || undefined,
-      registroAbierto: abierto,
+      // Altas del $599 sin versión publicada: no hay qué vender todavía.
+      registroAbierto: abierto && (!ALTAS_SON_599 || oferta599 !== null),
+      oferta599,
+      catalogo,
     }),
     tools: [CLASSIFY_TOOL],
     executeTool: async (name, input) => {

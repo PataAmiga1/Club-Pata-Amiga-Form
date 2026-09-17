@@ -1,4 +1,4 @@
-import { MEMBERSHIP_FEATURES } from "@/lib/constants";
+import { MEMBERSHIP_FEATURES, MEMBERSHIP_FEATURES_599 } from "@/lib/constants";
 
 /** Huellita monocroma que hereda el color del texto (currentColor). */
 function PawIcon({ className }: { className?: string }) {
@@ -28,21 +28,25 @@ function PawIcon({ className }: { className?: string }) {
  */
 export function BenefitsMarquee({
   variant = "dark",
+  es599 = false,
 }: {
   variant?: "dark" | "light";
+  /** Altas del $599 (`ALTAS_SON_599`): la tercera característica cambia. */
+  es599?: boolean;
 }) {
+  const features = es599 ? MEMBERSHIP_FEATURES_599 : MEMBERSHIP_FEATURES;
   // El loop CSS recorre -50% del riel, así que el contenido va duplicado.
   // Cada mitad repite la lista 3 veces para que una sola mitad sea más ancha
   // que cualquier pantalla — sin huecos vacíos en monitores grandes.
   const REPEATS_PER_HALF = 3;
   const items = Array.from(
     { length: REPEATS_PER_HALF * 2 },
-    () => MEMBERSHIP_FEATURES,
+    () => features,
   ).flat();
 
   return (
     <div
-      aria-label={`Beneficios: ${MEMBERSHIP_FEATURES.join(", ")}`}
+      aria-label={`Beneficios: ${features.join(", ")}`}
       className={`overflow-hidden py-3 ${
         variant === "dark" ? "bg-teal-dark" : "border-y border-border-divider bg-white"
       }`}

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getLLMProvider, isUrgent, type ChatMessage } from "@/lib/llm";
 import { puedeResponderIA, registrarUso } from "@/lib/llm/gobierno";
 import { reportError } from "@/lib/alerts";
+import { esMiembro599 } from "@/lib/reintegros-599";
 
 const HISTORY_LIMIT = 20;
 
@@ -110,6 +111,7 @@ export async function POST(request: Request) {
     })),
     urgent,
     emergencyPhone: phoneRow?.value ?? null,
+    es599: await esMiembro599(admin, user.id),
   };
 
   let reply: string;

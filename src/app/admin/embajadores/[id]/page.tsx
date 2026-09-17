@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { corteDeComisiones } from "@/lib/comisiones";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateEs } from "@/lib/dates";
@@ -42,10 +43,15 @@ export default async function AdminEmbajadorTableroPage({
 
   const monthStart = inicioDelMes();
   const refs = referrals ?? [];
-  const historic = refs.reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
-  const porCobrar = refs
-    .filter((r) => r.status === "pending" && new Date(r.created_at) < monthStart)
-    .reduce((s, r) => s + Number(r.commission_amount ?? 0), 0);
+  // Comisión única del $159 + mensual del $599, con la regla del corte (y de
+  // la baja, que antes aquí no se aplicaba): src/lib/comisiones.
+  const corte = await corteDeComisiones(admin, monthStart, [id]);
+  const historic = corte.todas.reduce((s, i) => s + i.monto, 0);
+  const porCobrar = corte.total;
+  const mensualDe = (referralId: string) =>
+    corte.todas
+      .filter((i) => i.fuente === "mensual" && i.referralId === referralId)
+      .reduce((s, i) => s + i.monto, 0);
   const pagado = (payouts ?? [])
     .filter((p) => p.status === "paid")
     .reduce((s, p) => s + Number(p.total_amount ?? 0), 0);
@@ -171,7 +177,7 @@ export default async function AdminEmbajadorTableroPage({
               Alta el {formatDateEs(new Date(r.created_at))}
             </span>
             <span className="font-bold text-ink-title">
-              {formatMxn(Number(r.commission_amount ?? 0))} MXN
+              {formatMxn(mensualDe(r.id) > 0 ? mensualDe(r.id) : Number(r.commission_amount ?? 0))} MXN
             </span>
             <span
               className={`rounded-full px-2.5 py-[3px] text-[10.5px] font-extrabold ${

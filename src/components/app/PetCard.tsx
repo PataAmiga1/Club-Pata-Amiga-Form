@@ -38,7 +38,25 @@ const STATUS_CHIP = {
   rejected: { text: "DENEGADO", cls: "bg-error-bg text-error-text" },
 } as const;
 
-export function PetCard({ pet }: { pet: PetRow }) {
+/** Un monto del $599 tal como lo necesita la tarjeta (sale de `estadoDePeludo599`). */
+export type AperturaDeMonto = {
+  label: string;
+  abierto: boolean;
+  fechaApertura: string | null;
+};
+
+export function PetCard({
+  pet,
+  montos599,
+}: {
+  pet: PetRow;
+  /**
+   * Peludo con membresía $599 (sección 7): en vez de la barra de «tiempo de
+   * espera» de 180/150/120/90 días del $159, la tarjeta dice cuándo se abre
+   * cada uno de sus montos.
+   */
+  montos599?: AperturaDeMonto[];
+}) {
   const inactive = pet.is_active === false;
   const chip = STATUS_CHIP[pet.approval_status];
   const wait = waitingProgress(
@@ -131,6 +149,29 @@ export function PetCard({ pet }: { pet: PetRow }) {
               {docsCompletos ? "Ver perfil completo" : "Completar perfil"}
             </Link>
           </span>
+        </div>
+        ) : montos599 ? (
+        <div className="flex flex-col gap-[5px]">
+          {montos599.map((m) => (
+            <div key={m.label} className="flex justify-between gap-2 text-[11.5px] text-ink-tertiary">
+              <span>{m.label}</span>
+              <span className={m.abierto ? "font-bold text-teal-deep" : "font-bold text-warning-text"}>
+                {m.abierto
+                  ? "Disponible"
+                  : m.fechaApertura
+                    ? `Se abre el ${new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${m.fechaApertura}T00:00:00Z`))}`
+                    : "Al confirmar su información"}
+              </span>
+            </div>
+          ))}
+          {pet.approval_status === "approved" && montos599.some((m) => m.abierto) ? (
+            <Link
+              href="/app/reintegros/nueva"
+              className="text-[11.5px] font-semibold text-teal-deep hover:underline"
+            >
+              Reintegro disponible 🎉 Utilizar mis beneficios →
+            </Link>
+          ) : null}
         </div>
         ) : (
         <div className="flex flex-col gap-[5px]">

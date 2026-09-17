@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getCampaign } from "@/lib/landings";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
 import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
 import { LeadForm } from "./LeadForm";
 
@@ -105,9 +106,12 @@ export default async function CampaignLandingPage({
         </div>
       </main>
 
-      {/* La banda dice «hasta 3 peludos», que ya no aplica a la membresía
-          nueva: en la lista de espera no se muestra. */}
-      {campaign.tipo !== "lista_espera" && <BenefitsMarquee />}
+      {/* La banda del $159 dice «hasta 3 peludos», que ya no aplica a la
+          membresía nueva: en la lista de espera no se muestra. Con las altas
+          del $599 la banda ya trae su propia tercera característica. */}
+      {(campaign.tipo !== "lista_espera" || ALTAS_SON_599) && (
+        <BenefitsMarquee es599={ALTAS_SON_599} />
+      )}
     </div>
   );
 }

@@ -1,6 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { valorDeUnMesCentavos } from "@/lib/garantia";
+import { corteDeComisiones } from "@/lib/comisiones";
+import { formatDateEs } from "@/lib/dates";
+import { estadoDePeludo599, esRubro599 } from "@/lib/reintegros-599";
+import type { Rubro599 } from "@/lib/plans/montos";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatMxn } from "@/lib/format";
@@ -92,10 +97,27 @@ export async function resolveReimbursement(
 
   const { data: req } = await admin
     .from("reimbursements")
-    .select("id, folio, user_id, amount_requested, pets(name)")
+    .select("id, folio, user_id, pet_id, category, amount_requested, due_business_date, pets(name)")
     .eq("id", id)
     .single();
   if (!req) throw new Error("Solicitud no encontrada");
+
+  // Membresía $599 (sección 3): lo aprobado no puede pasar del disponible del
+  // rubro de ESE peludo (sin contar esta misma solicitud). Se valida aquí, en el
+  // servidor: el panel lo enseña, pero no es quien decide.
+  const es599 = esRubro599(req.category);
+  if (es599 && resolution.action !== "reject") {
+    const monto =
+      resolution.action === "partial" ? resolution.amount : Number(req.amount_requested);
+    const estado = await estadoDePeludo599(admin, req.pet_id, { excluirReintegroId: req.id });
+    const rubro = estado?.rubros[req.category as Rubro599];
+    if (!estado || !rubro)
+      return { error: "Este peludo ya no tiene una membresía activa del $599." };
+    if (Math.round(monto * 100) > rubro.disponibleCentavos)
+      return {
+        error: `No se puede aprobar ${formatMxn(monto)}: a ${estado.nombre} le quedan ${formatMxn(rubro.disponibleCentavos / 100)} MXN en ${rubro.label.toLowerCase()} este año.`,
+      };
+  }
   const pet = Array.isArray(req.pets)
     ? (req.pets[0] as { name: string } | undefined)
     : (req.pets as { name: string } | null);
@@ -144,7 +166,9 @@ export async function resolveReimbursement(
       {
         type: "reimbursement_approved",
         title: `¡Tu reintegro ${req.folio} fue aprobado! 🎉`,
-        message: `Aprobamos ${formatMxn(amount)} MXN para ${petName}. Recibirás tu transferencia en máximo 72 horas.`,
+        message: es599 && req.due_business_date
+          ? `Aprobamos ${formatMxn(amount)} MXN para ${petName}. Te depositamos a más tardar el ${formatDateEs(req.due_business_date)}.`
+          : `Aprobamos ${formatMxn(amount)} MXN para ${petName}. Recibirás tu transferencia en máximo 72 horas.`,
       },
       {
         template: "reimbursement_approved",
@@ -153,6 +177,10 @@ export async function resolveReimbursement(
           petName,
           amount: formatMxn(amount),
           reintegroUrl: `${SITE_URL}/app/reintegros/${id}`,
+          plazoLine:
+            es599 && req.due_business_date
+              ? `a más tardar el <strong>${formatDateEs(req.due_business_date)}</strong>`
+              : "en un máximo de <strong>72 horas</strong>",
         },
       },
     );
@@ -160,6 +188,7 @@ export async function resolveReimbursement(
 
   revalidatePath("/admin");
   revalidatePath("/admin/reintegros");
+  return { ok: true as const };
 }
 
 export async function resolvePet(
@@ -169,10 +198,27 @@ export async function resolvePet(
   const { adminId, admin } = await requireAdmin();
   const { data: pet } = await admin
     .from("pets")
-    .select("id, name, user_id")
+    .select("id, name, user_id, is_senior, vet_certificate_url")
     .eq("id", petId)
     .single();
   if (!pet) throw new Error("Peludo no encontrado");
+
+  // Membresía $599 (sección 4): el senior se inscribe CON certificado médico.
+  // El formulario ya lo exige; aquí se asegura que tampoco se apruebe sin él.
+  if (decision.approve && pet.is_senior && !pet.vet_certificate_url) {
+    const { data: suya } = await admin
+      .from("subscriptions")
+      .select("benefits_snapshot, status")
+      .eq("pet_id", petId)
+      .in("status", ["active", "past_due", "trialing"])
+      .limit(1);
+    const exige = (suya?.[0]?.benefits_snapshot as Record<string, unknown> | null)
+      ?.certificado_senior_al_inscribir;
+    if (exige === true)
+      return {
+        error: `${pet.name} es senior y su membresía exige el certificado médico para aprobarlo. Pídeselo con «Solicitar información».`,
+      };
+  }
 
   await admin
     .from("pets")
@@ -198,12 +244,16 @@ export async function resolvePet(
   // (es la plataforma), así que respeta cualquier tarjeta que ventas haya
   // fijado a mano.
   if (decision.approve) {
-    const { data: sub } = await admin
+    // `.limit(1)`: con una suscripción por peludo ($599) `maybeSingle()` daba
+    // error con dos o más, y la tarjeta del CRM nunca llegaba a «Miembro activo».
+    const { data: subs } = await admin
       .from("subscriptions")
       .select("id, plan")
       .eq("user_id", pet.user_id)
       .eq("status", "active")
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const sub = subs?.[0] ?? null;
     if (sub) {
       await crmEventoDeUsuario(admin, {
         userId: pet.user_id,
@@ -872,11 +922,6 @@ export async function payAmbassadorCut(ambassadorId: string) {
   const { admin } = await requireAdmin();
 
   const monthStart = inicioDelMes();
-  const { data: amb } = await admin
-    .from("ambassadors")
-    .select("deactivated_at")
-    .eq("id", ambassadorId)
-    .maybeSingle();
   // Un día antes del arranque del mes cae siempre en el mes anterior, y
   // `inicioDelMes` lo lleva a su día 1. El corte se etiqueta con ESE mes,
   // que es el que se está liquidando.
@@ -884,21 +929,12 @@ export async function payAmbassadorCut(ambassadorId: string) {
     inicioDelMes(new Date(monthStart.getTime() - 24 * 60 * 60 * 1000)),
   );
 
-  let consulta = admin
-    .from("referrals")
-    .select("id, commission_amount")
-    .eq("ambassador_id", ambassadorId)
-    .eq("status", "pending")
-    .lt("created_at", monthStart.toISOString());
-  if (amb?.deactivated_at)
-    consulta = consulta.lte("created_at", amb.deactivated_at);
-  const { data: pending } = await consulta;
-  if (!pending?.length) throw new Error("Sin comisiones por pagar");
-
-  const total = pending.reduce(
-    (sum, r) => sum + Number(r.commission_amount ?? 0),
-    0,
-  );
+  // Las dos fuentes —la comisión única del $159 y la mensual del $599— con
+  // la MISMA regla que el archivo del banco y Finanzas (src/lib/comisiones).
+  const { pagables: pending, total } = await corteDeComisiones(admin, monthStart, [
+    ambassadorId,
+  ]);
+  if (!pending.length) throw new Error("Sin comisiones por pagar");
 
   const { data: payout, error } = await admin
     .from("ambassador_payouts")
@@ -913,13 +949,18 @@ export async function payAmbassadorCut(ambassadorId: string) {
     .single();
   if (error || !payout) throw new Error("No se pudo registrar el pago");
 
-  await admin
-    .from("referrals")
-    .update({ status: "paid", payout_id: payout.id })
-    .in(
-      "id",
-      pending.map((r) => r.id),
-    );
+  const deReferidos = pending.filter((r) => r.fuente === "referido").map((r) => r.id);
+  const mensuales = pending.filter((r) => r.fuente === "mensual").map((r) => r.id);
+  if (deReferidos.length)
+    await admin
+      .from("referrals")
+      .update({ status: "paid", payout_id: payout.id })
+      .in("id", deReferidos);
+  if (mensuales.length)
+    await admin
+      .from("referral_commissions")
+      .update({ status: "paid", payout_id: payout.id })
+      .in("id", mensuales);
 
   revalidatePath("/admin/embajadores");
 }
@@ -1297,14 +1338,24 @@ export async function deactivateMemberAccount(userId: string, reason: string) {
     .single();
   if (!profile) return { error: "Miembro no encontrado." };
 
-  // Cancela la suscripción activa en Stripe (inmediato, no al corte)
-  const { data: sub } = await admin
+  // Cancela las suscripciones activas en Stripe (inmediato, no al corte). En el
+  // $599 hay una por peludo: antes se leía UNA con maybeSingle(), que con dos
+  // filas devuelve null, y los cobros de todos los peludos seguían corriendo.
+  const { data: activas } = await admin
     .from("subscriptions")
     .select("id, stripe_subscription_id")
     .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (sub?.stripe_subscription_id) {
+    .in("status", ["active", "past_due", "unpaid", "trialing"]);
+  // Primero se marcan TODAS en la base y después se cancelan en Stripe: si no,
+  // el webhook de la cancelación del primer peludo veía a los demás todavía
+  // vivos e intentaba subir a uno de precio justo antes de cancelarlo.
+  if (activas?.length)
+    await admin
+      .from("subscriptions")
+      .update({ status: "canceled", cancel_at_period_end: false })
+      .in("id", activas.map((a) => a.id));
+  for (const sub of activas ?? []) {
+    if (!sub.stripe_subscription_id) continue;
     try {
       const stripe = getStripe();
       await stripe.subscriptions.cancel(sub.stripe_subscription_id);
@@ -1319,10 +1370,6 @@ export async function deactivateMemberAccount(userId: string, reason: string) {
         pendiente: "cancelar la suscripción a mano en el panel de Stripe",
       });
     }
-    await admin
-      .from("subscriptions")
-      .update({ status: "canceled", cancel_at_period_end: false })
-      .eq("id", sub.id);
   }
 
   await admin
@@ -1477,4 +1524,64 @@ export async function bypassWaitingPeriod(petId: string) {
     })
     .eq("id", petId);
   revalidatePath("/admin");
+}
+
+/**
+ * «Si nos tardamos más de 5 días hábiles, tu mes es gratis» (sección 6). El
+ * sistema detectó el vencimiento (sección 3); el equipo lo aplica aquí con un
+ * clic. Es un CRÉDITO en el saldo del cliente de Stripe por un mes de ese
+ * peludo (precio mensual, o la doceava parte del anual), que Stripe descuenta
+ * solo en su siguiente cobro. Una sola vez por solicitud.
+ */
+export async function aplicarMesGratis(reimbursementId: string) {
+  const { adminId, admin } = await requireAdmin();
+  const { data: req } = await admin
+    .from("reimbursements")
+    .select("id, folio, user_id, pet_id, sla_breached_at, free_month_applied_at, pets(name)")
+    .eq("id", reimbursementId)
+    .maybeSingle();
+  if (!req) return { error: "No encontramos la solicitud." };
+  if (!req.sla_breached_at) return { error: "Esta solicitud no pasó del plazo de 5 días hábiles." };
+  if (req.free_month_applied_at) return { error: "El mes gratis de esta solicitud ya se aplicó." };
+
+  const { data: subs } = await admin
+    .from("subscriptions")
+    .select("id, status, plan, amount, stripe_customer_id, created_at")
+    .eq("pet_id", req.pet_id)
+    .order("created_at", { ascending: false });
+  const sub = (subs ?? []).find((s) => ["active", "past_due", "unpaid", "trialing"].includes(s.status ?? ""));
+  if (!sub?.stripe_customer_id) return { error: "El peludo ya no tiene una membresía activa a la cual aplicar el mes." };
+
+  const centavos = valorDeUnMesCentavos(sub.plan, Number(sub.amount ?? 0));
+  if (centavos <= 0) return { error: "No pudimos calcular el valor del mes." };
+  let ref: string;
+  try {
+    const credito = await getStripe().customers.createBalanceTransaction(
+      sub.stripe_customer_id,
+      { amount: -centavos, currency: "mxn", description: `Mes gratis por reintegro ${req.folio} (más de 5 días hábiles)` },
+      { idempotencyKey: `mes-gratis-${req.id}` },
+    );
+    ref = credito.id;
+  } catch (e) {
+    return { error: `Stripe no aceptó el crédito: ${e instanceof Error ? e.message : "error"}` };
+  }
+
+  await admin
+    .from("reimbursements")
+    .update({
+      free_month_applied_at: new Date().toISOString(),
+      free_month_cents: centavos,
+      free_month_stripe_ref: ref,
+      free_month_applied_by: adminId,
+    })
+    .eq("id", req.id);
+  const pet = (Array.isArray(req.pets) ? req.pets[0] : req.pets) as { name?: string } | null;
+  await admin.from("notifications").insert({
+    user_id: req.user_id,
+    type: "reimbursement_approved",
+    title: `Tu siguiente mes de ${pet?.name ?? "tu peludo"} es gratis`,
+    message: `Nos tardamos más de 5 días hábiles con tu reintegro ${req.folio}. Como lo prometimos, aplicamos ${formatMxn(centavos / 100)} MXN a tu siguiente cobro.`,
+  });
+  revalidatePath(`/admin/reintegros/${req.id}`);
+  return { ok: true as const, centavos };
 }

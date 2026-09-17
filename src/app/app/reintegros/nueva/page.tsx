@@ -10,6 +10,9 @@ import {
   startOfCurrentYear,
 } from "@/lib/reimbursement-balance";
 import { RequestForm, type EligiblePet } from "./RequestForm";
+import { RequestForm599, type PeludoParaSolicitud } from "./RequestForm599";
+import { estadoDePeludo599, esMiembro599 } from "@/lib/reintegros-599";
+import { leerCatalogo } from "@/lib/catalogo-cuidados";
 
 export default async function NuevaSolicitudPage() {
   const supabase = await createClient();
@@ -65,6 +68,90 @@ export default async function NuevaSolicitudPage() {
   ]);
 
   if (profile?.membership_status !== "active") redirect("/app");
+
+  // Membresía $599 (sección 3): reintegros por peludo y por rubro, con el
+  // disponible calculado en el servidor. El $159 sigue abajo, sin cambios.
+  const admin = createAdminClient();
+  if (await esMiembro599(admin, user.id)) {
+    // También los que fallecieron y ya se dieron de baja: su despedida sigue
+    // disponible mientras su membresía esté vigente.
+    const { data: fallecidos } = await admin
+      .from("pets")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_active", false)
+      .like("deactivation_reason", "Falleció%");
+    const idsFallecidos = new Set((fallecidos ?? []).map((p) => p.id));
+    const [estados, catalogo] = await Promise.all([
+      Promise.all(
+        [...(pets ?? []).map((p) => p.id), ...idsFallecidos].map((id) =>
+          estadoDePeludo599(admin, id),
+        ),
+      ),
+      leerCatalogo(admin),
+    ]);
+    const peludos: PeludoParaSolicitud[] = estados
+      .filter((e) => e !== null)
+      .map((e) => ({
+        id: e.petId,
+        nombre: e.nombre,
+        especie: e.especie,
+        aprobado: e.aprobado,
+        puedePedir: e.puedePedir,
+        anioHasta: e.anioHasta,
+        diasHabiles: Number(e.beneficios.dias_habiles_reintegro) || 5,
+        rubros: Object.values(e.rubros)
+          // Del que falleció, solo la despedida.
+          .filter((r) => !idsFallecidos.has(e.petId) || r.rubro === "despedida")
+          .map((r) => ({
+            rubro: r.rubro,
+            label: r.label,
+            abierto: r.abierto,
+            fechaApertura: r.fechaApertura,
+            monto: r.montoCentavos / 100,
+            gastado: r.gastadoCentavos / 100,
+            disponible: r.disponibleCentavos / 100,
+          })),
+      }));
+    return (
+      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-[22px] px-5 py-6 md:py-10">
+        <div className="flex items-center gap-2.5 text-[13px] font-semibold text-ink-tertiary">
+          <Link href="/app/reintegros" className="text-teal-deep">
+            Reintegros
+          </Link>
+          <span>›</span>
+          <span>Nueva solicitud</span>
+        </div>
+        <div>
+          <h1 className="font-display text-[30px] text-ink-title md:text-4xl">
+            Solicita tu reintegro
+          </h1>
+          <p className="mt-1.5 text-[14.5px] leading-normal text-ink-secondary">
+            Vas a tu veterinario de confianza, subes la factura y te depositamos
+            en {peludos[0]?.diasHabiles ?? 5} días hábiles.
+          </p>
+        </div>
+        {!profile.profile_completed && (
+          <div className="rounded-[14px] bg-warning-bg px-4 py-3.5 text-sm leading-normal text-warning-text">
+            Antes de solicitar un reintegro necesitas{" "}
+            <Link href="/app/perfil" className="font-bold underline">
+              completar tu perfil
+            </Link>
+            .
+          </div>
+        )}
+        <RequestForm599
+          userId={user.id}
+          peludos={peludos}
+          catalogo={catalogo}
+          cuentas={cuentas}
+          ultimaClabe={lastReq?.[0]?.clabe ?? ""}
+          holderName={[profile?.first_name, profile?.last_name].filter(Boolean).join(" ")}
+          blocked={!profile.profile_completed}
+        />
+      </div>
+    );
+  }
 
   const petOptions: EligiblePet[] = (pets ?? []).map((p) => {
     const wait = waitingProgress(

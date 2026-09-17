@@ -13,6 +13,7 @@ import {
   revisarCuenta,
 } from "@/lib/cuentas-bancarias";
 import { versionVigente } from "@/lib/plans/versiones";
+import { PLAN_159, planDeLaVersion } from "@/lib/plans/planes";
 import { reemplazarSnapshot } from "@/lib/plans/resolve";
 
 const PRICE_BY_PLAN: Record<"monthly" | "annual", string | undefined> = {
@@ -34,6 +35,10 @@ async function getOwnSubscription() {
     .eq("user_id", user.id)
     .eq("status", "active")
     .not("stripe_subscription_id", "is", null)
+    // Solo la membresía de $159 (una por persona). Las del $599 son por
+    // peludo y se cambian desde `cambiarIntervaloDePeludo`.
+    .is("pet_id", null)
+    .limit(1)
     .maybeSingle();
   if (!sub?.stripe_subscription_id) {
     // Miembro heredado de Memberstack: su cobro no vive aquí, así que no hay
@@ -49,18 +54,16 @@ async function getOwnSubscription() {
 }
 
 /**
- * Switch plan on the live Stripe subscription.
- * - Upgrade to annual: applies now; Stripe credits unused monthly time and
- *   invoices the difference immediately.
- * - Downgrade to monthly: applies now with proration; Stripe credits the
- *   unused part of the year as CUSTOMER BALANCE, and the monthly charges are
- *   paid from that balance until it runs out.
+ * Switch plan on the live Stripe subscription. Los dos sentidos aplican hoy y
+ * con prorrateo (`always_invoice`):
+ * - A anual: Stripe abona lo no usado del mes y cobra la diferencia.
+ * - A mensual: Stripe abona lo no usado del año como SALDO del cliente y de
+ *   ahí salen las siguientes mensualidades.
  *
- * 17-sep-2026: antes a mensual iba con `proration_behavior: "none"`. Al
- * cambiar de intervalo Stripe reinicia el ciclo, así que quien pagó $1,699 por
- * el año recibía el cobro mensual al mes siguiente y perdía lo que no había
- * usado. Comprobado en Stripe test (el siguiente cobro pasaba del próximo año
- * al próximo mes).
+ * Sección 9 (17-sep-2026): antes a mensual iba con `proration_behavior:
+ * "none"`. Al cambiar de intervalo Stripe reinicia el ciclo, así que quien
+ * pagó $1,699 (o $6,612) por el año recibía el cobro mensual al mes siguiente
+ * y perdía lo que no había usado. Comprobado en Stripe test.
  *
  * Sección 3, punto 6.3: además de prorratear, el snapshot de beneficios se
  * actualiza EN ESE MOMENTO, con el antes y el después escritos en la línea de
@@ -72,13 +75,19 @@ export async function switchPlan(target: "monthly" | "annual") {
   const { userId, sub, admin } = await getOwnSubscription();
   if (sub.plan === target) return { ok: true as const };
 
+  // Se cambia de intervalo DENTRO DE SU PROPIO PLAN. Un miembro de $159 que
+  // pasa a anual sigue en $159 (a $1,699), nunca en el plan que se venda hoy.
+  // Sin versión = plan de $159 (ver planDeLaVersion).
+  //
   // La versión publicada manda; la variable de entorno queda de respaldo
-  // mientras el plan no esté publicado en Stripe (mismo criterio que el
-  // checkout, para que subir de plan y darse de alta no usen precios
-  // distintos).
+  // mientras el plan no esté publicado en Stripe — y solo para el plan de
+  // $159, que es a quien pertenecen esos precios.
   const intervalo = target === "annual" ? "year" : "month";
-  const version = await versionVigente(admin, intervalo);
-  const price = version?.stripe_price_id ?? PRICE_BY_PLAN[target];
+  const planDelMiembro = await planDeLaVersion(admin, sub.plan_version_id);
+  const version = await versionVigente(admin, intervalo, planDelMiembro);
+  const price =
+    version?.stripe_price_id ??
+    (planDelMiembro === PLAN_159 ? PRICE_BY_PLAN[target] : undefined);
   if (!price) throw new Error("Plan inválido");
 
   const stripe = getStripe();
@@ -170,7 +179,24 @@ export async function cancelMembership(reason: string, comments: string) {
     .eq("user_id", userId)
     .eq("status", "active")
     .not("stripe_subscription_id", "is", null)
+    .is("pet_id", null)
+    .limit(1)
     .maybeSingle();
+
+  // Miembro del $599: cancela peludo por peludo (`cancelarMembresiaDePeludo`).
+  // Sin este freno caía en la rama de «cobro heredado» y avisaba al equipo de
+  // algo que no pasó.
+  if (!sub) {
+    const { data: porPeludo } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", userId)
+      .not("pet_id", "is", null)
+      .eq("status", "active")
+      .limit(1);
+    if (porPeludo?.length)
+      throw new Error("Tu membresía es por peludo: cancélala desde la tarjeta de cada peludo en Mi cuenta.");
+  }
 
   let coverageEnd: Date | null = null;
 
@@ -408,4 +434,174 @@ export async function marcarCuentaPorOmision(id: string) {
   revalidatePath("/app/cuenta");
   revalidatePath("/app/reintegros/nueva");
   return { ok: true as const };
+}
+
+// ===========================================================================
+// Membresía $599: una suscripción por peludo (sección 4, 17-sep-2026)
+// ===========================================================================
+
+/** La suscripción de un peludo, solo si es de quien la pide. */
+async function suscripcionPropiaDePeludo(subscriptionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const admin = createAdminClient();
+  const { data: sub } = await admin
+    .from("subscriptions")
+    .select("id, user_id, pet_id, status, plan, price_tier, stripe_subscription_id, cancel_at_period_end, pets(name)")
+    .eq("id", subscriptionId)
+    .maybeSingle();
+  if (!sub || sub.user_id !== user.id || !sub.pet_id || !sub.stripe_subscription_id) return null;
+  const pet = (Array.isArray(sub.pets) ? sub.pets[0] : sub.pets) as { name?: string } | null;
+  return { admin, userId: user.id, sub, petName: pet?.name ?? "tu peludo" };
+}
+
+/** Cancela al corte la membresía de UN peludo; los demás siguen igual. */
+export async function cancelarMembresiaDePeludo(subscriptionId: string, reason: string) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  const { cancelarAlCorte } = await import("@/lib/plans/peludos-599");
+  const r = await cancelarAlCorte(ctx.admin, ctx.sub.id);
+  if (!r) return { error: "No pudimos cancelar. Intenta de nuevo." };
+
+  await ctx.admin.from("cancellations").insert({
+    user_id: ctx.userId,
+    reason: reason || "Sin motivo",
+    survey: { membresia_599: true, peludo: ctx.petName, subscription_id: ctx.sub.id },
+    coverage_end_date: r.hasta?.slice(0, 10) ?? null,
+  });
+  await notifyTeam(
+    "notify_memberships",
+    `Cancelación de la membresía de ${ctx.petName}`,
+    `<p>Un miembro canceló la membresía de <strong>${ctx.petName}</strong> al final de su período${r.hasta ? ` (${new Date(r.hasta).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: ZONA_MX })})` : ""}.</p><p>Motivo: ${reason || "—"}</p>`,
+  );
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/peludos");
+  return { ok: true as const, hasta: r.hasta };
+}
+
+/** Deshace la cancelación de un peludo antes de que termine su período. */
+export async function reactivarMembresiaDePeludo(subscriptionId: string) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  // Un peludo dado de baja no vuelve a cobrarse (sección 9).
+  const { data: pet } = await ctx.admin.from("pets").select("is_active").eq("id", ctx.sub.pet_id!).maybeSingle();
+  if (!pet?.is_active)
+    return { error: `${ctx.petName} está dado de baja; su membresía termina al final del período.` };
+  await getStripe().subscriptions.update(ctx.sub.stripe_subscription_id!, {
+    cancel_at_period_end: false,
+  });
+  await ctx.admin
+    .from("subscriptions")
+    .update({ cancel_at_period_end: false })
+    .eq("id", ctx.sub.id);
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/peludos");
+  return { ok: true as const };
+}
+
+/**
+ * Mensual ↔ anual de UN peludo, dentro del $599 y conservando su nivel
+ * (principal o adicional). Mismo criterio de prorrateo que el $159: a anual se
+ * cobra la diferencia hoy; a mensual lo no usado del año queda como saldo a su
+ * favor (ver `switchPlan`).
+ */
+export async function cambiarIntervaloDePeludo(
+  subscriptionId: string,
+  target: "monthly" | "annual",
+) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  if (ctx.sub.plan === target) return { ok: true as const };
+  if (ctx.sub.status !== "active")
+    return { error: "Esta membresía tiene un pago pendiente; primero actualiza tu método de pago." };
+
+  const { PLAN_599 } = await import("@/lib/plans/planes");
+  const version = await versionVigente(ctx.admin, target === "annual" ? "year" : "month", PLAN_599);
+  const price =
+    ctx.sub.price_tier === "adicional"
+      ? version?.stripe_additional_price_id
+      : version?.stripe_price_id;
+  if (!version || !price) return { error: "Ese plan no está disponible en este momento." };
+
+  const stripe = getStripe();
+  const actual = await stripe.subscriptions.retrieve(ctx.sub.stripe_subscription_id!);
+  const item = actual.items.data[0];
+  const nueva = await stripe.subscriptions.update(ctx.sub.stripe_subscription_id!, {
+    items: [{ id: item.id, price }],
+    proration_behavior: "always_invoice",
+    metadata: { ...actual.metadata, plan: target, plan_version_id: version.id },
+  });
+  const nuevoItem = nueva.items.data[0];
+  await ctx.admin
+    .from("subscriptions")
+    .update({
+      plan: target,
+      plan_name: target === "annual" ? "Anual" : "Mensual",
+      amount: nuevoItem.price.unit_amount != null ? nuevoItem.price.unit_amount / 100 : null,
+      current_period_start: nuevoItem.current_period_start
+        ? new Date(nuevoItem.current_period_start * 1000).toISOString()
+        : null,
+      current_period_end: nuevoItem.current_period_end
+        ? new Date(nuevoItem.current_period_end * 1000).toISOString()
+        : null,
+    })
+    .eq("id", ctx.sub.id);
+  await reemplazarSnapshot(ctx.admin, {
+    subscriptionId: ctx.sub.id,
+    userId: ctx.userId,
+    planVersionId: version.id,
+    kind: "plan_cambiado",
+    motivo: `${ctx.petName} cambió al plan ${target === "annual" ? "Anual" : "Mensual"} (v${version.version})`,
+  });
+  revalidatePath("/app/cuenta");
+  revalidatePath("/app/peludos");
+  return { ok: true as const };
+}
+
+/**
+ * Garantía de 90 días de UN peludo (sección 6). El sistema calcula el monto
+ * (lo cobrado menos lo reintegrado) y deja la solicitud; el equipo confirma y
+ * reembolsa desde el panel. «Sin preguntas»: el comentario es opcional.
+ */
+export async function pedirGarantia(subscriptionId: string, comentario: string) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  const { estadoDeGarantia } = await import("@/lib/garantia");
+  const estado = await estadoDeGarantia(ctx.admin, ctx.sub.id);
+  if (!estado?.aplica) return { error: "Esta membresía no tiene garantía." };
+  if (!estado.dentroDelPlazo) return { error: "El plazo de la garantía ya terminó." };
+  if (estado.solicitud?.status === "pendiente")
+    return { error: "Ya pediste la garantía de esta membresía; el equipo la está confirmando." };
+
+  const { error } = await ctx.admin.from("guarantee_requests").insert({
+    user_id: ctx.userId,
+    subscription_id: ctx.sub.id,
+    pet_id: ctx.sub.pet_id,
+    paid_cents: estado.pagadoCents,
+    reimbursed_cents: estado.reintegradoCents,
+    refund_cents: estado.reembolsoCents,
+    member_comment: comentario.trim() || null,
+  });
+  if (error) return { error: "No pudimos registrar tu solicitud. Intenta de nuevo." };
+
+  const pesos = (c: number) => `$${(c / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
+  await ctx.admin.from("notifications").insert({
+    user_id: ctx.userId,
+    type: "plan_changed",
+    title: `Recibimos tu solicitud de garantía para ${ctx.petName}`,
+    message: `Te devolveremos ${pesos(estado.reembolsoCents)} MXN (lo pagado menos lo reintegrado). El equipo lo confirma y te avisa cuando se haga el reembolso.`,
+  });
+  await notifyTeam(
+    "notify_memberships",
+    `Garantía de 90 días solicitada: ${ctx.petName}`,
+    `<h2 style="color:#1E5350">Solicitud de garantía</h2>
+     <p><strong>${ctx.petName}</strong> · pagado ${pesos(estado.pagadoCents)} · reintegrado ${pesos(estado.reintegradoCents)} · <strong>a reembolsar ${pesos(estado.reembolsoCents)}</strong></p>
+     ${comentario.trim() ? `<p>Comentario: «${comentario.trim()}»</p>` : ""}
+     <p>Confírmala en el panel → Finanzas → Garantías.</p>`,
+  );
+  revalidatePath("/app/cuenta");
+  return { ok: true as const, reembolsoCents: estado.reembolsoCents };
 }

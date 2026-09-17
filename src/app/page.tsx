@@ -4,7 +4,6 @@ import Link from "next/link";
 import Script from "next/script";
 import { PLANS } from "@/lib/constants";
 import { COMPANY_LINE, LEGAL_DOCS, fetchSiteAssets, fetchSiteSettings } from "@/lib/site";
-import { createClient } from "@/lib/supabase/server";
 import { LEGAL_TEXTS } from "@/data/legal-texts";
 import { Faq } from "@/components/landing/Faq";
 import { NewsletterForm } from "@/components/landing/NewsletterForm";
@@ -13,6 +12,11 @@ import { SocialIcon } from "@/components/landing/SocialIcons";
 import { PhoneMockup } from "@/components/landing/PhoneMockup";
 import { ConfigurarCookies } from "@/components/analytics/ConfigurarCookies";
 import { RUTA_LISTA_DE_ESPERA, valorAbierto } from "@/lib/registro";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
+import { ofertaPublica599 } from "@/lib/plans/oferta";
+import { pesosDeOferta } from "@/lib/plans/oferta-texto";
 
 export const metadata: Metadata = {
   title: "Club Pata Amiga — Protección para tu manada",
@@ -97,8 +101,24 @@ export default async function Home() {
   ].filter((s) => s.href);
   // Registro cerrado (src/lib/registro.ts): sin precios y los botones llevan a
   // la lista de interesados. Los links a /registro igual los redirige el proxy.
-  const abierto = valorAbierto(settings.registro_abierto);
+  // Membresía $599 (sección 7): los precios y montos salen de la versión
+  // publicada. Si las altas ya son del $599 pero todavía no hay versión con
+  // precio en Stripe, la portada se comporta como con el registro cerrado:
+  // nunca enseña los números del $159, que ya no se vende.
+  const oferta = ALTAS_SON_599 ? await ofertaPublica599(createAdminClient()) : null;
+  const abierto = valorAbierto(settings.registro_abierto) && (!ALTAS_SON_599 || oferta !== null);
   const alta = abierto ? "/registro" : RUTA_LISTA_DE_ESPERA;
+  const $ = pesosDeOferta;
+  const beneficios = oferta
+    ? BENEFITS.map((b) =>
+        b.title === "Reintegros"
+          ? {
+              ...b,
+              text: `Cuidados cotidianos, emergencia veterinaria y despedida, con el veterinario que tú elijas. Te reintegramos en máximo ${oferta.principal.diasHabiles} días hábiles.`,
+            }
+          : b,
+      )
+    : BENEFITS;
 
   return (
     <div className="flex min-h-dvh flex-col bg-cream">
@@ -168,9 +188,11 @@ export default async function Home() {
               href="/#planes"
               className="grid h-[54px] place-items-center px-2 text-[15px] font-semibold text-white underline underline-offset-4 sm:px-6"
             >
-              {abierto
-                ? `Desde $${PLANS.monthly.amountMxn} MXN al mes`
-                : "Nueva membresía, muy pronto"}
+              {!abierto
+                ? "Nueva membresía, muy pronto"
+                : oferta
+                  ? `${$(oferta.principal.mensualPesos)} MXN al mes por peludo`
+                  : `Desde $${PLANS.monthly.amountMxn} MXN al mes`}
             </Link>
           </div>
         </div>
@@ -195,7 +217,7 @@ export default async function Home() {
       </section>
 
       {/* Las 5 características — banda animada */}
-      <BenefitsMarquee />
+      <BenefitsMarquee es599={ALTAS_SON_599} />
 
       {/* Beneficios */}
       <section
@@ -211,7 +233,7 @@ export default async function Home() {
           </p>
         </div>
         <div className="grid gap-[18px] md:grid-cols-3">
-          {BENEFITS.map((b) => (
+          {beneficios.map((b) => (
             <div
               key={b.title}
               className="flex flex-col gap-2.5 rounded-[20px] bg-white p-[26px] shadow-[0_2px_12px_rgba(30,83,80,.06)]"
@@ -236,7 +258,68 @@ export default async function Home() {
           id="planes"
           className="grid items-center gap-[18px] rounded-[24px] bg-white p-6 shadow-[0_2px_12px_rgba(30,83,80,.06)] sm:p-8 lg:grid-cols-2"
         >
-          {abierto ? (
+          {abierto && oferta ? (
+          <div className="flex flex-col gap-3">
+            <h2 className="font-display text-[26px] leading-tight text-ink-title sm:text-[30px]">
+              Una membresía
+              <br />
+              para cada peludo
+            </h2>
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex-1 rounded-[16px] border-[1.5px] border-border-input p-4">
+                <div className="text-[13px] font-bold text-ink-tertiary">
+                  MENSUAL
+                </div>
+                <div className="font-display text-[28px] text-ink-title">
+                  {$(oferta.principal.mensualPesos)}{" "}
+                  <span className="font-sans text-[13px] text-ink-tertiary">
+                    MXN/mes
+                  </span>
+                </div>
+              </div>
+              <div className="relative flex-1 rounded-[16px] border-2 border-teal p-4">
+                <span className="absolute -top-2.5 right-3 rounded-full bg-pink px-2.5 py-1 text-[10px] font-extrabold text-white">
+                  AHORRA {$(oferta.principal.ahorroAnualPesos)}
+                </span>
+                <div className="text-[13px] font-bold text-teal-deep">
+                  ANUAL
+                </div>
+                <div className="font-display text-[28px] text-ink-title">
+                  {$(oferta.principal.anualPesos)}{" "}
+                  <span className="font-sans text-[13px] text-ink-tertiary">
+                    MXN/año
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p className="rounded-[12px] bg-cream-light px-4 py-3 text-[13.5px] leading-[1.5] text-ink-body">
+              <strong>Segundo peludo en adelante: 15% de descuento</strong> —{" "}
+              {$(oferta.adicional.mensualPesos)} al mes o{" "}
+              {$(oferta.adicional.anualPesos)} al año.
+            </p>
+            <ul className="flex flex-col gap-1.5 text-[13.5px] leading-[1.5] text-ink-secondary">
+              <li>
+                🐾 Cuidados cotidianos desde {$(oferta.principal.cuidados.inicial)}, hasta{" "}
+                {$(oferta.principal.cuidados.tope)} al año
+              </li>
+              <li>
+                🐾 Emergencia veterinaria desde {$(oferta.principal.emergencia.inicial)}, hasta{" "}
+                {$(oferta.principal.emergencia.tope)} al año
+              </li>
+              <li>🐾 Despedida: {$(oferta.principal.despedida.monto)}</li>
+              <li>
+                🐾 Reintegro en {oferta.principal.diasHabiles} días hábiles o tu mes es gratis
+              </li>
+              <li>🐾 Garantía de {oferta.principal.garantiaDias} días · sin límite de edad</li>
+            </ul>
+            <Link
+              href="/registro"
+              className="grid h-[52px] place-items-center rounded-full bg-teal text-[15px] font-bold text-white transition-colors hover:bg-teal-deep"
+            >
+              Obtener mi membresía
+            </Link>
+          </div>
+          ) : abierto ? (
           <div className="flex flex-col gap-3">
             <h2 className="font-display text-[26px] leading-tight text-ink-title sm:text-[30px]">
               Planes simples,
@@ -369,7 +452,7 @@ export default async function Home() {
           </p>
         </div>
         <div className="mx-auto w-full max-w-[860px]">
-          <Faq registroAbierto={abierto} />
+          <Faq registroAbierto={abierto} oferta599={oferta} />
         </div>
       </section>
 

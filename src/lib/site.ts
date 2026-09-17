@@ -154,7 +154,7 @@ export const NOTIFY_EVENTS = [
   {
     key: "notify_reimbursements",
     label: "Nuevo reintegro solicitado",
-    hint: "Aviso cuando un miembro envía una solicitud (compromiso 72 hrs).",
+    hint: "Aviso cuando un miembro envía una solicitud (compromiso: 72 hrs en la membresía de $159, 5 días hábiles en la de $599).",
   },
   {
     key: "notify_channel_attention",

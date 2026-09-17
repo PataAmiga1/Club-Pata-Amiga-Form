@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { OfertaPublica599 } from "@/lib/plans/oferta";
+import { pesosDeOferta } from "@/lib/plans/oferta-texto";
 
 /**
  * Preguntas frecuentes (contenido del sitio actual pataamiga.mx, adaptado a
@@ -106,9 +108,76 @@ const PRECIOS_CON_REGISTRO_CERRADO = [
   "Si ya eres miembro, tu membresía sigue igual, con todos sus beneficios.",
 ];
 
-export function Faq({ registroAbierto = true }: { registroAbierto?: boolean }) {
+/**
+ * Las respuestas que cambian con la membresía $599 (sección 7, 17-sep-2026).
+ * Los números salen de la versión publicada, no se escriben aquí: si el equipo
+ * publica una versión nueva, la portada la sigue sola. Lo que no está aquí
+ * (formas de pago, embajadores, red de aliados) es igual en los dos productos.
+ */
+function respuestas599(o: OfertaPublica599): Record<string, string[]> {
+  const p = o.principal;
+  const a = o.adicional;
+  const $ = pesosDeOferta;
+  return {
+    "¿Qué es Pata Amiga?": [
+      FAQ[0].items[0].a[0],
+      FAQ[0].items[0].a[1],
+      `Cada peludo tiene su propia membresía, y del segundo en adelante tienes 15% de descuento. Sus beneficios:\n• Cuidados cotidianos: reintegro para consultas y cuidados del día a día incluidos en nuestro catálogo.\n• Emergencia veterinaria: reintegro para urgencias, estudios, cirugía u hospitalización cuando tu peludo más lo necesite.\n• Despedida: reintegro para ayudarte con los gastos en uno de los momentos más difíciles.\n• Orientación veterinaria 24/7, para resolver dudas y recibir guía cuando la necesites, estés donde estés.`,
+      FAQ[0].items[0].a[3],
+      FAQ[0].items[0].a[4],
+    ],
+    "¿Cuántas membresías existen?": [
+      "En Pata Amiga cada peludo tiene su propia membresía, con sus propios montos disponibles.",
+      `Puedes elegir la modalidad que mejor se adapte a ti:\n• Mensual: ${$(p.mensualPesos)} al mes por peludo.\n• Anual: ${$(p.anualPesos)} en un solo pago, y te ahorras ${$(p.ahorroAnualPesos)}.`,
+      `Del segundo peludo en adelante, sin límite, tienes 15% de descuento: ${$(a.mensualPesos)} al mes o ${$(a.anualPesos)} al año.`,
+      "No hay plazo forzoso: cancelas cuando quieras.",
+    ],
+    "¿Con qué cuento al ser parte de la manada?": [
+      "Cada peludo cuenta con montos disponibles que crecen mientras sigue en la manada. Se renuevan cada año desde el día en que entró; lo que no se usa no se acumula.",
+      `Cuidados cotidianos: desde el día ${p.cuidados.aperturaDia}, con ${$(p.cuidados.inicial)}. Suben ${$(p.cuidados.incremento)} por cada mes pagado, hasta ${$(p.cuidados.tope)} al año. Aplican para lo que está en nuestro catálogo de cuidados, que puedes ver antes de pagar.`,
+      `Emergencia veterinaria: desde el mes ${p.emergencia.aperturaMes}, con ${$(p.emergencia.inicial)}. Suben ${$(p.emergencia.incremento)} por cada mes pagado, hasta ${$(p.emergencia.tope)} al año.`,
+      `Despedida: ${$(p.despedida.monto)} desde el día ${p.despedida.aperturaDia}, para ayudarte con los gastos de la despedida de tu compañero.`,
+      "Los días y los meses se cuentan desde que nuestro comité aprueba el perfil de tu peludo.",
+      `Te reintegramos en máximo ${p.diasHabiles} días hábiles. Si nos tardamos más, ese mes de tu peludo es gratis.`,
+      "Orientación veterinaria 24/7: resuelve tus dudas y recibe orientación en cualquier momento, desde donde estés, para tomar las mejores decisiones sobre la salud de tu peludo.",
+      FAQ[2].items[0].a[5],
+    ],
+    "¿Hay límite de edad para mi peludo?": [
+      "No. Recibimos peludos de cualquier edad. Si tu peludo tiene 8 años o más, te pedimos un certificado médico de su veterinario al registrarlo.",
+    ],
+    "¿Y si la membresía no es lo que esperaba?": [
+      `Tienes una garantía de satisfacción: durante los primeros ${p.garantiaDias} días te devolvemos lo que pagaste por ese peludo, menos lo que ya se te haya reintegrado. La pides desde tu cuenta.`,
+    ],
+  };
+}
+
+/** Preguntas que solo existen en el $599; van después de la respuesta indicada. */
+const NUEVAS_599: Record<string, string[]> = {
+  "¿Con qué cuento al ser parte de la manada?": [
+    "¿Hay límite de edad para mi peludo?",
+    "¿Y si la membresía no es lo que esperaba?",
+  ],
+};
+
+export function Faq({
+  registroAbierto = true,
+  oferta599 = null,
+}: {
+  registroAbierto?: boolean;
+  /** Oferta publicada del $599 cuando es lo que se vende (`ALTAS_SON_599`). */
+  oferta599?: OfertaPublica599 | null;
+}) {
   const [open, setOpen] = useState<string | null>(FAQ[0].title);
-  const faq = registroAbierto
+  const nuevas = registroAbierto && oferta599 ? respuestas599(oferta599) : null;
+  const faq = nuevas
+    ? FAQ.map((cat) => ({
+        ...cat,
+        items: cat.items.flatMap((item) => [
+          { ...item, a: nuevas[item.q] ?? item.a },
+          ...(NUEVAS_599[item.q] ?? []).map((q) => ({ q, a: nuevas[q] })),
+        ]),
+      }))
+    : registroAbierto
     ? FAQ
     : FAQ.map((cat) => ({
         ...cat,

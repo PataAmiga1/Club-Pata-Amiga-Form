@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicHeader } from "@/components/public/PublicHeader";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
 import { ProfileMenu } from "@/components/app/ProfileMenu";
 import { ChangePasswordCard } from "@/components/app/ChangePasswordCard";
 import { AppealButton } from "@/components/app/AppealButton";
@@ -206,7 +207,9 @@ export default async function CentroLayout({
               <span className="text-[12.5px] opacity-90">
                 {wasMember
                   ? "Tu membresía no está activa. Reactívala para volver a cuidar a tus peludos."
-                  : "Tu cuenta de centro aliado aún no tiene membresía. Únete y registra hasta 3 peludos."}
+                  : ALTAS_SON_599
+                    ? "Tu cuenta de centro aliado aún no tiene membresía. Únete y protege a tu peludo: del segundo en adelante, 15% de descuento."
+                    : "Tu cuenta de centro aliado aún no tiene membresía. Únete y registra hasta 3 peludos."}
               </span>
             </div>
             <Link

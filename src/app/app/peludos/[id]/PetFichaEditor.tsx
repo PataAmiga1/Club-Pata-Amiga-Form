@@ -56,11 +56,14 @@ export function PetFichaEditor({
   pet,
   thread,
   adjuntosDelHilo,
+  tieneMembresia599 = false,
 }: {
   pet: PetFicha;
   thread: ThreadMessage[];
   /** Adjuntos ya firmados por la página, por id de mensaje. */
   adjuntosDelHilo: Record<string, AdjuntoFirmado[]>;
+  /** Membresía $599: dar de baja cancela SU suscripción al corte. */
+  tieneMembresia599?: boolean;
 }) {
   const router = useRouter();
   // ?completar=1 → venimos del flujo guiado que arranca en "completa tu perfil"
@@ -501,9 +504,9 @@ export function PetFichaEditor({
           ) : (
             <div className="flex flex-col gap-3">
               <p className="text-[13px] leading-relaxed text-ink-secondary">
-                Su tarjeta se quedará contigo como recuerdo y su lugar se
-                libera para otro peludo (el nuevo entra como reemplazo, con
-                tiempo de espera de 180 días).
+                {tieneMembresia599
+                  ? "Su tarjeta se quedará contigo como recuerdo. Su membresía se cancela al final del período que ya pagaste: no se te vuelve a cobrar por él."
+                  : "Su tarjeta se quedará contigo como recuerdo y su lugar se libera para otro peludo (el nuevo entra como reemplazo, con tiempo de espera de 180 días)."}
               </p>
               <SelectField
                 label="¿Por qué lo das de baja?"
@@ -539,7 +542,7 @@ export function PetFichaEditor({
                     const result = await deactivatePet(pet.id, bajaReason, bajaDetails);
                     setBusy(null);
                     if (result.error) setError(result.error);
-                    else window.location.assign("/app/peludos");
+                    else window.location.assign(tieneMembresia599 ? "/app/peludos?baja=1" : "/app/peludos");
                   }}
                   className="rounded-full bg-error-bg px-4 py-2 text-[12.5px] font-bold text-error-text transition-opacity hover:opacity-80 disabled:opacity-50"
                 >

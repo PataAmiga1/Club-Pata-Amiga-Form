@@ -1,4 +1,5 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
+import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
 import { diaEnMexico } from "@/lib/zona-horaria";
 
 /**
@@ -58,6 +59,7 @@ export async function cargarBajas(admin: ClienteAdmin): Promise<Bajas> {
     { data: contactos },
     { data: subsCanceladas },
     { data: perfilesCancelados },
+    { data: vivasDe599 },
   ] = await Promise.all([
     admin
       .from("cancellations")
@@ -71,14 +73,25 @@ export async function cargarBajas(admin: ClienteAdmin): Promise<Bajas> {
       .not("profile_id", "is", null),
     admin
       .from("subscriptions")
-      .select("user_id, updated_at")
+      .select("user_id, updated_at, pet_id")
       .eq("status", "canceled"),
     admin
       .from("profiles")
       .select("id")
       .eq("role", "member")
       .eq("membership_status", "canceled"),
+    admin
+      .from("subscriptions")
+      .select("user_id")
+      .not("pet_id", "is", null)
+      .in("status", ESTADOS_VIVOS),
   ]);
+
+  // Membresía $599 (sección 8): se cancela peludo por peludo. Cancelar UNO no
+  // es una baja de la persona mientras le quede otro peludo con membresía; si
+  // no se filtra, quien quita a su segundo peludo aparece como baja en el
+  // padrón, en el mensual y en Finanzas.
+  const sigueConOtroPeludo = new Set((vivasDe599 ?? []).map((v) => v.user_id));
 
   const porUsuario = new Map<string, BajaDeMiembro>();
 
@@ -100,7 +113,9 @@ export async function cargarBajas(admin: ClienteAdmin): Promise<Bajas> {
     });
   };
 
-  for (const c of cancelaciones ?? [])
+  for (const c of cancelaciones ?? []) {
+    const deUnPeludo = Boolean((c.survey as { membresia_599?: boolean } | null)?.membresia_599);
+    if (deUnPeludo && sigueConOtroPeludo.has(c.user_id)) continue;
     anotar({
       userId: c.user_id,
       fecha: diaEnMexico(new Date(c.created_at)),
@@ -110,6 +125,7 @@ export async function cargarBajas(admin: ClienteAdmin): Promise<Bajas> {
       regresoEl: c.rejoined_at ? diaEnMexico(new Date(c.rejoined_at)) : null,
       origen: "voluntaria",
     });
+  }
 
   type ContactoConEventos = {
     profile_id: string | null;
@@ -131,7 +147,8 @@ export async function cargarBajas(admin: ClienteAdmin): Promise<Bajas> {
     }
   }
 
-  for (const s of subsCanceladas ?? [])
+  for (const s of subsCanceladas ?? []) {
+    if (s.pet_id && sigueConOtroPeludo.has(s.user_id)) continue;
     anotar({
       userId: s.user_id,
       fecha: diaEnMexico(new Date(s.updated_at)),
@@ -141,6 +158,7 @@ export async function cargarBajas(admin: ClienteAdmin): Promise<Bajas> {
       regresoEl: null,
       origen: "suscripcion",
     });
+  }
 
   const cancelados = (perfilesCancelados ?? []).map((p) => p.id);
   const sinFecha = cancelados.filter((id) => !porUsuario.has(id)).length;

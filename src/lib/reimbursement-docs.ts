@@ -37,6 +37,22 @@ export const DOCS_BY_CATEGORY: Record<string, DocSlot[]> = {
     { type: "prescription", label: "Certificado de defunción o informe médico" },
     { type: "receipt", label: "Comprobante de gastos funerarios" },
   ],
+  // Membresía $599 (sección 3, 17-sep-2026)
+  cuidados: [
+    { type: "evidence_photo", label: "Foto de tu peludo en la consulta" },
+    { type: "prescription", label: "Informe, receta o cartilla del veterinario" },
+    { type: "receipt", label: "Factura o recibo de pago" },
+  ],
+  emergencia: [
+    { type: "evidence_photo", label: "Foto de tu peludo en la clínica" },
+    { type: "prescription", label: "Informe médico de la emergencia" },
+    { type: "receipt", label: "Factura o recibo de pago" },
+  ],
+  despedida: [
+    { type: "evidence_photo", label: "Una foto hermosa de tu peludito" },
+    { type: "prescription", label: "Certificado de defunción o informe médico" },
+    { type: "receipt", label: "Comprobante de los gastos de despedida" },
+  ],
 };
 
 export const DOC_TYPE_LABELS: Record<ReimbursementDocType, string> = {
@@ -51,6 +67,9 @@ export const DATE_LABEL_BY_CATEGORY: Record<string, string> = {
   vet_expenses: "¿Qué día asististe a la veterinaria?",
   vaccines: "¿Qué día le aplicaron la vacuna?",
   death: "¿En qué fecha nos dejó tu peludito?",
+  cuidados: "¿Qué día asististe a la veterinaria?",
+  emergencia: "¿Qué día fue la atención?",
+  despedida: "¿En qué fecha nos dejó tu peludito?",
 };
 
 /** Etiquetas del monto solicitado por motivo (sitio vivo). */
@@ -58,6 +77,9 @@ export const AMOUNT_LABEL_BY_CATEGORY: Record<string, string> = {
   vet_expenses: "Monto que solicitas reembolsar",
   vaccines: "Monto solicitado a reembolsar por vacuna",
   death: "Monto del apoyo solicitado por fallecimiento",
+  cuidados: "Monto que solicitas",
+  emergencia: "Monto que solicitas",
+  despedida: "Monto que solicitas",
 };
 
 /**

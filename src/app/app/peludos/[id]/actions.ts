@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cancelarAlCorte } from "@/lib/plans/peludos-599";
+import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
+import { formatDateEs } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTeam } from "@/lib/alerts";
@@ -150,6 +153,31 @@ export async function deactivatePet(
     .eq("id", petId);
   if (error) return { error: "No pudimos dar de baja a tu peludo. Intenta de nuevo." };
 
+  // Membresía $599 (sección 4): el peludo tiene SU suscripción. Se cancela al
+  // final del período ya pagado (no se cobra otra vez ni se reembolsa lo que
+  // corre). Si era el principal, al terminar sube el siguiente peludo (webhook).
+  let membresiaHasta: string | null = null;
+  const { data: suyaDelPeludo } = await ctx.admin
+    .from("subscriptions")
+    .select("id, status, cancel_at_period_end, current_period_end")
+    .eq("pet_id", petId)
+    .order("created_at", { ascending: false });
+  const viva = (suyaDelPeludo ?? []).find((s) => ESTADOS_VIVOS.includes(s.status ?? ""));
+  if (viva) {
+    if (viva.cancel_at_period_end) membresiaHasta = viva.current_period_end;
+    else {
+      try {
+        membresiaHasta = (await cancelarAlCorte(ctx.admin, viva.id))?.hasta ?? null;
+      } catch {
+        await notifyTeam(
+          "notify_memberships",
+          `⚠️ No se pudo cancelar la membresía de ${ctx.pet.name}`,
+          `<p>El miembro dio de baja a <strong>${ctx.pet.name}</strong>, pero Stripe no aceptó cancelar su suscripción. Hay que cancelarla a mano para que no se le vuelva a cobrar.</p>`,
+        );
+      }
+    }
+  }
+
   await notifyTeam(
     "notify_pets",
     `Baja de peludo: ${ctx.pet.name} 🕊️`,
@@ -160,5 +188,11 @@ export async function deactivatePet(
 
   revalidatePath("/app/peludos");
   revalidatePath(`/app/peludos/${petId}`);
-  return { ok: true as const };
+  revalidatePath("/app/cuenta");
+  return {
+    ok: true as const,
+    ...(membresiaHasta
+      ? { mensaje: `Su membresía termina el ${formatDateEs(membresiaHasta)}; no se te vuelve a cobrar por ${ctx.pet.name}.` }
+      : {}),
+  };
 }

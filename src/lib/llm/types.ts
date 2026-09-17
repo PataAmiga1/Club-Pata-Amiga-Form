@@ -16,7 +16,28 @@ export type VetContext = {
   urgent: boolean;
   /** Teléfono del veterinario humano (site_settings.emergency_phone). */
   emergencyPhone?: string | null;
+  /**
+   * Membresía por peludo ($599). Cambia lo que el bot recuerda sobre el
+   * reintegro: el $159 tiene un tope fijo de gastos veterinarios; el $599, un
+   * monto de emergencia que crece y que cada peludo ve en Reintegros.
+   */
+  es599?: boolean;
 };
+
+/**
+ * La frase «su/tu membresía …» que el bot usa al recordar el reintegro: en
+ * tercera persona para el prompt («Recuérdale que su membresía…»), en segunda
+ * para el texto que lee el miembro.
+ */
+export function recordatorioDeReintegro(
+  es599: boolean | undefined,
+  topeVeterinarioMxn: number,
+  persona: "su" | "tu" = "su",
+): string {
+  return es599
+    ? `${persona} membresía tiene un monto disponible para emergencia veterinaria; en Reintegros ${persona === "su" ? "ve" : "ves"} cuánto le queda a ${persona} peludo`
+    : `${persona} membresía reintegra hasta $${topeVeterinarioMxn.toLocaleString("es-MX")} MXN en gastos veterinarios`;
+}
 
 /**
  * Herramienta que el modelo puede invocar para leer datos reales (BD del

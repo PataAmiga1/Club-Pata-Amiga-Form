@@ -1,5 +1,8 @@
 import { PLANS, REIMBURSEMENT_CAPS_MXN } from "@/lib/constants";
 import { SHARED_GUARDRAILS } from "./brand-voice";
+import type { OfertaPublica599 } from "@/lib/plans/oferta";
+import { renglonesDeLaOferta599 } from "@/lib/plans/oferta-texto";
+import type { GrupoCatalogo } from "@/lib/catalogo-cuidados";
 
 /**
  * System prompt del agente de ventas en canales sociales (Messenger,
@@ -15,7 +18,16 @@ export function buildSalesSystemPrompt(opts: {
    * $159 ya no se vende y el agente no puede ofrecerlo ni dar sus montos.
    */
   registroAbierto: boolean;
+  /**
+   * Membresía $599 (sección 7, 17-sep-2026): la oferta publicada cuando es lo
+   * que se vende (`ALTAS_SON_599`). Con ella el agente da los datos del $599 y
+   * nunca los del $159. Sin ella —se vende el $159, o el $599 aún no tiene
+   * versión con precio— se queda con lo de antes.
+   */
+  oferta599?: OfertaPublica599 | null;
+  catalogo?: GrupoCatalogo[];
 }): string {
+  const venta599 = opts.registroAbierto && opts.oferta599 ? opts.oferta599 : null;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://pataamiga.mx";
 
   const objetivo = opts.registroAbierto
@@ -23,11 +35,17 @@ export function buildSalesSystemPrompt(opts: {
     : `Estamos preparando la nueva membresía y el registro está CERRADO por ahora. Resuelve dudas con calidez e invita a dejar sus datos en ${siteUrl}/landings/nueva-membresia para avisarle antes que a nadie cuando abra. Nunca presiones.`;
 
   // «Hasta 3 peludos» es del $159; con el registro cerrado no se menciona.
-  const caracteristicas = opts.registroAbierto
+  const caracteristicas = venta599
+    ? "- Las 5 características, siempre en este orden: funciona en todo México · mantienes a tu veterinario de confianza · segunda mascota con 15% de descuento · orientación veterinaria 24/7 · 100% digital."
+    : opts.registroAbierto
     ? "- Las 5 características, siempre en este orden: funciona en todo México · mantienes a tu veterinario de confianza · hasta 3 peludos · orientación veterinaria 24/7 · 100% digital."
     : "- Características, en este orden: funciona en todo México · mantienes a tu veterinario de confianza · orientación veterinaria 24/7 · 100% digital.";
 
-  const datosDelNegocio = opts.registroAbierto
+  const datosDelNegocio = venta599
+    ? `${renglonesDeLaOferta599(venta599, opts.catalogo).join("\n")}
+- NO digas «hasta 3 peludos» ni des precios de $159 o $1,699: son de una membresía anterior que ya no se vende. Quien ya la tiene la conserva.
+- Registro y pago 100% digital en ${siteUrl}/registro.`
+    : opts.registroAbierto
     ? `- Planes: Mensual $${PLANS.monthly.amountMxn} MXN/mes · Anual $${PLANS.annual.amountMxn} MXN/año (ahorra 10%).
 - Topes de reintegro: gastos veterinarios hasta $${REIMBURSEMENT_CAPS_MXN.vet_expenses.toLocaleString("es-MX")} MXN · fallecimiento hasta $${REIMBURSEMENT_CAPS_MXN.death.toLocaleString("es-MX")} MXN · vacunas hasta $${REIMBURSEMENT_CAPS_MXN.vaccines} MXN.
 - El contratante no tiene tiempo de espera: la membresía queda activa al pagar. Por peludo (desde que el comité aprueba su perfil): estándar 180 días · adoptado de raza 150 · adoptado mestizo 120 · con código de embajador 90.

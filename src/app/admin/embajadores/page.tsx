@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { corteDeComisiones } from "@/lib/comisiones";
 import { getAdminRole } from "@/lib/admin-guard";
 import { formatDateEs } from "@/lib/dates";
 import { formatMxn } from "@/lib/format";
@@ -212,6 +213,7 @@ export default async function AdminEmbajadoresPage({
   // Medianoche de México: las comisiones del mes se cortan con el calendario del
   // negocio, no con el del servidor.
   const monthStart = inicioDelMes();
+  const corte = await corteDeComisiones(admin, monthStart);
 
   const stats = (a: Row) => {
     // A quien se dio de baja se le paga hasta SU fecha de baja (Pablo, 16-ago):
@@ -219,23 +221,14 @@ export default async function AdminEmbajadoresPage({
     // que entró después. Mismo filtro que `payAmbassadorCut` y que el layout
     // del banco — si los tres no coinciden, el panel promete un monto que el
     // botón de pagar no liquida.
-    const corteBaja = a.deactivated_at ? new Date(a.deactivated_at) : null;
-    const payable = a.referrals.filter(
-      (r) =>
-        r.status === "pending" &&
-        new Date(r.created_at) < monthStart &&
-        (!corteBaja || new Date(r.created_at) <= corteBaja),
-    );
+    // Comisión única del $159 + mensual del $599 (src/lib/comisiones).
+    const payable = corte.porEmbajador.get(a.id) ?? [];
     return {
       count: a.referrals.length,
-      historic: a.referrals.reduce(
-        (s, r) => s + Number(r.commission_amount ?? 0),
-        0,
-      ),
-      payable: payable.reduce(
-        (s, r) => s + Number(r.commission_amount ?? 0),
-        0,
-      ),
+      historic: corte.todas
+        .filter((i) => i.ambassadorId === a.id)
+        .reduce((s, i) => s + i.monto, 0),
+      payable: payable.reduce((s, i) => s + i.monto, 0),
       payableCount: payable.length,
     };
   };
@@ -468,8 +461,8 @@ export default async function AdminEmbajadoresPage({
             >
               <span className="flex-1 text-[13px] text-ink-body">
                 <strong className="text-ink-title">{fullName(a)}</strong> ·{" "}
-                {a.referral_code} · {s.payableCount} referido
-                {s.payableCount === 1 ? "" : "s"} por pagar
+                {a.referral_code} · {s.payableCount} comisi
+                {s.payableCount === 1 ? "ón" : "ones"} por pagar
               </span>
               <span className="text-sm font-bold text-teal-deep">
                 {formatMxn(s.payable)} MXN

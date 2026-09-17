@@ -1,8 +1,7 @@
-"use client";
-
 import { RegistroHeader } from "@/components/registro/Header";
 import { Stepper } from "@/components/registro/Stepper";
 import { PetForm } from "@/components/registro/PetForm";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
 
 /** Paso 2 del registro: primera mascota (pre-pago). */
 export default function PeludoPage() {
@@ -17,11 +16,11 @@ export default function PeludoPage() {
               Preséntanos a tu peludo
             </h1>
             <p className="mt-1.5 text-[15px] leading-normal text-ink-secondary">
-              Registra a tu primer peludo. Podrás agregar hasta 3 desde tu
-              cuenta.
+              Registra a tu primer peludo. A los demás los agregas después
+              desde tu cuenta.
             </p>
           </div>
-          <PetForm mode="registro" />
+          <PetForm mode="registro" modelo599={ALTAS_SON_599} />
         </div>
       </div>
     </div>

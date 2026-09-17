@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { comisionesDeEmbajadores } from "@/lib/comisiones";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ZONA_MX } from "@/lib/zona-horaria";
 import { formatMxn } from "@/lib/format";
@@ -70,17 +71,18 @@ export default async function EmbajadorResumenPage() {
   const active = referrals.filter(
     (r) => !r.subscriptions?.status || r.subscriptions.status === "active",
   );
+  // Referidos que llegaron este mes (para el «▲ N este mes»).
   const thisMonth = referrals.filter(
     (r) => new Date(r.created_at) >= monthStart,
   );
-  const monthTotal = thisMonth.reduce(
-    (sum, r) => sum + Number(r.commission_amount ?? 0),
-    0,
-  );
-  const historicTotal = referrals.reduce(
-    (sum, r) => sum + Number(r.commission_amount ?? 0),
-    0,
-  );
+  // Comisión única del $159 + 3% mensual del $599 (src/lib/comisiones).
+  const comisiones = await comisionesDeEmbajadores(admin, [ambassador.id]);
+  const monthTotal = comisiones
+    .filter((c) => new Date(c.fecha) >= monthStart)
+    .reduce((sum, c) => sum + c.monto, 0);
+  const historicTotal = comisiones.reduce((sum, c) => sum + c.monto, 0);
+  const acumuladoDe = (referralId: string) =>
+    comisiones.filter((c) => c.referralId === referralId).reduce((s, c) => s + c.monto, 0);
   const monthName = new Intl.DateTimeFormat("es-MX", {
     month: "long",
     timeZone: ZONA_MX,
@@ -224,9 +226,12 @@ export default async function EmbajadorResumenPage() {
                 </span>
                 <span>{planLabel(r)}</span>
                 <span className="font-bold text-teal-deep">
-                  {r.commission_amount != null
-                    ? formatMxn(Number(r.commission_amount))
-                    : "—"}
+                  {/* $599: el 3% mensual acumulado de ese referido. */}
+                  {acumuladoDe(r.id) > 0
+                    ? formatMxn(acumuladoDe(r.id))
+                    : r.commission_amount != null
+                      ? formatMxn(Number(r.commission_amount))
+                      : "—"}
                 </span>
               </div>
             );

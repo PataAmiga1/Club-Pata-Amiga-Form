@@ -4,6 +4,10 @@ import { PublicHeader } from "@/components/public/PublicHeader";
 import { datosConocidos } from "@/lib/datos-conocidos";
 import { AmbassadorForm } from "./AmbassadorForm";
 import { AMBASSADOR_PAYOUT_DAY } from "@/lib/constants";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ALTAS_SON_599 } from "@/lib/plans/planes";
+import { ofertaPublica599 } from "@/lib/plans/oferta";
+import { pesosDeOferta } from "@/lib/plans/oferta-texto";
 
 export const metadata: Metadata = {
   title: "Programa de embajadores · Club Pata Amiga",
@@ -35,7 +39,25 @@ const PERKS = [
 
 export default async function EmbajadoresPage() {
   // Con sesión abierta el formulario llega lleno con lo que ya dio (15-ago).
-  const conocidos = await datosConocidos();
+  const [conocidos, oferta] = await Promise.all([
+    datosConocidos(),
+    ALTAS_SON_599 ? ofertaPublica599(createAdminClient()) : Promise.resolve(null),
+  ]);
+  // Membresía $599 (juntas/64 §4d): 3% mensual solo sobre el primer peludo del
+  // referido, y el código ya no reduce la espera. Mientras se venda el $159
+  // (o no haya versión publicada) la página dice lo de siempre.
+  const p = oferta?.principal;
+  const perks = p
+    ? PERKS.map((perk) =>
+        perk.emoji === "💸"
+          ? {
+              ...perk,
+              title: `${p.comisionPct}% cada mes`,
+              text: `Por cada miembro que entra con tu código recibes el ${p.comisionPct}% de lo que paga por su primer peludo, cada mes que siga en la manada (${pesosDeOferta(Math.round(p.mensualPesos * p.comisionPct) / 100)} al mes en el plan mensual). Corte mensual con pago el día ${AMBASSADOR_PAYOUT_DAY}.`,
+            }
+          : perk,
+      )
+    : PERKS;
   return (
     <div className="min-h-dvh bg-cream">
       <PublicHeader />
@@ -47,8 +69,8 @@ export default async function EmbajadoresPage() {
             Conviértete en embajador de la manada
           </h1>
           <p className="max-w-[560px] text-[14.5px] leading-[1.55] text-white/85">
-            Comparte Pata Amiga con tu comunidad y genera comisiones por cada
-            suscripción con tu código. Sumando esfuerzos con causa para cuidar a
+            Comparte Pata Amiga con tu comunidad y genera comisiones
+            {p ? " cada mes por cada miembro" : " por cada suscripción"} con tu código. Sumando esfuerzos con causa para cuidar a
             más peludos en todo México.
           </p>
           <p className="text-[12.5px] text-white/70">
@@ -62,7 +84,7 @@ export default async function EmbajadoresPage() {
 
       <div className="mx-auto grid w-full max-w-[880px] gap-6 px-5 py-8 lg:grid-cols-[1fr_420px]">
         <div className="flex flex-col gap-3.5">
-          {PERKS.map((perk) => (
+          {perks.map((perk) => (
             <div
               key={perk.title}
               className="flex items-start gap-3.5 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]"
@@ -86,12 +108,20 @@ export default async function EmbajadoresPage() {
               a 90 días cuando la membresía trae código de embajador, desde el
               11-jul. La página le estaba escondiendo al embajador su mejor
               argumento para compartirlo. */}
+          {p ? (
+            <p className="px-1 text-xs leading-relaxed text-ink-tertiary">
+              El programa de embajadores está pensado para influencers, refugios
+              y ONGs con fines de difusión. Registro con revisión del comité —
+              solo mayores de edad.
+            </p>
+          ) : (
           <p className="px-1 text-xs leading-relaxed text-ink-tertiary">
             El programa de embajadores está pensado para influencers, refugios y
             ONGs con fines de difusión: el código reduce el tiempo de espera de
             6 a 3 meses, pero no modifica los demás beneficios de la membresía.
             Registro con revisión del comité — solo mayores de edad.
           </p>
+          )}
         </div>
         <AmbassadorForm conocidos={conocidos} />
       </div>

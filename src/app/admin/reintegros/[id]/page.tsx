@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MesGratisBoton } from "./MesGratisBoton";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -12,6 +13,10 @@ import { formatDateEs, waitingProgress } from "@/lib/dates";
 import { ResolutionPanel } from "./ResolutionPanel";
 import { ThreadPanel } from "./ThreadPanel";
 import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
+import { estadoDePeludo599, esRubro599 } from "@/lib/reintegros-599";
+import { diasHabilesRestantes } from "@/lib/dias-habiles";
+import { hoyEnMexico } from "@/lib/zona-horaria";
+import type { Rubro599 } from "@/lib/plans/montos";
 
 export default async function ReviewPage({
   params,
@@ -24,7 +29,7 @@ export default async function ReviewPage({
   const { data: req } = await admin
     .from("reimbursements")
     .select(
-      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
+      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, care_concepts, plan_balance, due_business_date, sla_breached_at, high_amount_alert_at, free_month_applied_at, free_month_cents, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
     )
     .eq("id", id)
     .single();
@@ -99,7 +104,20 @@ export default async function ReviewPage({
         ["approved", "partial", "paid"].includes(h.status),
     )
     .reduce((acc, h) => acc + Number(h.amount_approved ?? 0), 0);
-  const capLeft = Math.max(cap - consumed, 0);
+  // Membresía $599 (sección 3): el disponible sale del motor, por peludo y
+  // rubro y SIN contar esta solicitud — el mismo cálculo que valida al aprobar.
+  const es599 = esRubro599(req.category);
+  const estado599 = es599
+    ? await estadoDePeludo599(admin, req.pet_id, { excluirReintegroId: req.id })
+    : null;
+  const rubro599 = estado599?.rubros[req.category as Rubro599] ?? null;
+  const capLeft = rubro599
+    ? rubro599.disponibleCentavos / 100
+    : Math.max(cap - consumed, 0);
+  const hoy = hoyEnMexico();
+  const habilesRestantes = req.due_business_date
+    ? diasHabilesRestantes(hoy, req.due_business_date)
+    : null;
 
   const hrs = hoursSince(req.created_at);
   const open = req.status === "pending" || req.status === "in_review";
@@ -126,9 +144,29 @@ export default async function ReviewPage({
           </Link>
           <span>›</span>
           <span className="font-bold text-ink-title">Folio {req.folio}</span>
-          {open && hrs >= REIMBURSEMENT_SLA_HOURS - 8 && (
+          {!es599 && open && hrs >= REIMBURSEMENT_SLA_HOURS - 8 && (
             <span className="rounded-full bg-error-bg px-2.5 py-1 text-[10.5px] font-extrabold text-error-text">
               VENCE EN {Math.max(REIMBURSEMENT_SLA_HOURS - hrs, 0)} HRS
+            </span>
+          )}
+          {es599 && req.due_business_date && req.status !== "paid" && req.status !== "rejected" && (
+            <span
+              className={`rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${
+                habilesRestantes !== null && habilesRestantes < 0
+                  ? "bg-error-bg text-error-text"
+                  : habilesRestantes !== null && habilesRestantes <= 1
+                    ? "bg-warning-bg text-warning-text"
+                    : "bg-info-bg text-info-text"
+              }`}
+            >
+              {habilesRestantes !== null && habilesRestantes < 0
+                ? `PLAZO VENCIDO EL ${formatDateEs(req.due_business_date).toUpperCase()} · MES GRATIS`
+                : `DEPOSITAR A MÁS TARDAR EL ${formatDateEs(req.due_business_date).toUpperCase()} · ${habilesRestantes} DÍA(S) HÁBIL(ES)`}
+            </span>
+          )}
+          {req.high_amount_alert_at && (
+            <span className="rounded-full bg-orange/20 px-2.5 py-1 text-[10.5px] font-extrabold text-orange">
+              MAYOR A ${Number(estado599?.beneficios.aviso_reintegro_mayor_a_mxn ?? 8000).toLocaleString("es-MX")}
             </span>
           )}
         </div>
@@ -156,7 +194,13 @@ export default async function ReviewPage({
                   {member.member_since
                     ? ` · miembro desde ${formatDateEs(new Date(member.member_since))}`
                     : ""}
-                  {wait.done ? " · tiempo de espera cumplido ✓" : ` · en espera (${wait.elapsed}/${wait.total})`}
+                  {es599
+                    ? rubro599?.abierto
+                      ? ` · ${rubro599.label.toLowerCase()} abierto ✓`
+                      : ` · ${rubro599?.label.toLowerCase() ?? "rubro"} aún no abre${rubro599?.fechaApertura ? ` (${formatDateEs(rubro599.fechaApertura)})` : ""}`
+                    : wait.done
+                      ? " · tiempo de espera cumplido ✓"
+                      : ` · en espera (${wait.elapsed}/${wait.total})`}
                 </span>
               </div>
               <span
@@ -188,7 +232,7 @@ export default async function ReviewPage({
               </div>
               <div className="flex flex-col gap-0.5 rounded-[12px] bg-cream p-3">
                 <span className="text-[10.5px] font-bold text-ink-tertiary">
-                  TOPE DISPONIBLE
+                  {es599 ? "DISPONIBLE DEL RUBRO" : "TOPE DISPONIBLE"}
                 </span>
                 <span
                   className={`text-sm font-bold ${Number(req.amount_requested) <= capLeft ? "text-teal-deep" : "text-error-text"}`}
@@ -198,6 +242,37 @@ export default async function ReviewPage({
                 </span>
               </div>
             </div>
+            {req.sla_breached_at && (
+              <MesGratisBoton
+                reimbursementId={req.id}
+                aplicadoEl={req.free_month_applied_at}
+                montoCentavos={req.free_month_cents}
+              />
+            )}
+            {es599 && estado599 && rubro599 && (
+              <div className="flex flex-col gap-1.5 rounded-[12px] border-[1.5px] border-border-input p-3 text-[12.5px] text-ink-body">
+                <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">
+                  MEMBRESÍA $599 · {rubro599.label.toUpperCase()} DE {estado599.nombre.toUpperCase()}
+                </span>
+                <span>
+                  Monto de su año: <strong>{formatMxn(rubro599.montoCentavos / 100)}</strong> ·
+                  usado sin esta solicitud: {formatMxn(rubro599.gastadoCentavos / 100)} ·
+                  disponible: <strong>{formatMxn(rubro599.disponibleCentavos / 100)}</strong>
+                </span>
+                <span className="text-ink-tertiary">
+                  Año del {formatDateEs(estado599.anioDesde)} al {formatDateEs(estado599.anioHasta)} ·{" "}
+                  {estado599.mesesPagados} mes(es) pagado(s) ·{" "}
+                  {rubro599.fechaApertura
+                    ? `abre el ${formatDateEs(rubro599.fechaApertura)}`
+                    : "sin fecha de apertura (perfil sin aprobar)"}
+                </span>
+                {Array.isArray(req.care_concepts) && req.care_concepts.length > 0 && (
+                  <span>
+                    Del catálogo: <strong>{(req.care_concepts as string[]).join(" · ")}</strong>
+                  </span>
+                )}
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <span className="text-xs font-extrabold tracking-[.05em] text-ink-tertiary">
                 DOCUMENTOS
@@ -276,7 +351,7 @@ export default async function ReviewPage({
           rejectionReason={req.rejection_reason}
           clabeLast4={String(req.clabe ?? "").slice(-4)}
           isSuperAdmin={isSuperAdmin}
-          waitingDone={wait.done}
+          waitingDone={es599 ? Boolean(rubro599?.abierto) : wait.done}
         />
 
         {/* Conversación separada por área: este hilo pertenece SOLO a esta solicitud */}
