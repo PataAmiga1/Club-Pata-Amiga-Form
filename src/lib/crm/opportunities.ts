@@ -1,6 +1,8 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS } from "@/lib/constants";
 import { emitEvent } from "@/lib/crm/events";
+import { ALTAS_SON_599, PLAN_599 } from "@/lib/plans/planes";
+import { versionVigente } from "@/lib/plans/versiones";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -23,6 +25,22 @@ export type StageKey =
  * En la fase 3 esto pasa a leer `plan_versions`; mientras, sale de las
  * constantes, que son la misma fuente de verdad que usa el checkout.
  */
+/**
+ * Valor de una oportunidad: el precio del plan que se vende hoy. Con altas del
+ * $599 (sección 8) es el del primer peludo, leído de la versión publicada; si
+ * no hay versión, se cae a las constantes del $159 como antes.
+ */
+export async function valorDelPlanCents(
+  admin: Admin,
+  interval?: "month" | "year" | null,
+): Promise<{ valueCents: number; isEstimate: boolean }> {
+  if (ALTAS_SON_599) {
+    const v = await versionVigente(admin, interval ?? "year", PLAN_599);
+    if (v) return { valueCents: v.price_cents, isEstimate: !interval };
+  }
+  return planValueCents(interval);
+}
+
 export function planValueCents(interval?: "month" | "year" | null): {
   valueCents: number;
   isEstimate: boolean;
@@ -135,7 +153,7 @@ export async function ensureOpportunity(
     title = opportunityTitle(input.stageKey, label || null);
   }
 
-  const { valueCents, isEstimate } = planValueCents(input.interval);
+  const { valueCents, isEstimate } = await valorDelPlanCents(admin, input.interval);
   const status = stage.is_won ? "ganada" : stage.is_lost ? "perdida" : "abierta";
 
   const { data: created, error } = await admin

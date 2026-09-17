@@ -10,6 +10,7 @@ import { ReportButton } from "./ReportButton";
 import { Bell } from "@/components/panel/Bell";
 import { MiniBarChart } from "@/components/panel/MiniBarChart";
 import { BloqueVentas } from "@/components/panel/tablero/BloqueVentas";
+import { resumenDeIngresos } from "@/lib/plans/ingresos";
 
 function urgencyChip(hours: number) {
   if (hours >= 48) return "bg-error-bg text-error-text";
@@ -182,10 +183,8 @@ export default async function AdminHome() {
         .gte("created_at", sixMonthsStart.toISOString()),
     ]);
 
-  const mrr = (subs.data ?? []).reduce((acc, s) => {
-    const amount = Number(s.amount ?? 0);
-    return acc + (s.plan === "annual" ? amount / 12 : amount);
-  }, 0);
+  // Mismo cálculo que Finanzas (src/lib/plans/ingresos.ts).
+  const mrr = resumenDeIngresos(subs.data ?? []).mrr;
 
   const monthApproved = (monthResolved.data ?? []).filter((r) =>
     ["approved", "partial", "paid"].includes(r.status),

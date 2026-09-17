@@ -10,6 +10,7 @@ import { MiniBarChart } from "@/components/panel/MiniBarChart";
 import { sexoDeMiembro } from "@/lib/sexo";
 import { cargarBajas } from "@/lib/bajas";
 import { DetailModal, DetailItem } from "@/components/panel/DetailModal";
+import { resumenDeIngresos } from "@/lib/plans/ingresos";
 
 type PaymentRow = {
   id: string;
@@ -45,7 +46,7 @@ export default async function AdminFinanzasPage() {
 
   const [subsQ, monthReimbs, payableReferrals, activosQ, bajasQ, cfdiQ] =
     await Promise.all([
-    admin.from("subscriptions").select("plan, amount").eq("status", "active"),
+    admin.from("subscriptions").select("user_id, plan, amount, pet_id, price_tier").eq("status", "active"),
     admin
       .from("reimbursements")
       .select("amount_approved, status")
@@ -156,14 +157,13 @@ export default async function AdminFinanzasPage() {
       ? `${b.profiles.first_name} ${b.profiles.last_name ?? ""}`.trim()
       : (b.profiles?.email ?? "Miembro");
   const activosTotales = activosQ.count ?? 0;
-  const sinCobroAqui = Math.max(0, activosTotales - subs.length);
-  const mrr = subs.reduce(
-    (acc, s) =>
-      acc + (s.plan === "annual" ? Number(s.amount ?? 0) / 12 : Number(s.amount ?? 0)),
-    0,
-  );
-  const annualCount = subs.filter((s) => s.plan === "annual").length;
-  const monthlyCount = subs.filter((s) => s.plan === "monthly").length;
+  // Sección 8 del $599: una suscripción por peludo. Las personas con cobro se
+  // cuentan distintas; antes `subs.length` eran personas y con el $599 ya no.
+  const ingresos = resumenDeIngresos(subs);
+  const sinCobroAqui = Math.max(0, activosTotales - ingresos.miembrosConCobro);
+  const mrr = ingresos.mrr;
+  const annualCount = ingresos.anual.n;
+  const monthlyCount = ingresos.mensual.n;
   const reimbOut = (monthReimbs.data ?? []).reduce(
     (acc, r) => acc + Number(r.amount_approved ?? 0),
     0,
@@ -207,10 +207,8 @@ export default async function AdminFinanzasPage() {
     timeZone: ZONA_MX,
   }).format(new Date());
 
-  const monthlyMrr = subs
-    .filter((s) => s.plan === "monthly")
-    .reduce((acc, s) => acc + Number(s.amount ?? 0), 0);
-  const annualMrr = mrr - monthlyMrr;
+  const monthlyMrr = ingresos.mensual.mrr;
+  const annualMrr = ingresos.anual.mrr;
 
   const kpis = [
     {
@@ -218,7 +216,7 @@ export default async function AdminFinanzasPage() {
       value: `${formatMxn(Math.round(mrr))}`,
       note:
         sinCobroAqui > 0
-          ? `solo ${subs.length} de ${activosTotales} miembros activos ⚠`
+          ? `solo ${ingresos.miembrosConCobro} de ${activosTotales} miembros activos ⚠`
           : "lo que suman las membresías activas cada mes",
       noteCls: sinCobroAqui > 0 ? "text-warning-text font-semibold" : undefined,
       detail: (
@@ -236,8 +234,22 @@ export default async function AdminFinanzasPage() {
             value={`${formatMxn(Math.round(mrr))} MXN`}
           />
           <DetailItem
+            label="MEMBRESÍA $159"
+            value={`${ingresos.plan159.n} · ${formatMxn(Math.round(ingresos.plan159.mrr))} MXN/mes`}
+          />
+          <DetailItem
+            label="MEMBRESÍA $599 (POR PELUDO)"
+            value={`${ingresos.plan599.n} peludos de ${ingresos.plan599.miembros} miembros · ${formatMxn(Math.round(ingresos.plan599.mrr))} MXN/mes`}
+          />
+          {ingresos.plan599.n > 0 && (
+            <DetailItem
+              label="$599 · PRECIO COMPLETO / CON 15%"
+              value={`${ingresos.plan599.principal.n} · ${formatMxn(Math.round(ingresos.plan599.principal.mrr))} MXN — ${ingresos.plan599.adicional.n} · ${formatMxn(Math.round(ingresos.plan599.adicional.mrr))} MXN`}
+            />
+          )}
+          <DetailItem
             label="MIEMBROS ACTIVOS"
-            value={`${activosTotales} en total · ${subs.length} con cobro en la plataforma`}
+            value={`${activosTotales} en total · ${ingresos.miembrosConCobro} con cobro en la plataforma`}
           />
           {sinCobroAqui > 0 && (
             <DetailItem

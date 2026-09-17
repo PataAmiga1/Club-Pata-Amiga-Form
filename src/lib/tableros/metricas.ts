@@ -1,4 +1,5 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
+import { resumenDeIngresos } from "@/lib/plans/ingresos";
 import {
   diaEnMexico,
   diasDelRango,
@@ -253,10 +254,8 @@ async function crudosDelPeriodo(admin: Admin, rango: Rango) {
   // MRR nuevo: lo mensual cuenta tal cual, lo anual dividido entre 12. Sumar
   // $1,699 de un plan anual como si fuera recurrencia mensual infla el número
   // por doce.
-  const mrr = (suscripciones ?? []).reduce((s, x) => {
-    const monto = Number(x.amount ?? 0);
-    return s + (x.plan === "annual" ? monto / 12 : monto);
-  }, 0);
+  // (Sección 8 del $599: el mismo cálculo que Finanzas; cada peludo es un cobro.)
+  const mrr = resumenDeIngresos(suscripciones ?? []).mrr;
 
   const posts = contenido ?? [];
   const correos = envios ?? [];

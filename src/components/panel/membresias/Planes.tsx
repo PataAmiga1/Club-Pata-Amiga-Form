@@ -290,7 +290,8 @@ export function Planes({
                 </span>
               )}
               <span className="ml-auto text-[11.5px] text-ink-secondary">
-                {v.miembros} miembro(s) en esta versión
+                {/* $599: una suscripción por peludo, así que se cuentan suscripciones (sección 8). */}
+                {v.miembros} suscripción(es) en esta versión
               </span>
             </div>
 

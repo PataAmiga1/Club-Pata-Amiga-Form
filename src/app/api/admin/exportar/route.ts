@@ -8,6 +8,8 @@ import { cargarBajas, ETIQUETA_ORIGEN_BAJA } from "@/lib/bajas";
 import { edadEnAnios } from "@/lib/edad";
 import { diaEnMexico } from "@/lib/zona-horaria";
 import { reportePorGrano, type GranoDeReporte } from "@/lib/exportacion";
+import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
+import { aporteMensual, esCobroDe599, etiquetaDePlanDelMiembro } from "@/lib/plans/ingresos";
 
 /**
  * Exportación a CSV de Finanzas (equipo, 26-ago): el admin elige qué es un
@@ -113,7 +115,7 @@ async function cargarPerfiles(admin: ClienteAdmin) {
         .eq("role", "member"),
       admin
         .from("subscriptions")
-        .select("user_id, plan, plan_name, amount, status, stripe_customer_id"),
+        .select("user_id, plan, plan_name, amount, status, stripe_customer_id, stripe_subscription_id, pet_id, price_tier, pets(name)"),
       // Las bajas se resuelven juntando las tres señales fechadas — ver
       // `src/lib/bajas.ts`. Contarlas solo desde `cancellations` desaparecía a
       // quien se fue por un cobro fallido.
@@ -126,18 +128,29 @@ async function cargarPerfiles(admin: ClienteAdmin) {
   const listaSubs = subs ?? [];
   const subDe = new Map<string, (typeof listaSubs)[number]>();
   for (const s of listaSubs) if (!subDe.has(s.user_id)) subDe.set(s.user_id, s);
+  // Membresía $599 (sección 8): una suscripción por peludo. Las vivas de cada
+  // persona dan su plan y su ingreso; la suscripción de Stripe de cada cobro
+  // dice de qué peludo es.
+  const vivasDe = new Map<string, typeof listaSubs>();
+  for (const s of listaSubs)
+    if (ESTADOS_VIVOS.includes(s.status ?? ""))
+      vivasDe.set(s.user_id, [...(vivasDe.get(s.user_id) ?? []), s]);
+  const subPorStripe = new Map<string, (typeof listaSubs)[number]>();
+  for (const s of listaSubs) if (s.stripe_subscription_id) subPorStripe.set(s.stripe_subscription_id, s);
 
   const peludosDe = new Map<string, number>();
   for (const p of peludos ?? [])
     peludosDe.set(p.user_id, (peludosDe.get(p.user_id) ?? 0) + 1);
 
-  return { perfiles: perfiles ?? [], bajaDe, subDe, peludosDe, bajas };
+  return { perfiles: perfiles ?? [], bajaDe, subDe, vivasDe, subPorStripe, listaSubs, peludosDe, bajas };
 }
 
 /** Todas las columnas posibles de UN miembro, ya resueltas. */
 function filaDeMiembro(p: PerfilExport["perfiles"][number], ctx: PerfilExport): Fila {
   const baja = ctx.bajaDe.get(p.id);
   const sub = ctx.subDe.get(p.id);
+  const vivas = ctx.vivasDe.get(p.id) ?? [];
+  const de599 = vivas.filter(esCobroDe599);
   const { sexo, origen } = sexoDeMiembro(p.gender, p.curp);
   return {
     nombre: p.first_name ?? "",
@@ -153,8 +166,12 @@ function filaDeMiembro(p: PerfilExport["perfiles"][number], ctx: PerfilExport): 
     curp: p.curp ?? "",
     nacionalidad: p.nationality ?? "",
     estatus_membresia: p.membership_status ?? "",
-    plan: sub?.plan_name ?? sub?.plan ?? "",
-    monto_plan: sub?.amount ?? "",
+    plan: etiquetaDePlanDelMiembro(vivas) ?? sub?.plan_name ?? sub?.plan ?? "",
+    // Con varios peludos del $599 es la suma de sus cobros (cada uno en su intervalo).
+    monto_plan: vivas.length ? vivas.reduce((a, s) => a + Number(s.amount ?? 0), 0) : (sub?.amount ?? ""),
+    membresia: de599.length ? "$599" : vivas.length || sub ? "$159" : "",
+    peludos_con_membresia: de599.length,
+    ingreso_mensual: vivas.length ? vivas.reduce((a, s) => a + aporteMensual(s), 0).toFixed(2) : "",
     registro: dia(p.created_at),
     alta: dia(p.member_since),
     baja: baja?.fecha ?? "",
@@ -210,8 +227,8 @@ async function filasDePagos(
   // El miembro se encuentra por su cliente de Stripe; el correo es el respaldo
   // para los cobros viejos que no tienen suscripción registrada aquí.
   const porCliente = new Map<string, string>();
-  for (const [userId, s] of ctx.subDe)
-    if (s.stripe_customer_id) porCliente.set(s.stripe_customer_id, userId);
+  for (const s of ctx.listaSubs)
+    if (s.stripe_customer_id) porCliente.set(s.stripe_customer_id, s.user_id);
   const porCorreo = new Map<string, string>();
   for (const p of ctx.perfiles)
     if (p.email) porCorreo.set(p.email.toLowerCase(), p.id);
@@ -225,6 +242,7 @@ async function filasDePagos(
     status: string | null;
     customer: string | null;
     customer_email: string | null;
+    subscription: string | null;
   }[] = [];
 
   let startingAfter: string | undefined;
@@ -243,6 +261,10 @@ async function filasDePagos(
         status: f.status,
         customer: typeof f.customer === "string" ? f.customer : null,
         customer_email: f.customer_email,
+        subscription:
+          typeof f.parent?.subscription_details?.subscription === "string"
+            ? f.parent.subscription_details.subscription
+            : null,
       });
     if (!pagina.has_more || pagina.data.length === 0) break;
     startingAfter = pagina.data[pagina.data.length - 1].id;
@@ -260,8 +282,13 @@ async function filasDePagos(
       const base: Fila = perfil
         ? filaDeMiembro(perfil, ctx)
         : { correo: f.customer_email ?? "", sexo: "Sin dato", sexo_origen: "sin dato" };
+      const suya = f.subscription ? ctx.subPorStripe.get(f.subscription) : undefined;
+      const pet = (Array.isArray(suya?.pets) ? suya.pets[0] : suya?.pets) as { name?: string } | null | undefined;
       return {
         ...base,
+        // El cobro dice su propia membresía y su peludo, no los del miembro.
+        membresia: suya ? (esCobroDe599(suya) ? "$599" : "$159") : "",
+        peludo: pet?.name ?? "",
         comprobante: f.number ?? "",
         fecha,
         // Stripe guarda centavos.
