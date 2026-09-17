@@ -13,6 +13,7 @@ import {
   revisarCuenta,
 } from "@/lib/cuentas-bancarias";
 import { versionVigente } from "@/lib/plans/versiones";
+import { PLAN_159, planDeLaVersion } from "@/lib/plans/planes";
 import { reemplazarSnapshot } from "@/lib/plans/resolve";
 
 const PRICE_BY_PLAN: Record<"monthly" | "annual", string | undefined> = {
@@ -65,13 +66,19 @@ export async function switchPlan(target: "monthly" | "annual") {
   const { userId, sub, admin } = await getOwnSubscription();
   if (sub.plan === target) return { ok: true as const };
 
+  // Se cambia de intervalo DENTRO DE SU PROPIO PLAN. Un miembro de $159 que
+  // pasa a anual sigue en $159 (a $1,699), nunca en el plan que se venda hoy.
+  // Sin versión = plan de $159 (ver planDeLaVersion).
+  //
   // La versión publicada manda; la variable de entorno queda de respaldo
-  // mientras el plan no esté publicado en Stripe (mismo criterio que el
-  // checkout, para que subir de plan y darse de alta no usen precios
-  // distintos).
+  // mientras el plan no esté publicado en Stripe — y solo para el plan de
+  // $159, que es a quien pertenecen esos precios.
   const intervalo = target === "annual" ? "year" : "month";
-  const version = await versionVigente(admin, intervalo);
-  const price = version?.stripe_price_id ?? PRICE_BY_PLAN[target];
+  const planDelMiembro = await planDeLaVersion(admin, sub.plan_version_id);
+  const version = await versionVigente(admin, intervalo, planDelMiembro);
+  const price =
+    version?.stripe_price_id ??
+    (planDelMiembro === PLAN_159 ? PRICE_BY_PLAN[target] : undefined);
   if (!price) throw new Error("Plan inválido");
 
   const stripe = getStripe();

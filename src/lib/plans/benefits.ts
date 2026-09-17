@@ -1,10 +1,4 @@
-import {
-  APPEAL_MAX_PER_SUBJECT,
-  MAX_ACTIVE_PETS,
-  REIMBURSEMENT_CAPS_MXN,
-  REIMBURSEMENT_SLA_HOURS,
-  AMBASSADOR_COMMISSION_MXN,
-} from "@/lib/constants";
+import { BENEFICIOS_PLAN_159 } from "@/lib/plans/planes";
 
 /**
  * CATÁLOGO DE BENEFICIOS — la pieza central de la sección 3.
@@ -15,8 +9,10 @@ import {
  * arbitrarios, nacería un campo que nadie lee y la promesa se rompería en
  * silencio — el peor resultado posible en un producto de salud.
  *
- * Los valores por omisión se IMPORTAN de constants.ts; no se copian. Una sola
- * fuente de verdad, y el día del despliegue nada cambia.
+ * Los valores por omisión son las reglas CONGELADAS del plan de $159
+ * (`BENEFICIOS_PLAN_159`). Hasta el 16-sep-2026 salían de constants.ts, pero
+ * con dos productos eso dejaba a los miembros de $159 expuestos a cualquier
+ * cambio de constante pensado para el $599.
  *
  * Para agregar un beneficio: una entrada aquí + el código que lo obedece.
  */
@@ -61,7 +57,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
-    porOmision: 180,
+    porOmision: BENEFICIOS_PLAN_159.espera_mascota_estandar_dias,
   },
   espera_mascota_adoptada_raza_dias: {
     label: "Tiempo de espera — adoptado de raza",
@@ -71,7 +67,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
-    porOmision: 150,
+    porOmision: BENEFICIOS_PLAN_159.espera_mascota_adoptada_raza_dias,
   },
   espera_mascota_adoptada_mestizo_dias: {
     label: "Tiempo de espera — adoptado mestizo",
@@ -81,7 +77,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
-    porOmision: 120,
+    porOmision: BENEFICIOS_PLAN_159.espera_mascota_adoptada_mestizo_dias,
   },
   espera_mascota_con_embajador_dias: {
     label: "Tiempo de espera — con código de embajador",
@@ -91,7 +87,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
-    porOmision: 90,
+    porOmision: BENEFICIOS_PLAN_159.espera_mascota_con_embajador_dias,
   },
   // --- Topes de reintegro ---------------------------------------------------
   tope_gastos_veterinarios_mxn: {
@@ -102,7 +98,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "mayor",
-    porOmision: REIMBURSEMENT_CAPS_MXN.vet_expenses,
+    porOmision: BENEFICIOS_PLAN_159.tope_gastos_veterinarios_mxn,
   },
   tope_fallecimiento_mxn: {
     // La LLAVE se queda: vive en la BD. Solo cambia la etiqueta visible, al
@@ -114,7 +110,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "mayor",
-    porOmision: REIMBURSEMENT_CAPS_MXN.death,
+    porOmision: BENEFICIOS_PLAN_159.tope_fallecimiento_mxn,
   },
   tope_vacunas_mxn: {
     label: "Tope anual — vacunas",
@@ -124,7 +120,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "mayor",
-    porOmision: REIMBURSEMENT_CAPS_MXN.vaccines,
+    porOmision: BENEFICIOS_PLAN_159.tope_vacunas_mxn,
   },
   horas_compromiso_reintegro: {
     label: "Compromiso de transferencia",
@@ -134,7 +130,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "menor",
-    porOmision: REIMBURSEMENT_SLA_HOURS,
+    porOmision: BENEFICIOS_PLAN_159.horas_compromiso_reintegro,
   },
   apelaciones_max: {
     label: "Apelaciones por caso",
@@ -143,7 +139,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "mayor",
-    porOmision: APPEAL_MAX_PER_SUBJECT,
+    porOmision: BENEFICIOS_PLAN_159.apelaciones_max,
   },
 
   // --- Mascotas -------------------------------------------------------------
@@ -154,7 +150,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "super_admin",
     vinculante: true,
     mejorSi: "mayor",
-    porOmision: MAX_ACTIVE_PETS,
+    porOmision: BENEFICIOS_PLAN_159.mascotas_activas_max,
   },
   // `edad_senior_anios` se QUITÓ del catálogo el 11-ago-2026: la edad senior
   // es una regla GLOBAL (SENIOR_PET_AGE_YEARS, hoy 8), no un beneficio
@@ -171,7 +167,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "gerente_ventas",
     vinculante: false,
     mejorSi: "verdadero",
-    porOmision: true,
+    porOmision: BENEFICIOS_PLAN_159.orientacion_vet_24_7,
   },
 
   // --- Embajadores ----------------------------------------------------------
@@ -183,7 +179,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "gerente_ventas",
     vinculante: false,
     mejorSi: "mayor",
-    porOmision: AMBASSADOR_COMMISSION_MXN.monthly,
+    porOmision: BENEFICIOS_PLAN_159.comision_embajador_mensual_mxn,
   },
   comision_embajador_anual_mxn: {
     label: "Comisión de embajador — plan anual",
@@ -193,7 +189,7 @@ export const CATALOGO_BENEFICIOS = {
     editablePor: "gerente_ventas",
     vinculante: false,
     mejorSi: "mayor",
-    porOmision: AMBASSADOR_COMMISSION_MXN.annual,
+    porOmision: BENEFICIOS_PLAN_159.comision_embajador_anual_mxn,
   },
 } as const satisfies Record<string, DefinicionBeneficio>;
 

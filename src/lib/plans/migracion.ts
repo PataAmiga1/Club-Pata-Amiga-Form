@@ -7,6 +7,7 @@ import {
 } from "@/lib/plans/benefits";
 import { beneficiosDe, reemplazarSnapshot } from "@/lib/plans/resolve";
 import { sendTemplatedEmail } from "@/lib/email/send";
+import { PLAN_159 } from "@/lib/plans/planes";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -68,6 +69,11 @@ export type Previsualizacion = {
   empeoranVinculante: { label: string; personas: number }[];
   /** Si es true, ejecutar exige documento legal + confirmación explícita. */
   exigePapel: boolean;
+  /**
+   * Suscripciones que cumplían el filtro pero son de OTRO plan, y por eso
+   * quedaron fuera. Una migración nunca cruza de plan (sección 0 del $599).
+   */
+  fueraPorOtroPlan: number;
 };
 
 /** Los estados que cuentan como "miembro vigente" si no se pide otra cosa. */
@@ -88,7 +94,7 @@ export async function previsualizarMigracion(
 ): Promise<Previsualizacion | { error: string }> {
   const { data: destino } = await admin
     .from("plan_versions")
-    .select("id, version, interval, status, benefits, membership_plans(name)")
+    .select("id, version, interval, status, benefits, membership_plans(name, slug)")
     .eq("id", input.versionDestinoId)
     .maybeSingle();
   if (!destino) return { error: "La versión destino no existe." };
@@ -126,18 +132,38 @@ export async function previsualizarMigracion(
   const { data: subs, error } = await consulta;
   if (error) return { error: "No se pudo leer la cohorte." };
 
-  // Los nombres de las versiones de origen, para que la tabla se lea.
+  // Los nombres de las versiones de origen, para que la tabla se lea, y el
+  // plan de cada una.
   const { data: versiones } = await admin
     .from("plan_versions")
-    .select("id, version, interval");
+    .select("id, version, interval, membership_plans(slug)");
   const nombreVersion = new Map(
     (versiones ?? []).map((v) => [v.id, `v${v.version} ${v.interval === "year" ? "anual" : "mensual"}`]),
   );
+  const slugDe = (x: unknown) =>
+    ((Array.isArray(x) ? x[0] : x) as { slug?: string } | null)?.slug;
+  const planDeVersion = new Map(
+    (versiones ?? []).map((v) => [v.id, slugDe(v.membership_plans)]),
+  );
+  const planDestino = slugDe(destino.membership_plans);
 
   const miembros: MiembroDeLaCohorte[] = [];
+  let fueraPorOtroPlan = 0;
   for (const s of subs ?? []) {
     // La suscripción destino ya es esta: no hay nada que migrar.
     if (s.plan_version_id === input.versionDestinoId) continue;
+
+    // NUNCA SE CRUZA DE PLAN. Migrar mueve la foto de beneficios, no el precio
+    // en Stripe: un miembro de $159 movido a una versión del $599 seguiría
+    // pagando $159 con las reglas del $599. Sin versión = plan de $159. Si no
+    // se sabe el plan de algo, se deja fuera.
+    const planDelMiembro = s.plan_version_id
+      ? planDeVersion.get(s.plan_version_id)
+      : PLAN_159;
+    if (!planDestino || planDelMiembro !== planDestino) {
+      fueraPorOtroPlan++;
+      continue;
+    }
 
     const antes = beneficiosDe(
       s.benefits_snapshot as Record<string, unknown> | null,
@@ -200,6 +226,7 @@ export async function previsualizarMigracion(
     },
     empeoranVinculante,
     exigePapel: empeoranVinculante.length > 0,
+    fueraPorOtroPlan,
   };
 }
 

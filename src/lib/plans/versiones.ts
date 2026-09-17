@@ -15,16 +15,21 @@ export type VersionVigente = {
 };
 
 /**
- * La versión publicada más reciente de un intervalo. Es la que contrata quien
- * se registra hoy.
+ * La versión publicada más reciente de un intervalo DENTRO DE UN PLAN.
  *
- * Nunca lanza: si algo falla devuelve null y el checkout usa el precio de las
- * variables de entorno. El cobro no se queda sin funcionar por el motor de
- * planes.
+ * El plan es obligatorio (sección 0 del $599, 16-sep-2026). Antes la consulta
+ * traía «la última versión publicada» de CUALQUIER plan: en cuanto existiera
+ * el $599, un miembro de $159 que cambiara de mensual a anual habría quedado
+ * cobrado a $599 con las reglas nuevas, y el checkout habría vendido el plan
+ * equivocado según cuál se publicó al último.
+ *
+ * Nunca lanza: si algo falla devuelve null y quien llama decide el respaldo
+ * (las variables de entorno, que son SOLO del plan de $159).
  */
 export async function versionVigente(
   admin: Admin,
   interval: "month" | "year",
+  planSlug: string,
 ): Promise<VersionVigente | null> {
   try {
     const { data } = await admin
@@ -32,6 +37,8 @@ export async function versionVigente(
       .select(
         "id, version, interval, price_cents, stripe_price_id, benefits, membership_plans!inner(slug, is_public, archived_at)",
       )
+      .eq("membership_plans.slug", planSlug)
+      .is("membership_plans.archived_at", null)
       .eq("interval", interval)
       .eq("status", "publicada")
       .order("version", { ascending: false })

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
 import { crmEventoDeUsuario } from "@/lib/crm/sync";
 import { versionVigente } from "@/lib/plans/versiones";
+import { PLAN_159, PLAN_DE_ALTAS } from "@/lib/plans/planes";
 
 const PRICE_BY_PLAN: Record<string, string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
@@ -24,14 +25,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
 
-  // La versión publicada manda sobre la variable de entorno. Si todavía no hay
-  // versión con precio en Stripe (o falla la consulta), se usa el precio de
-  // siempre: el cobro nunca se queda sin funcionar por el motor de planes.
+  // Quien se registra contrata el plan de altas (PLAN_DE_ALTAS). La versión
+  // publicada manda sobre la variable de entorno; si todavía no hay versión con
+  // precio en Stripe (o falla la consulta), se usa el precio de siempre.
+  //
+  // Ese respaldo es SOLO del plan de $159: las variables de entorno apuntan a
+  // sus precios. Si el plan de altas es otro y no tiene precio publicado, el
+  // checkout se niega — venderle $159 a quien debía contratar el plan nuevo
+  // sería un error que no se ve hasta el primer reintegro.
   const versionPublicada = await versionVigente(
     createAdminClient(),
     plan === "annual" ? "year" : "month",
+    PLAN_DE_ALTAS,
   );
-  const price = versionPublicada?.stripe_price_id ?? PRICE_BY_PLAN[plan];
+  const price =
+    versionPublicada?.stripe_price_id ??
+    (PLAN_DE_ALTAS === PLAN_159 ? PRICE_BY_PLAN[plan] : undefined);
   if (!price) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
@@ -108,6 +117,7 @@ export async function POST(request: Request) {
     metadata: {
       user_id: user.id,
       plan,
+      plan_slug: PLAN_DE_ALTAS,
       // Viaja la versión para que el webhook NUNCA tenga que adivinar de qué
       // versión fue este pago al tomar la foto de beneficios.
       ...(versionPublicada ? { plan_version_id: versionPublicada.id } : {}),
@@ -117,6 +127,7 @@ export async function POST(request: Request) {
       metadata: {
         user_id: user.id,
         plan,
+        plan_slug: PLAN_DE_ALTAS,
         ...(versionPublicada ? { plan_version_id: versionPublicada.id } : {}),
       },
     },

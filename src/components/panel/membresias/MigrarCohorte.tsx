@@ -201,6 +201,14 @@ export function MigrarCohorte({
                 </span>
               )}
 
+              {previa.fueraPorOtroPlan > 0 && (
+                <span className="text-[12.5px] text-ink-secondary">
+                  {previa.fueraPorOtroPlan} miembro(s) quedan fuera por ser de
+                  otro plan. Una migración nunca cambia a nadie de plan: solo
+                  movería sus beneficios, y seguiría pagando el precio del suyo.
+                </span>
+              )}
+
               {previa.miembros.slice(0, 25).map((m) => (
                 <div
                   key={m.subscriptionId}
