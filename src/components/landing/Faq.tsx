@@ -133,8 +133,8 @@ function respuestas599(o: OfertaPublica599): Record<string, string[]> {
     ],
     "¿Con qué cuento al ser parte de la manada?": [
       "Cada peludo cuenta con montos disponibles que crecen mientras sigue en la manada. Se renuevan cada año desde el día en que entró; lo que no se usa no se acumula.",
-      `Cuidados cotidianos: desde el día ${p.cuidados.aperturaDia}, con ${$(p.cuidados.inicial)}. Suben ${$(p.cuidados.incremento)} por cada mes pagado, hasta ${$(p.cuidados.tope)} al año. Aplican para lo que está en nuestro catálogo de cuidados, que puedes ver antes de pagar.`,
-      `Emergencia veterinaria: desde el mes ${p.emergencia.aperturaMes}, con ${$(p.emergencia.inicial)}. Suben ${$(p.emergencia.incremento)} por cada mes pagado, hasta ${$(p.emergencia.tope)} al año.`,
+      `Cuidados cotidianos: de ${$(p.cuidados.inicial)} a ${$(p.cuidados.tope)} al año. Empiezas con ${$(p.cuidados.inicial)} a partir del día ${p.cuidados.aperturaDia}, y tu monto disponible crece poco a poco cada mes que pagas. Aplica para lo que está en nuestro catálogo de cuidados, que puedes ver antes de pagar.`,
+      `Emergencia veterinaria: de ${$(p.emergencia.inicial)} a ${$(p.emergencia.tope)} al año. Empiezas con ${$(p.emergencia.inicial)} a partir del mes ${p.emergencia.aperturaMes}, y tu monto disponible crece poco a poco cada mes que pagas.`,
       `Despedida: ${$(p.despedida.monto)} desde el día ${p.despedida.aperturaDia}, para ayudarte con los gastos de la despedida de tu compañero.`,
       "Los días y los meses se cuentan desde que nuestro comité aprueba el perfil de tu peludo.",
       `Te reintegramos en máximo ${p.diasHabiles} días hábiles. Si nos tardamos más, ese mes de tu peludo es gratis.`,
