@@ -139,7 +139,9 @@ export function MembresiasPorPeludo({ membresias }: { membresias: MembresiaDePel
                         onClick={() =>
                           correr(
                             () => cambiarIntervaloDePeludo(m.id, otro),
-                            `${m.petName} cambió al plan ${otro === "annual" ? "anual" : "mensual"}.`,
+                            otro === "annual"
+                              ? `${m.petName} cambió al plan anual. Se cobró la diferencia.`
+                              : `${m.petName} cambió al plan mensual. Lo que no usó de su año quedó como saldo a tu favor para sus mensualidades.`,
                           )
                         }
                         className="rounded-full border-[1.5px] border-teal px-4 py-2 text-[12.5px] font-bold text-teal-deep disabled:opacity-50"

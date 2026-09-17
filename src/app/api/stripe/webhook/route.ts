@@ -15,10 +15,15 @@ import {
 import { esModelo599 } from "@/lib/plans/montos";
 import {
   nombreDelIntervalo,
+  type NivelDePrecio,
   queEsEstePrecio,
   recalcularEstadoDelMiembro,
 } from "@/lib/plans/suscripciones";
-import { reacomodarPrecioPrincipal, registrarCobro } from "@/lib/plans/peludos-599";
+import {
+  controlarAltaDePeludo,
+  reacomodarPrecioPrincipal,
+  registrarCobro,
+} from "@/lib/plans/peludos-599";
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
@@ -36,11 +41,25 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // datos es una suscripción del $159, que cubre la cuenta completa.
   const es599 = esModelo599(beneficios);
   const petId = session.metadata?.pet_id ?? null;
-  const nivel =
+  let nivel: NivelDePrecio | null =
     session.metadata?.price_tier === "adicional" ||
     session.metadata?.price_tier === "principal"
       ? session.metadata.price_tier
       : null;
+  // Sección 9: antes de tocar nada, ¿este pago choca con otro que ya llegó?
+  // (mismo peludo pagado dos veces, o dos peludos pagados como «primero»).
+  if (petId && session.subscription) {
+    const control = await controlarAltaDePeludo(supabase, {
+      userId,
+      petId,
+      nivel,
+      stripeSubscriptionId: session.subscription as string,
+      planVersionId: session.metadata?.plan_version_id ?? null,
+    });
+    if (control.duplicada) return;
+    nivel = control.nivel;
+  }
+
   // Un peludo adicional no vuelve a «hacer miembro» a nadie: la persona ya lo
   // es desde su primer peludo, y su fecha de alta no se toca.
   const esAdicional = nivel === "adicional";
@@ -132,7 +151,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
   }
 
-  const { data: subRow } = await supabase
+  const { data: subRow, error: errorFila } = await supabase
     .from("subscriptions")
     .upsert(
       {
@@ -154,6 +173,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     )
     .select("id")
     .single();
+
+  // Un pago sin fila es un cobro que nadie ve ni puede cancelar: no se calla.
+  if (errorFila || !subRow)
+    await reportError("webhook: registrar la suscripción pagada", errorFila ?? new Error("sin fila"), {
+      userId,
+      stripe_subscription_id: session.subscription,
+      pet_id: petId,
+      pendiente: "revisar en Stripe y crear la fila o reembolsar",
+    });
 
   // 3b. Foto de los beneficios: a partir de aquí este miembro se rige por SU
   //     copia, no por lo que diga el plan después (grandfathering).

@@ -211,6 +211,29 @@ export async function POST(request: Request) {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const stripe = getStripe();
+
+  // Membresía $599 (sección 9): un checkout nuevo reemplaza a los que esta
+  // persona dejó abiertos. Una sesión de Stripe vive 24 horas y se puede pagar
+  // cuando sea; con dos abiertas (dos pestañas, el botón «atrás») se podían
+  // pagar las dos: el mismo peludo dos veces, o dos peludos a precio completo.
+  // Si aun así se cruzan dos pagos, el webhook los corrige
+  // (`controlarAltaDePeludo`).
+  if (peludo) {
+    try {
+      const desde = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+      for await (const abierta of stripe.checkout.sessions.list({
+        status: "open",
+        created: { gte: desde },
+        limit: 100,
+      })) {
+        if (abierta.metadata?.user_id === user.id && abierta.id)
+          await stripe.checkout.sessions.expire(abierta.id);
+      }
+    } catch (e) {
+      // No detiene el pago: el webhook sigue siendo la red de seguridad.
+      console.error("[checkout] no se pudieron expirar las sesiones abiertas", e);
+    }
+  }
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price, quantity: 1 }],

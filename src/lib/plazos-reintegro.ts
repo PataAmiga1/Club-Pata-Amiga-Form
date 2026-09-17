@@ -1,6 +1,6 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { notifyTeam } from "@/lib/alerts";
-import { hoyEnMexico } from "@/lib/zona-horaria";
+import { diaEnMexico, hoyEnMexico } from "@/lib/zona-horaria";
 import { formatDateEs } from "@/lib/dates";
 import { RUBRO_LABEL, esRubro599 } from "@/lib/reintegros-599";
 
@@ -14,8 +14,13 @@ type Admin = ReturnType<typeof createAdminClient>;
  * equipo con un botón (sección 6). Aquí solo se marca `sla_breached_at` y se
  * avisa una vez por solicitud.
  *
- * Vencida = pasó su último día hábil (`due_business_date`) y no está pagada.
- * Una denegada no genera mes gratis: no había depósito que hacer.
+ * Vencida = pasó su último día hábil (`due_business_date`) sin pagarse, o se
+ * pagó DESPUÉS de ese día. Una denegada no genera mes gratis: no había
+ * depósito que hacer.
+ *
+ * Sección 9: antes solo miraba las que seguían sin pagar. Una que vencía el
+ * viernes y se pagaba el lunes antes de que corriera el cron se escapaba, y el
+ * mes gratis prometido nunca se marcaba.
  */
 export async function revisarPlazosDeReintegro(
   admin: Admin,
@@ -23,13 +28,18 @@ export async function revisarPlazosDeReintegro(
 ): Promise<{ vencidas: number }> {
   const { data } = await admin
     .from("reimbursements")
-    .select("id, folio, category, amount_requested, due_business_date, status, pets(name)")
+    .select("id, folio, category, amount_requested, due_business_date, status, paid_at, pets(name)")
     .not("due_business_date", "is", null)
     .lt("due_business_date", hoy)
     .is("sla_breached_at", null)
-    .not("status", "in", "(paid,rejected)");
+    .neq("status", "rejected");
 
-  const vencidas = data ?? [];
+  const vencidas = (data ?? []).filter(
+    (v) =>
+      v.status !== "paid" ||
+      // Pagada: cuenta si el depósito cayó después de su último día hábil.
+      (v.paid_at !== null && diaEnMexico(new Date(v.paid_at)) > v.due_business_date!),
+  );
   if (vencidas.length === 0) return { vencidas: 0 };
 
   await admin

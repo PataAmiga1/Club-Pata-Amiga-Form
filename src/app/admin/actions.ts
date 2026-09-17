@@ -1346,6 +1346,14 @@ export async function deactivateMemberAccount(userId: string, reason: string) {
     .select("id, stripe_subscription_id")
     .eq("user_id", userId)
     .in("status", ["active", "past_due", "unpaid", "trialing"]);
+  // Primero se marcan TODAS en la base y después se cancelan en Stripe: si no,
+  // el webhook de la cancelación del primer peludo veía a los demás todavía
+  // vivos e intentaba subir a uno de precio justo antes de cancelarlo.
+  if (activas?.length)
+    await admin
+      .from("subscriptions")
+      .update({ status: "canceled", cancel_at_period_end: false })
+      .in("id", activas.map((a) => a.id));
   for (const sub of activas ?? []) {
     if (!sub.stripe_subscription_id) continue;
     try {
@@ -1362,10 +1370,6 @@ export async function deactivateMemberAccount(userId: string, reason: string) {
         pendiente: "cancelar la suscripción a mano en el panel de Stripe",
       });
     }
-    await admin
-      .from("subscriptions")
-      .update({ status: "canceled", cancel_at_period_end: false })
-      .eq("id", sub.id);
   }
 
   await admin

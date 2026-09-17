@@ -9,6 +9,9 @@ import {
   type NivelDePrecio,
 } from "@/lib/plans/suscripciones";
 import { acumularComisionDeCobro } from "@/lib/comisiones";
+import { lineaDelCobro } from "@/lib/plans/factura";
+import { notifyTeam, reportError } from "@/lib/alerts";
+import { reembolsarEnStripe } from "@/lib/garantia";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -29,8 +32,7 @@ export async function registrarCobro(admin: Admin, invoice: Stripe.Invoice) {
       : null;
   if (!subId || !invoice.id || invoice.status !== "paid") return;
 
-  const linea =
-    invoice.lines?.data?.find((l) => l.period?.start && l.period?.end) ?? null;
+  const linea = lineaDelCobro(invoice);
   await admin.from("subscription_payments").upsert(
     {
       stripe_invoice_id: invoice.id,
@@ -52,6 +54,130 @@ export async function registrarCobro(admin: Admin, invoice: Stripe.Invoice) {
   );
   // Sección 5: el 3% mensual del embajador sale de cada cobro del principal.
   await acumularComisionDeCobro(admin, invoice);
+}
+
+/**
+ * Deshace una suscripción de peludo que no debió existir: reembolsa lo cobrado
+ * y la cancela en Stripe, y avisa a la persona y al equipo. Si algo falla en
+ * Stripe no se esconde: se reporta como error para arreglarlo a mano.
+ */
+export async function anularAltaDuplicada(
+  admin: Admin,
+  input: { userId: string; petName: string; stripeSubscriptionId: string },
+): Promise<void> {
+  const stripe = getStripe();
+  let reembolsado = 0;
+  try {
+    const facturas = await stripe.invoices.list({
+      subscription: input.stripeSubscriptionId,
+      status: "paid",
+      limit: 10,
+    });
+    reembolsado = facturas.data.reduce((a, f) => a + (f.amount_paid ?? 0), 0);
+    if (reembolsado > 0)
+      await reembolsarEnStripe(input.stripeSubscriptionId, reembolsado, "alta_duplicada");
+    await stripe.subscriptions.cancel(input.stripeSubscriptionId);
+  } catch (e) {
+    await reportError("alta duplicada de peludo: reembolsar y cancelar", e, {
+      userId: input.userId,
+      stripe_subscription_id: input.stripeSubscriptionId,
+      pendiente: "reembolsar el cobro y cancelar la suscripción a mano en Stripe",
+    });
+  }
+  const monto = `$${(reembolsado / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })} MXN`;
+  await admin.from("notifications").insert({
+    user_id: input.userId,
+    type: "plan_changed",
+    title: `${input.petName} ya tenía su membresía`,
+    message: `Se registró un segundo pago para ${input.petName}, que ya tenía membresía. Lo cancelamos y te devolvimos ${monto} a tu tarjeta.`,
+  });
+  await notifyTeam(
+    "notify_memberships",
+    `Pago duplicado de ${input.petName}: reembolsado`,
+    `<p>Llegó un segundo pago para <strong>${input.petName}</strong>, que ya tenía una membresía viva (dos pestañas o un checkout viejo). La plataforma reembolsó ${monto} y canceló la suscripción <code>${input.stripeSubscriptionId}</code>.</p><p>Si en la sección de errores aparece uno de «alta duplicada», el reembolso NO se completó y hay que hacerlo en Stripe.</p>`,
+  );
+}
+
+/**
+ * Control del alta de un peludo del $599, en el momento en que Stripe confirma
+ * el pago (sección 9). El checkout decide con lo que ya está escrito, pero
+ * puede haber dos pagos en camino a la vez (dos pestañas, un checkout de hace
+ * horas que se paga después):
+ *
+ *  · el peludo YA tiene otra membresía viva → es un cobro doble: se anula;
+ *  · se pagó como primer peludo y la persona ya tiene otro vivo → se baja al
+ *    precio con 15% desde ahora, con prorrateo (el abono sale en su siguiente
+ *    cobro); y al revés, si se pagó con descuento pero ya no le queda ningún
+ *    otro, sube al precio completo.
+ *
+ * Devuelve el nivel con el que debe quedar la fila, o `duplicada`.
+ */
+export async function controlarAltaDePeludo(
+  admin: Admin,
+  input: {
+    userId: string;
+    petId: string;
+    nivel: NivelDePrecio | null;
+    stripeSubscriptionId: string;
+    planVersionId: string | null;
+  },
+): Promise<{ duplicada: true } | { duplicada: false; nivel: NivelDePrecio | null }> {
+  const [{ data: subs }, { data: pet }] = await Promise.all([
+    admin
+      .from("subscriptions")
+      .select("pet_id, status, stripe_subscription_id")
+      .eq("user_id", input.userId)
+      .not("pet_id", "is", null),
+    admin.from("pets").select("name").eq("id", input.petId).maybeSingle(),
+  ]);
+  const otras = (subs ?? []).filter(
+    (s) => ESTADOS_VIVOS.includes(s.status ?? "") && s.stripe_subscription_id !== input.stripeSubscriptionId,
+  );
+
+  if (otras.some((s) => s.pet_id === input.petId)) {
+    await anularAltaDuplicada(admin, {
+      userId: input.userId,
+      petName: pet?.name ?? "Tu peludo",
+      stripeSubscriptionId: input.stripeSubscriptionId,
+    });
+    return { duplicada: true };
+  }
+
+  const correcto: NivelDePrecio = otras.length > 0 ? "adicional" : "principal";
+  if (!input.nivel || input.nivel === correcto || !input.planVersionId)
+    return { duplicada: false, nivel: input.nivel };
+
+  try {
+    const { data: version } = await admin
+      .from("plan_versions")
+      .select("stripe_price_id, stripe_additional_price_id")
+      .eq("id", input.planVersionId)
+      .maybeSingle();
+    const precio = correcto === "principal" ? version?.stripe_price_id : version?.stripe_additional_price_id;
+    if (!precio) return { duplicada: false, nivel: input.nivel };
+    const stripe = getStripe();
+    const actual = await stripe.subscriptions.retrieve(input.stripeSubscriptionId);
+    await stripe.subscriptions.update(input.stripeSubscriptionId, {
+      items: [{ id: actual.items.data[0].id, price: precio }],
+      // Mismo intervalo: no reinicia el ciclo. El ajuste (a favor o en
+      // contra) aparece en su siguiente cobro.
+      proration_behavior: "create_prorations",
+      metadata: { ...actual.metadata, price_tier: correcto },
+    });
+    await notifyTeam(
+      "notify_memberships",
+      `Precio ajustado: ${pet?.name ?? "peludo"} pasó a ${correcto}`,
+      `<p>Se pagaron dos peludos casi al mismo tiempo y <strong>${pet?.name ?? "uno"}</strong> quedó con el precio equivocado. La plataforma lo cambió a <strong>${correcto}</strong> con prorrateo: la diferencia se ajusta en su siguiente cobro.</p>`,
+    );
+    return { duplicada: false, nivel: correcto };
+  } catch (e) {
+    await reportError("alta de peludo: ajustar nivel de precio", e, {
+      userId: input.userId,
+      stripe_subscription_id: input.stripeSubscriptionId,
+      pendiente: `cambiar a ${correcto} a mano en Stripe`,
+    });
+    return { duplicada: false, nivel: input.nivel };
+  }
 }
 
 /**
@@ -102,7 +228,14 @@ export async function registrarSuscripcionDePeludo(
     )
     .select("id")
     .single();
-  if (!fila) return null;
+  if (!fila) {
+    await reportError("registrar suscripción de peludo", new Error("no se pudo escribir la fila"), {
+      userId: input.userId,
+      petId: input.petId,
+      stripe_subscription_id: input.suscripcion.id,
+    });
+    return null;
+  }
   await tomarSnapshot(admin, { subscriptionId: fila.id, planVersionId: input.planVersionId });
   await recalcularEstadoDelMiembro(admin, input.userId);
   return fila.id;

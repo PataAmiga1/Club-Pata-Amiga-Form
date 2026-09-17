@@ -11,6 +11,7 @@ import {
   metodoDePagoGuardado,
   registrarCobro,
   registrarSuscripcionDePeludo,
+  controlarAltaDePeludo,
 } from "@/lib/plans/peludos-599";
 import { notifyTeam } from "@/lib/alerts";
 
@@ -63,6 +64,7 @@ export async function activarMembresiaDePeludo(
     nivel === "principal" ? version?.stripe_price_id : version?.stripe_additional_price_id;
   if (!version || !precio) return { error: "La membresía no está disponible en este momento." };
 
+  const previasDelPeludo = (suyas ?? []).filter((s) => s.pet_id === pet.id).length;
   const metodo = await metodoDePagoGuardado(admin, user.id);
   if (!metodo) return { checkout: true };
 
@@ -86,9 +88,11 @@ export async function activarMembresiaDePeludo(
         },
         expand: ["latest_invoice"],
       },
-      // Doble clic = una sola suscripción. Va por minuto para que reactivar
-      // más tarde (después de cancelar) sí cree una nueva.
-      { idempotencyKey: `activar-${pet.id}-${plan}-${nivel}-${Math.floor(Date.now() / 60000)}` },
+      // Doble clic o reintento = una sola suscripción. La llave cambia solo
+      // cuando cambia cuántas suscripciones ha tenido el peludo, así que
+      // reactivar después de cancelar sí crea una nueva (sección 9: antes iba
+      // por minuto y un reintento al minuto siguiente cobraba doble).
+      { idempotencyKey: `activar-${pet.id}-${plan}-${nivel}-${previasDelPeludo}` },
     );
   } catch {
     return {
@@ -97,10 +101,22 @@ export async function activarMembresiaDePeludo(
     };
   }
 
-  const filaId = await registrarSuscripcionDePeludo(admin, {
+  // Pudo llegar otro pago del mismo peludo mientras tanto (un checkout abierto
+  // en otra pestaña): mismo control que el webhook.
+  const control = await controlarAltaDePeludo(admin, {
     userId: user.id,
     petId: pet.id,
     nivel,
+    stripeSubscriptionId: suscripcion.id,
+    planVersionId: version.id,
+  });
+  if (control.duplicada)
+    return { error: `${pet.name} ya tenía su membresía. Cancelamos este cobro y te lo devolvimos.` };
+
+  const filaId = await registrarSuscripcionDePeludo(admin, {
+    userId: user.id,
+    petId: pet.id,
+    nivel: control.nivel ?? nivel,
     plan,
     planVersionId: version.id,
     suscripcion,

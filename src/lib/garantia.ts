@@ -108,6 +108,7 @@ export async function estadoDeGarantia(
 export async function reembolsarEnStripe(
   stripeSubscriptionId: string,
   centavos: number,
+  motivo: "garantia_90_dias" | "alta_duplicada" = "garantia_90_dias",
 ): Promise<string[]> {
   if (centavos <= 0) return [];
   const stripe = getStripe();
@@ -132,8 +133,8 @@ export async function reembolsarEnStripe(
       const monto = Math.min(falta, pago.amount_paid ?? 0);
       if (!pi || monto <= 0) continue;
       const reembolso = await stripe.refunds.create(
-        { payment_intent: pi, amount: monto, metadata: { motivo: "garantia_90_dias" } },
-        { idempotencyKey: `garantia-${factura.id}-${pi}-${monto}` },
+        { payment_intent: pi, amount: monto, metadata: { motivo } },
+        { idempotencyKey: `${motivo}-${factura.id}-${pi}-${monto}` },
       );
       ids.push(reembolso.id);
       falta -= monto;

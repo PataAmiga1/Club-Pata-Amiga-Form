@@ -84,16 +84,26 @@ export function mesesPagadosAl(
   cobros: { period_start: string | null; period_end: string | null }[],
   hoy: string,
 ): number {
+  // Sección 9: al cambiar de mensual a anual (o al revés) los períodos se
+  // enciman — el mes en curso ya pagado y el año nuevo que empieza hoy. Un mes
+  // que arranca dentro de un período ya contado no vuelve a sumar.
+  const periodos = cobros
+    .filter((c) => c.period_start)
+    .map((c) => {
+      const inicio = diaEnMexico(new Date(c.period_start!));
+      const fin = c.period_end ? diaEnMexico(new Date(c.period_end)) : sumarMeses(inicio, 1);
+      return { inicio, fin };
+    })
+    .sort((a, b) => a.inicio.localeCompare(b.inicio));
   let total = 0;
-  for (const c of cobros) {
-    if (!c.period_start) continue;
-    const inicio = diaEnMexico(new Date(c.period_start));
-    const fin = c.period_end ? diaEnMexico(new Date(c.period_end)) : sumarMeses(inicio, 1);
+  let cubiertoHasta = "";
+  for (const { inicio, fin } of periodos) {
     for (let m = 0; m < 1200; m++) {
       const arranque = sumarMeses(inicio, m);
       if (arranque >= fin || arranque > hoy) break;
-      total++;
+      if (arranque >= cubiertoHasta) total++;
     }
+    if (fin > cubiertoHasta) cubiertoHasta = fin;
   }
   return total;
 }

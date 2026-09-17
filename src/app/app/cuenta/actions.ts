@@ -54,11 +54,16 @@ async function getOwnSubscription() {
 }
 
 /**
- * Switch plan on the live Stripe subscription.
- * - Upgrade to annual: applies now; Stripe credits unused monthly time and
- *   invoices the difference immediately.
- * - Downgrade to monthly: applies now with no refund; the already-paid
- *   period stays covered and the next renewal bills monthly.
+ * Switch plan on the live Stripe subscription. Los dos sentidos aplican hoy y
+ * con prorrateo (`always_invoice`):
+ * - A anual: Stripe abona lo no usado del mes y cobra la diferencia.
+ * - A mensual: Stripe abona lo no usado del año como SALDO del cliente y de
+ *   ahí salen las siguientes mensualidades.
+ *
+ * Sección 9 (17-sep-2026): antes a mensual iba con `proration_behavior:
+ * "none"`. Al cambiar de intervalo Stripe reinicia el ciclo, así que quien
+ * pagó $1,699 (o $6,612) por el año recibía el cobro mensual al mes siguiente
+ * y perdía lo que no había usado. Comprobado en Stripe test.
  *
  * Sección 3, punto 6.3: además de prorratear, el snapshot de beneficios se
  * actualiza EN ESE MOMENTO, con el antes y el después escritos en la línea de
@@ -91,7 +96,7 @@ export async function switchPlan(target: "monthly" | "annual") {
 
   const updated = await stripe.subscriptions.update(sub.stripe_subscription_id, {
     items: [{ id: item.id, price }],
-    proration_behavior: target === "annual" ? "always_invoice" : "none",
+    proration_behavior: "always_invoice",
     metadata: { ...current.metadata, plan: target },
   });
 
@@ -132,7 +137,7 @@ export async function switchPlan(target: "monthly" | "annual") {
     message:
       target === "annual"
         ? "Cambiaste al plan Anual. Se cobró la diferencia proporcional y tu protección sigue sin interrupciones."
-        : "Cambiaste al plan Mensual. Tu período ya pagado sigue vigente; la próxima renovación será mensual.",
+        : "Cambiaste al plan Mensual. Lo que no usaste de tu año quedó como saldo a tu favor y de ahí se pagan tus siguientes mensualidades.",
   });
 
   revalidatePath("/app/cuenta");
@@ -481,6 +486,10 @@ export async function cancelarMembresiaDePeludo(subscriptionId: string, reason: 
 export async function reactivarMembresiaDePeludo(subscriptionId: string) {
   const ctx = await suscripcionPropiaDePeludo(subscriptionId);
   if (!ctx) return { error: "No encontramos esa membresía." };
+  // Un peludo dado de baja no vuelve a cobrarse (sección 9).
+  const { data: pet } = await ctx.admin.from("pets").select("is_active").eq("id", ctx.sub.pet_id!).maybeSingle();
+  if (!pet?.is_active)
+    return { error: `${ctx.petName} está dado de baja; su membresía termina al final del período.` };
   await getStripe().subscriptions.update(ctx.sub.stripe_subscription_id!, {
     cancel_at_period_end: false,
   });
@@ -496,7 +505,8 @@ export async function reactivarMembresiaDePeludo(subscriptionId: string) {
 /**
  * Mensual ↔ anual de UN peludo, dentro del $599 y conservando su nivel
  * (principal o adicional). Mismo criterio de prorrateo que el $159: a anual se
- * cobra la diferencia hoy; a mensual rige desde el siguiente cobro.
+ * cobra la diferencia hoy; a mensual lo no usado del año queda como saldo a su
+ * favor (ver `switchPlan`).
  */
 export async function cambiarIntervaloDePeludo(
   subscriptionId: string,
@@ -521,7 +531,7 @@ export async function cambiarIntervaloDePeludo(
   const item = actual.items.data[0];
   const nueva = await stripe.subscriptions.update(ctx.sub.stripe_subscription_id!, {
     items: [{ id: item.id, price }],
-    proration_behavior: target === "annual" ? "always_invoice" : "none",
+    proration_behavior: "always_invoice",
     metadata: { ...actual.metadata, plan: target, plan_version_id: version.id },
   });
   const nuevoItem = nueva.items.data[0];

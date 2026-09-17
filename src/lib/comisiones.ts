@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { lineaDelCobro } from "@/lib/plans/factura";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { beneficiosDe } from "@/lib/plans/resolve";
 import { sumarMeses } from "@/lib/plans/montos";
@@ -153,10 +154,18 @@ export async function acumularComisionDeCobro(admin: Admin, invoice: Stripe.Invo
 
   const { data: referido } = await admin
     .from("referrals")
-    .select("id, ambassador_id, ambassadors(status, deactivated_at)")
+    .select("id, ambassador_id, subscription_id, ambassadors(status, deactivated_at)")
     .eq("referred_user_id", sub.user_id)
     .maybeSingle();
   if (!referido) return;
+  // «Solo para referidos del $599» (sección 9). El referido es uno por persona:
+  // si vino de un embajador cuando contrató el $159 (que ya le pagó sus $16) y
+  // después volvió con el $599, ese vínculo viejo no genera el 3%. Cuenta solo
+  // si el alta referida fue una membresía por peludo.
+  const { data: suscripcionReferida } = referido.subscription_id
+    ? await admin.from("subscriptions").select("pet_id").eq("id", referido.subscription_id).maybeSingle()
+    : { data: null };
+  if (!suscripcionReferida?.pet_id) return;
   const emb = (Array.isArray(referido.ambassadors) ? referido.ambassadors[0] : referido.ambassadors) as
     | { status?: string; deactivated_at?: string | null }
     | null;
@@ -166,7 +175,7 @@ export async function acumularComisionDeCobro(admin: Admin, invoice: Stripe.Invo
   if (emb?.deactivated_at && new Date(cobradoEl) > new Date(emb.deactivated_at)) return;
 
   // Meses que cubre el cobro: 1 en mensual, 12 en anual.
-  const linea = invoice.lines?.data?.find((l) => l.period?.start && l.period?.end) ?? null;
+  const linea = lineaDelCobro(invoice);
   const inicio = linea?.period?.start
     ? diaEnMexico(new Date(linea.period.start * 1000))
     : diaEnMexico(new Date(cobradoEl));
