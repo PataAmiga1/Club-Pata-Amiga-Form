@@ -22,15 +22,21 @@ export const PLAN_159 = "membresia";
 export const PLAN_599 = "membresia-599";
 
 /**
- * El plan que contrata quien se registra hoy. El día del lanzamiento cambia al
- * slug del $599 — y en ese mismo despliegue tiene que haber versión publicada
- * con precio en Stripe, porque el respaldo de las variables de entorno es
- * SOLO del plan de $159.
+ * El plan que contrata quien se registra hoy.
  *
- * Tipado como `string` a propósito: al cambiar el valor, las comparaciones
- * contra PLAN_159 siguen compilando.
+ * Sale de la variable de entorno `PLAN_DE_ALTAS` (sección 2, 17-sep-2026) y
+ * por omisión es el $159. El día del lanzamiento se pone `membresia-599` en
+ * Vercel — y para entonces tiene que haber versión publicada con sus DOS
+ * precios en Stripe, porque el respaldo de las variables de entorno de precios
+ * es SOLO del $159. Ir por variable y no por código permite probar el $599 en
+ * local contra la base de pruebas sin tocar lo que corre en producción.
+ *
+ * Solo se lee en el servidor.
  */
-export const PLAN_DE_ALTAS: string = PLAN_159;
+export const PLAN_DE_ALTAS: string = process.env.PLAN_DE_ALTAS?.trim() || PLAN_159;
+
+/** ¿Las altas de hoy son de la membresía $599? */
+export const ALTAS_SON_599 = PLAN_DE_ALTAS === PLAN_599;
 
 /**
  * Las reglas del plan de $159 tal como estaban el 16-sep-2026, CONGELADAS.

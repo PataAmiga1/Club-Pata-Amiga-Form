@@ -11,6 +11,9 @@ export type VersionVigente = {
   interval: "month" | "year";
   price_cents: number;
   stripe_price_id: string | null;
+  /** Membresía $599: precio de cada peludo después del primero. */
+  additional_price_cents: number | null;
+  stripe_additional_price_id: string | null;
   benefits: Record<string, unknown>;
 };
 
@@ -35,7 +38,7 @@ export async function versionVigente(
     const { data } = await admin
       .from("plan_versions")
       .select(
-        "id, version, interval, price_cents, stripe_price_id, benefits, membership_plans!inner(slug, is_public, archived_at)",
+        "id, version, interval, price_cents, stripe_price_id, additional_price_cents, stripe_additional_price_id, benefits, membership_plans!inner(slug, is_public, archived_at)",
       )
       .eq("membership_plans.slug", planSlug)
       .is("membership_plans.archived_at", null)
@@ -51,6 +54,8 @@ export async function versionVigente(
       interval: data.interval as "month" | "year",
       price_cents: data.price_cents,
       stripe_price_id: data.stripe_price_id,
+      additional_price_cents: data.additional_price_cents,
+      stripe_additional_price_id: data.stripe_additional_price_id,
       benefits: (data.benefits as Record<string, unknown>) ?? {},
     };
   } catch (err) {
@@ -88,7 +93,7 @@ export async function publicarVersion(
   const { data: version } = await admin
     .from("plan_versions")
     .select(
-      "id, version, interval, price_cents, additional_price_cents, currency, benefits, status, stripe_product_id, stripe_price_id, legal_confirmed_at, membership_plans(id, name, slug)",
+      "id, version, interval, price_cents, additional_price_cents, currency, benefits, status, stripe_product_id, stripe_price_id, stripe_additional_price_id, legal_confirmed_at, membership_plans(id, name, slug)",
     )
     .eq("id", input.versionId)
     .maybeSingle();
@@ -101,16 +106,6 @@ export async function publicarVersion(
     : version.membership_plans;
   if (!plan) return { ok: false, error: "La versión no tiene plan" };
 
-  // Candado de la sección 1 del $599 (17-sep-2026): publicar hoy crearía en
-  // Stripe solo el precio del primer peludo, sin el del adicional ($509), y la
-  // versión quedaría «publicada» a medias. Se quita en la sección 2, cuando
-  // publicar cree los dos precios.
-  if (version.additional_price_cents != null)
-    return {
-      ok: false,
-      error:
-        "Esta versión cobra por peludo y el cobro por peludo todavía no está construido (sección 2). No se puede publicar aún.",
-    };
 
   // --- Compuerta legal ---------------------------------------------------
   // Cambiar un beneficio VINCULANTE exige el reglamento que ya lo refleje y la
@@ -129,6 +124,7 @@ export async function publicarVersion(
   // --- Stripe -------------------------------------------------------------
   let productId = version.stripe_product_id;
   let priceId = version.stripe_price_id;
+  let adicionalId = version.stripe_additional_price_id;
   let creadoEnStripe = false;
 
   try {
@@ -169,6 +165,25 @@ export async function publicarVersion(
       priceId = precio.id;
       creadoEnStripe = true;
     }
+
+    // Membresía $599 (sección 2): el peludo adicional tiene su propio precio.
+    // Se crean los DOS o la versión no se publica: una versión a medias
+    // cobraría $599 a cada peludo.
+    if (version.additional_price_cents != null && !adicionalId) {
+      const adicional = await stripe.prices.create({
+        product: productId,
+        currency: (version.currency ?? "MXN").toLowerCase(),
+        unit_amount: version.additional_price_cents,
+        recurring: { interval: version.interval as "month" | "year" },
+        metadata: {
+          plan_version_id: version.id,
+          version: String(version.version),
+          nivel: "adicional",
+        },
+      });
+      adicionalId = adicional.id;
+      creadoEnStripe = true;
+    }
   } catch (err) {
     const mensaje = err instanceof Error ? err.message : "Stripe rechazó la publicación";
     await admin
@@ -184,6 +199,7 @@ export async function publicarVersion(
       status: "publicada",
       stripe_product_id: productId,
       stripe_price_id: priceId,
+      stripe_additional_price_id: adicionalId,
       published_by: input.publishedBy,
       published_at: new Date().toISOString(),
     })

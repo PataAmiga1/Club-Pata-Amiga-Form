@@ -12,6 +12,12 @@ import {
   esperasDe,
   tomarSnapshot,
 } from "@/lib/plans/resolve";
+import { esModelo599 } from "@/lib/plans/montos";
+import {
+  nombreDelIntervalo,
+  queEsEstePrecio,
+  recalcularEstadoDelMiembro,
+} from "@/lib/plans/suscripciones";
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
@@ -24,6 +30,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     supabase,
     session.metadata?.plan_version_id,
   );
+
+  // Membresía $599 (sección 2): la suscripción es de UN peludo. Sin estos
+  // datos es una suscripción del $159, que cubre la cuenta completa.
+  const es599 = esModelo599(beneficios);
+  const petId = session.metadata?.pet_id ?? null;
+  const nivel =
+    session.metadata?.price_tier === "adicional" ||
+    session.metadata?.price_tier === "principal"
+      ? session.metadata.price_tier
+      : null;
+  // Un peludo adicional no vuelve a «hacer miembro» a nadie: la persona ya lo
+  // es desde su primer peludo, y su fecha de alta no se toca.
+  const esAdicional = nivel === "adicional";
 
   // 1. Member is ACTIVE immediately on payment.
   // El contratante NO tiene tiempo de espera (PM, 11-ago): quien compra la
@@ -40,7 +59,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     .from("profiles")
     .update({
       membership_status: "active",
-      member_since: new Date().toISOString(),
+      ...(esAdicional ? {} : { member_since: new Date().toISOString() }),
       ...(session.metadata?.ambassador_code
         ? { ambassador_code_used: session.metadata.ambassador_code }
         : {}),
@@ -54,11 +73,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // parte del bug de los "13 días transcurridos": si el pago llegaba días
   // después de crear el perfil, esa brecha aparecía como avance fantasma.
   const hasReferral = Boolean(session.metadata?.ambassador_code);
-  const { data: pets } = await supabase
+  let consultaPeludos = supabase
     .from("pets")
     .select("id, species, name, breed, is_adopted")
     .eq("user_id", userId)
     .is("waiting_period_end_date", null);
+  // En el $599 el correo habla del peludo que se acaba de pagar, no de todos.
+  if (petId) consultaPeludos = consultaPeludos.eq("id", petId);
+  const { data: pets } = await consultaPeludos;
 
   const petDays = new Map<string, number>();
   for (const pet of pets ?? []) {
@@ -112,6 +134,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         stripe_customer_id: session.customer as string,
         stripe_subscription_id: session.subscription as string,
         plan: session.metadata?.plan ?? null,
+        plan_name: nombreDelIntervalo(
+          session.metadata?.plan as "monthly" | "annual" | undefined,
+        ),
+        ...(petId ? { pet_id: petId, price_tier: nivel } : {}),
         amount: session.amount_total ? session.amount_total / 100 : null,
         currency: (session.currency ?? "mxn").toUpperCase(),
         status: "active",
@@ -133,7 +159,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // 4. Referral for the ambassador — commission fixed at signup, paid at the
   // monthly cut (día 5 del mes siguiente)
-  if (session.metadata?.ambassador_code) {
+  //
+  // Membresía $599: la comisión es MENSUAL, el 3% del primer peludo, y sale de
+  // cada cobro (sección 5). Aquí solo se registra el vínculo embajador ↔
+  // referido con monto 0, y solo desde el peludo principal. Ojo: antes el
+  // `|| AMBASSADOR_COMMISSION_MXN` convertía un 0 del plan en $16.
+  if (session.metadata?.ambassador_code && !esAdicional) {
     const { data: ambassador } = await supabase
       .from("ambassadors")
       .select("id")
@@ -149,8 +180,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             referred_user_id: userId,
             subscription_id: subRow?.id ?? null,
             // La comisión también sale del plan contratado.
-            commission_amount:
-              session.metadata?.plan === "annual"
+            commission_amount: es599
+              ? 0
+              : session.metadata?.plan === "annual"
                 ? Number(beneficios.comision_embajador_anual_mxn) ||
                   AMBASSADOR_COMMISSION_MXN.annual
                 : Number(beneficios.comision_embajador_mensual_mxn) ||
@@ -177,13 +209,15 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   await marcarComoMiembro(supabase, userId);
 
   // 6. Welcome email (sendTemplatedEmail never throws)
-  if (profile?.email) {
+  if (profile?.email && !esAdicional) {
     const firstPet = pets?.[0];
     await sendTemplatedEmail("welcome", profile.email, {
       firstName: profile.first_name ?? "",
-      petNotice: firstPet
-        ? `<strong>${firstPet.name}</strong> entra a revisión del comité. En cuanto su perfil sea aprobado empezará su tiempo de espera de ${petDays.get(firstPet.id) ?? 180} días.`
-        : "",
+      petNotice: !firstPet
+        ? ""
+        : es599
+          ? `<strong>${firstPet.name}</strong> entra a revisión del comité. En cuanto su perfil sea aprobado empiezan a contar sus beneficios: los cuidados cotidianos y la despedida se abren el día ${beneficios.cuidados_apertura_dias}, y la emergencia veterinaria en el mes ${beneficios.emergencia_apertura_mes}.`
+          : `<strong>${firstPet.name}</strong> entra a revisión del comité. En cuanto su perfil sea aprobado empezará su tiempo de espera de ${petDays.get(firstPet.id) ?? 180} días.`,
     });
   }
 }
@@ -191,20 +225,25 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 /** Keeps the local subscription row in sync (plan switches, renewals, cancel flags). */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const item = subscription.items.data[0];
-  const priceId = item?.price.id;
-  const plan =
-    priceId === process.env.STRIPE_PRICE_ANNUAL
-      ? "annual"
-      : priceId === process.env.STRIPE_PRICE_MONTHLY
-        ? "monthly"
-        : null;
-
   const supabase = createAdminClient();
-  await supabase
+
+  // El plan sale del precio: primero de las versiones publicadas (principal o
+  // adicional), después de las variables de entorno del $159. Antes solo se
+  // miraban las variables, y un precio publicado desde el panel dejaba `plan`
+  // en null.
+  const precio = await queEsEstePrecio(supabase, item?.price.id);
+  const plan = precio?.plan ?? null;
+
+  const { data: fila } = await supabase
     .from("subscriptions")
     .update({
-      ...(plan ? { plan, plan_name: plan === "annual" ? "Anual" : "Mensual" } : {}),
-      amount: item?.price.unit_amount != null ? item.price.unit_amount / 100 : undefined,
+      ...(plan ? { plan, plan_name: nombreDelIntervalo(plan) } : {}),
+      // Un peludo que pasa de adicional a principal (sección 4) cambia de precio.
+      ...(precio?.nivel ? { price_tier: precio.nivel } : {}),
+      amount:
+        item?.price.unit_amount != null
+          ? (item.price.unit_amount * (item.quantity ?? 1)) / 100
+          : undefined,
       status: subscription.status,
       cancel_at_period_end: subscription.cancel_at_period_end,
       current_period_start: item?.current_period_start
@@ -214,7 +253,13 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
         ? new Date(item.current_period_end * 1000).toISOString()
         : undefined,
     })
-    .eq("stripe_subscription_id", subscription.id);
+    .eq("stripe_subscription_id", subscription.id)
+    .select("user_id")
+    .maybeSingle();
+
+  // El estado del miembro sale de TODAS sus suscripciones (una por peludo en
+  // el $599). También cubre la recuperación: past_due → active.
+  if (fila?.user_id) await recalcularEstadoDelMiembro(supabase, fila.user_id);
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -226,10 +271,10 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .select("user_id")
     .maybeSingle();
   if (subRow?.user_id) {
-    await supabase
-      .from("profiles")
-      .update({ membership_status: "canceled" })
-      .eq("id", subRow.user_id);
+    // Con varios peludos, dar de baja a uno no cancela la membresía: solo si
+    // ya no le queda ninguna suscripción viva.
+    const estado = await recalcularEstadoDelMiembro(supabase, subRow.user_id);
+    if (estado !== "canceled") return;
     await crmEventoDeUsuario(supabase, {
       userId: subRow.user_id,
       kind: "membresia_inactiva",
@@ -265,10 +310,9 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     .select("user_id")
     .maybeSingle();
   if (subRow?.user_id) {
-    await supabase
-      .from("profiles")
-      .update({ membership_status: "past_due" })
-      .eq("id", subRow.user_id);
+    // Si le queda otro peludo al corriente, la persona sigue activa: el aviso
+    // y el correo salen igual, porque ESTE cobro sí falló.
+    await recalcularEstadoDelMiembro(supabase, subRow.user_id);
     // Un pago fallido es la señal más accionable que tiene ventas: la tarjeta
     // aparece en "Miembro inactivo" el mismo día, no cuando alguien lo note.
     await crmEventoDeUsuario(supabase, {
@@ -296,6 +340,44 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         });
     }
   }
+}
+
+/**
+ * Libro de cobros (sección 2): una fila por factura pagada. Es la fuente de
+ * los «meses pagados» que hacen crecer los montos del $599 y de las comisiones
+ * mensuales del embajador. Idempotente por el id de la factura: Stripe puede
+ * mandar el evento más de una vez.
+ */
+async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  const subId =
+    typeof invoice.parent?.subscription_details?.subscription === "string"
+      ? invoice.parent.subscription_details.subscription
+      : null;
+  if (!subId || !invoice.id) return;
+
+  // El período de la línea de la suscripción: un mes o un año.
+  const linea =
+    invoice.lines?.data?.find((l) => l.period?.start && l.period?.end) ?? null;
+  const supabase = createAdminClient();
+  await supabase.from("subscription_payments").upsert(
+    {
+      stripe_invoice_id: invoice.id,
+      stripe_subscription_id: subId,
+      amount_paid_cents: invoice.amount_paid ?? 0,
+      currency: (invoice.currency ?? "mxn").toUpperCase(),
+      period_start: linea?.period?.start
+        ? new Date(linea.period.start * 1000).toISOString()
+        : null,
+      period_end: linea?.period?.end
+        ? new Date(linea.period.end * 1000).toISOString()
+        : null,
+      billing_reason: invoice.billing_reason ?? null,
+      paid_at: invoice.status_transitions?.paid_at
+        ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+        : new Date().toISOString(),
+    },
+    { onConflict: "stripe_invoice_id", ignoreDuplicates: true },
+  );
 }
 
 export async function POST(request: Request) {
@@ -331,6 +413,11 @@ export async function POST(request: Request) {
         break;
       case "invoice.payment_failed":
         await handlePaymentFailed(event.data.object);
+        break;
+      // ⚠ Hay que activarlo también en el panel de Stripe (Webhooks → el
+      // endpoint de producción → eventos): si no está marcado, nunca llega.
+      case "invoice.paid":
+        await handleInvoicePaid(event.data.object);
         break;
     }
   } catch (e) {
