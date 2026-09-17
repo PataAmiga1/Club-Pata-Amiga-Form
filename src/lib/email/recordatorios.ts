@@ -109,12 +109,19 @@ export async function enviarRecordatoriosDeRenovacion(
   // cron corre en UTC y "dentro de 7 días" se recorrería un día para quien
   // renueva de noche.
   const ajustes = await fetchSiteSettings();
-  const dias =
-    opciones?.diasForzados ??
-    (ajustes.renewal_reminder_days ?? "")
+  const leerDias = (valor: string | undefined) =>
+    (valor ?? "")
       .split(",")
       .map((d) => Number(d.trim()))
       .filter((d) => Number.isInteger(d) && d >= 0 && d <= 90);
+
+  const diasNormales = opciones?.diasForzados ?? leerDias(ajustes.renewal_reminder_days);
+  // El año pagado por adelantado (meses sin intereses) se avisa con más
+  // anticipación: si quiere volver a pagar a meses, tiene que hacerlo ANTES del
+  // aniversario (17-sep-2026).
+  const diasDelAnual =
+    opciones?.diasForzados ?? leerDias(ajustes.renewal_reminder_days_anual || "30,15,3");
+  const dias = [...new Set([...diasNormales, ...diasDelAnual])].sort((a, b) => b - a);
 
   if (!dias.length)
     return { candidatos: 0, enviados: 0, bloqueados: 0, yaEnviados: 0, dias };
@@ -131,14 +138,19 @@ export async function enviarRecordatoriosDeRenovacion(
     const { data: subs } = await admin
       .from("subscriptions")
       .select(
-        "id, user_id, plan, amount, currency, current_period_end, cancel_at_period_end, status, pet_id, profiles!user_id(email, first_name), pets(name)",
+        "id, user_id, plan, amount, currency, current_period_end, cancel_at_period_end, status, pet_id, anual_prepagado, msi_meses, profiles!user_id(email, first_name), pets(name)",
       )
-      .eq("status", "active")
+      // `trialing` = año pagado por adelantado: la suscripción existe pero no
+      // cobra hasta el aniversario. También necesita su recordatorio.
+      .in("status", ["active", "trialing"])
       .not("cancel_at_period_end", "is", true)
       .gte("current_period_end", inicioDelDia(objetivo).toISOString())
       .lte("current_period_end", finDelDia(objetivo).toISOString());
 
     for (const sub of subs ?? []) {
+      // Cada tipo de membresía tiene su propia lista de días.
+      const toca = sub.anual_prepagado ? diasDelAnual.includes(d) : diasNormales.includes(d);
+      if (!toca) continue;
       const perfil = Array.isArray(sub.profiles) ? sub.profiles[0] : sub.profiles;
       const correo = (perfil as { email?: string } | null)?.email;
       if (!correo) continue;
@@ -178,6 +190,11 @@ export async function enviarRecordatoriosDeRenovacion(
             : ""
         }`,
         cuentaUrl: `${SITE_URL}/app/cuenta`,
+        // Solo el anual pagado por adelantado puede volver a pagarse a meses:
+        // Stripe no ofrece meses sin intereses en un cobro automático.
+        msiLine: sub.anual_prepagado
+          ? `<p>Si quieres, puedes <strong>renovar tu año a 3 o 6 meses sin intereses</strong> antes de esa fecha, desde Mi cuenta (si tu tarjeta lo permite). Si prefieres no hacer nada, ese día te cobramos el año completo con tu tarjeta guardada.</p>`
+          : "",
       });
       if (ok) enviados++;
       else {

@@ -39,6 +39,14 @@ export const SITE_SETTINGS = [
     default: "7,1",
   },
   {
+    // El anual pagado por adelantado (meses sin intereses) se avisa antes: si
+    // quiere volver a pagar a meses, tiene que hacerlo ANTES del aniversario,
+    // porque Stripe no ofrece meses sin intereses en un cobro automático.
+    key: "renewal_reminder_days_anual",
+    label: "Recordatorios del anual pagado por adelantado (días antes)",
+    default: "30,15,3",
+  },
+  {
     // 17-sep-2026: el $159 dejó de venderse y el $599 aún no está listo.
     // Cerrado, /registro manda a la lista de interesados y el checkout no
     // cobra. Ver src/lib/registro.ts.

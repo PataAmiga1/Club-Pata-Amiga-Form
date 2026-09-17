@@ -136,10 +136,50 @@ export async function acumularComisionDeCobro(admin: Admin, invoice: Stripe.Invo
   const pagado = invoice.amount_paid ?? 0;
   if (!subId || !invoice.id || invoice.status !== "paid" || pagado <= 0) return;
 
+  // Meses que cubre el cobro: 1 en mensual, 12 en anual.
+  const linea = lineaDelCobro(invoice);
+  const cobradoEl = invoice.status_transitions?.paid_at
+    ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
+    : new Date().toISOString();
+  const inicio = linea?.period?.start
+    ? diaEnMexico(new Date(linea.period.start * 1000))
+    : diaEnMexico(new Date(cobradoEl));
+  const fin = linea?.period?.end ? diaEnMexico(new Date(linea.period.end * 1000)) : sumarMeses(inicio, 1);
+
+  await acumularComisionDelPeriodo(admin, {
+    stripeSubscriptionId: subId,
+    stripeInvoiceId: invoice.id,
+    pagadoCentavos: pagado,
+    inicio,
+    fin,
+    cobradoEl,
+  });
+}
+
+/**
+ * El 3% de un pago que cubre un período, venga de una factura de suscripción o
+ * del pago único del anual a meses sin intereses (17-sep-2026). Idempotente
+ * por factura y mes.
+ */
+export async function acumularComisionDelPeriodo(
+  admin: Admin,
+  input: {
+    stripeSubscriptionId: string;
+    stripeInvoiceId: string;
+    pagadoCentavos: number;
+    /** Días mexicanos «yyyy-mm-dd». */
+    inicio: string;
+    fin: string;
+    cobradoEl: string;
+  },
+) {
+  const pagado = input.pagadoCentavos;
+  if (pagado <= 0) return;
+
   const { data: sub } = await admin
     .from("subscriptions")
     .select("id, user_id, pet_id, price_tier, benefits_snapshot")
-    .eq("stripe_subscription_id", subId)
+    .eq("stripe_subscription_id", input.stripeSubscriptionId)
     .maybeSingle();
   // Sin fila todavía (el cobro llegó antes que el alta): el alta lo vuelve a
   // procesar con la factura inicial.
@@ -169,32 +209,23 @@ export async function acumularComisionDeCobro(admin: Admin, invoice: Stripe.Invo
   const emb = (Array.isArray(referido.ambassadors) ? referido.ambassadors[0] : referido.ambassadors) as
     | { status?: string; deactivated_at?: string | null }
     | null;
-  const cobradoEl = invoice.status_transitions?.paid_at
-    ? new Date(invoice.status_transitions.paid_at * 1000).toISOString()
-    : new Date().toISOString();
-  if (emb?.deactivated_at && new Date(cobradoEl) > new Date(emb.deactivated_at)) return;
+  if (emb?.deactivated_at && new Date(input.cobradoEl) > new Date(emb.deactivated_at)) return;
 
-  // Meses que cubre el cobro: 1 en mensual, 12 en anual.
-  const linea = lineaDelCobro(invoice);
-  const inicio = linea?.period?.start
-    ? diaEnMexico(new Date(linea.period.start * 1000))
-    : diaEnMexico(new Date(cobradoEl));
-  const fin = linea?.period?.end ? diaEnMexico(new Date(linea.period.end * 1000)) : sumarMeses(inicio, 1);
   let meses = 0;
-  while (meses < 24 && sumarMeses(inicio, meses) < fin) meses++;
+  while (meses < 24 && sumarMeses(input.inicio, meses) < input.fin) meses++;
   meses = Math.max(1, meses);
 
   const totalCentavos = Math.round((pagado * porcentaje) / 100);
   const porMes = Math.floor(totalCentavos / meses);
   const filas = Array.from({ length: meses }, (_, k) => {
-    const mes = sumarMeses(inicio, k);
+    const mes = sumarMeses(input.inicio, k);
     return {
       referral_id: referido.id,
       ambassador_id: referido.ambassador_id,
       subscription_id: sub.id,
-      stripe_invoice_id: invoice.id!,
+      stripe_invoice_id: input.stripeInvoiceId,
       earned_on: `${mes.slice(0, 7)}-01`,
-      paid_at: cobradoEl,
+      paid_at: input.cobradoEl,
       base_cents: pagado,
       percentage: porcentaje,
       // El último mes se lleva los centavos que sobran del reparto.

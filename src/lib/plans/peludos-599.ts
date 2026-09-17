@@ -31,6 +31,11 @@ export async function registrarCobro(admin: Admin, invoice: Stripe.Invoice) {
       ? invoice.parent.subscription_details.subscription
       : null;
   if (!subId || !invoice.id || invoice.status !== "paid") return;
+  // Una factura de $0 no es un mes pagado: es la que Stripe emite al crear una
+  // suscripción que todavía no cobra (el anual pagado por adelantado, sección
+  // de meses sin intereses). Si se asentara, esos meses contarían dos veces.
+  // Ojo: un cobro cubierto con saldo a favor SÍ cuenta — ahí el total es > 0.
+  if ((invoice.total ?? 0) <= 0) return;
 
   const linea = lineaDelCobro(invoice);
   await admin.from("subscription_payments").upsert(

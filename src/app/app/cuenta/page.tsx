@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { puedeAdelantarRenovacion } from "@/lib/plans/msi";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { cuentasDelMiembro } from "@/lib/cuentas-bancarias";
@@ -49,7 +50,7 @@ export default async function CuentaPage() {
   // propio corte, cancelación y plan.
   const { data: porPeludo } = await createAdminClient()
     .from("subscriptions")
-    .select("id, pet_id, plan, price_tier, amount, status, cancel_at_period_end, current_period_end, created_at, pets(name)")
+    .select("id, pet_id, plan, price_tier, amount, status, cancel_at_period_end, current_period_end, created_at, anual_prepagado, msi_meses, pets(name)")
     .eq("user_id", user.id)
     .not("pet_id", "is", null)
     .order("created_at", { ascending: true });
@@ -71,6 +72,13 @@ export default async function CuentaPage() {
     monto: Number(s.amount ?? 0),
     estado: s.status ?? "",
     cancelaAlCorte: !!s.cancel_at_period_end,
+    anualPrepagado: !!s.anual_prepagado,
+    msiMeses: s.msi_meses ?? null,
+    // El botón de renovar aparece en los últimos 60 días del año pagado.
+    puedeRenovar:
+      !!s.anual_prepagado &&
+      !s.cancel_at_period_end &&
+      puedeAdelantarRenovacion(s.current_period_end),
     corte: s.current_period_end ? formatDateEs(s.current_period_end) : null,
     garantia: (() => {
       const g = garantias.get(s.id);
