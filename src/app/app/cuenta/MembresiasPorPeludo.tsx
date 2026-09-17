@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   cambiarIntervaloDePeludo,
   cancelarMembresiaDePeludo,
+  pedirGarantia,
   reactivarMembresiaDePeludo,
 } from "./actions";
 
@@ -25,12 +26,23 @@ export type MembresiaDePeludo = {
   cancelaAlCorte: boolean;
   /** Fecha legible del próximo cobro o del fin de la membresía. */
   corte: string | null;
+  /** Garantía de 90 días (sección 6). null si no aplica. */
+  garantia: {
+    dentroDelPlazo: boolean;
+    venceEl: string | null;
+    reembolsoCents: number;
+    solicitud: string | null;
+  } | null;
 };
+
+const pesos = (c: number) =>
+  `$${(c / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
 
 export function MembresiasPorPeludo({ membresias }: { membresias: MembresiaDePeludo[] }) {
   const router = useRouter();
   const [pendiente, startTransition] = useTransition();
   const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [garantiaDe, setGarantiaDe] = useState<string | null>(null);
   const [aviso, setAviso] = useState<{ texto: string; error: boolean } | null>(null);
 
   const correr = (accion: () => Promise<{ ok?: true; error?: string }>, exito: string) =>
@@ -41,6 +53,7 @@ export function MembresiasPorPeludo({ membresias }: { membresias: MembresiaDePel
       else {
         setAviso({ texto: exito, error: false });
         setConfirmando(null);
+        setGarantiaDe(null);
         router.refresh();
       }
     });
@@ -144,6 +157,57 @@ export function MembresiasPorPeludo({ membresias }: { membresias: MembresiaDePel
                   </>
                 )}
               </div>
+              {/* Garantía de satisfacción (sección 6) */}
+              {m.garantia?.solicitud === "pendiente" ? (
+                <span className="rounded-[10px] bg-info-bg px-3 py-2 text-[12.5px] text-info-text">
+                  Pediste la garantía: te devolveremos {pesos(m.garantia.reembolsoCents)} MXN en cuanto el
+                  equipo la confirme.
+                </span>
+              ) : m.garantia?.solicitud === "reembolsada" ? (
+                <span className="rounded-[10px] bg-success-bg px-3 py-2 text-[12.5px] text-success-text">
+                  Garantía reembolsada.
+                </span>
+              ) : m.garantia?.dentroDelPlazo ? (
+                garantiaDe === m.id ? (
+                  <div className="flex flex-col gap-2 rounded-[12px] bg-cream p-3 text-[12.5px] text-ink-body">
+                    <span>
+                      Te devolvemos <strong>{pesos(m.garantia.reembolsoCents)} MXN</strong> (lo que pagaste
+                      por {m.petName} menos lo que ya te reintegramos) y su membresía se cancela. Sin
+                      preguntas.
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={pendiente}
+                        onClick={() =>
+                          correr(
+                            () => pedirGarantia(m.id, ""),
+                            "Recibimos tu solicitud de garantía. El equipo la confirma y te avisamos.",
+                          )
+                        }
+                        className="rounded-full bg-teal px-4 py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
+                      >
+                        Pedir mi reembolso
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGarantiaDe(null)}
+                        className="rounded-full border-[1.5px] border-border-input px-4 py-2 text-[12.5px] font-bold text-ink-secondary"
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setGarantiaDe(m.id)}
+                    className="self-start text-[12.5px] font-bold text-teal-deep hover:underline"
+                  >
+                    ¿No te convenció? Garantía de satisfacción hasta el {m.garantia.venceEl} →
+                  </button>
+                )
+              ) : null}
             </li>
           );
         })}

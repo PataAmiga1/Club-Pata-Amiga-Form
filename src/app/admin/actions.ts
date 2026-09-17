@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { valorDeUnMesCentavos } from "@/lib/garantia";
 import { corteDeComisiones } from "@/lib/comisiones";
 import { formatDateEs } from "@/lib/dates";
 import { estadoDePeludo599, esRubro599 } from "@/lib/reintegros-599";
@@ -1513,4 +1514,64 @@ export async function bypassWaitingPeriod(petId: string) {
     })
     .eq("id", petId);
   revalidatePath("/admin");
+}
+
+/**
+ * «Si nos tardamos más de 5 días hábiles, tu mes es gratis» (sección 6). El
+ * sistema detectó el vencimiento (sección 3); el equipo lo aplica aquí con un
+ * clic. Es un CRÉDITO en el saldo del cliente de Stripe por un mes de ese
+ * peludo (precio mensual, o la doceava parte del anual), que Stripe descuenta
+ * solo en su siguiente cobro. Una sola vez por solicitud.
+ */
+export async function aplicarMesGratis(reimbursementId: string) {
+  const { adminId, admin } = await requireAdmin();
+  const { data: req } = await admin
+    .from("reimbursements")
+    .select("id, folio, user_id, pet_id, sla_breached_at, free_month_applied_at, pets(name)")
+    .eq("id", reimbursementId)
+    .maybeSingle();
+  if (!req) return { error: "No encontramos la solicitud." };
+  if (!req.sla_breached_at) return { error: "Esta solicitud no pasó del plazo de 5 días hábiles." };
+  if (req.free_month_applied_at) return { error: "El mes gratis de esta solicitud ya se aplicó." };
+
+  const { data: subs } = await admin
+    .from("subscriptions")
+    .select("id, status, plan, amount, stripe_customer_id, created_at")
+    .eq("pet_id", req.pet_id)
+    .order("created_at", { ascending: false });
+  const sub = (subs ?? []).find((s) => ["active", "past_due", "unpaid", "trialing"].includes(s.status ?? ""));
+  if (!sub?.stripe_customer_id) return { error: "El peludo ya no tiene una membresía activa a la cual aplicar el mes." };
+
+  const centavos = valorDeUnMesCentavos(sub.plan, Number(sub.amount ?? 0));
+  if (centavos <= 0) return { error: "No pudimos calcular el valor del mes." };
+  let ref: string;
+  try {
+    const credito = await getStripe().customers.createBalanceTransaction(
+      sub.stripe_customer_id,
+      { amount: -centavos, currency: "mxn", description: `Mes gratis por reintegro ${req.folio} (más de 5 días hábiles)` },
+      { idempotencyKey: `mes-gratis-${req.id}` },
+    );
+    ref = credito.id;
+  } catch (e) {
+    return { error: `Stripe no aceptó el crédito: ${e instanceof Error ? e.message : "error"}` };
+  }
+
+  await admin
+    .from("reimbursements")
+    .update({
+      free_month_applied_at: new Date().toISOString(),
+      free_month_cents: centavos,
+      free_month_stripe_ref: ref,
+      free_month_applied_by: adminId,
+    })
+    .eq("id", req.id);
+  const pet = (Array.isArray(req.pets) ? req.pets[0] : req.pets) as { name?: string } | null;
+  await admin.from("notifications").insert({
+    user_id: req.user_id,
+    type: "reimbursement_approved",
+    title: `Tu siguiente mes de ${pet?.name ?? "tu peludo"} es gratis`,
+    message: `Nos tardamos más de 5 días hábiles con tu reintegro ${req.folio}. Como lo prometimos, aplicamos ${formatMxn(centavos / 100)} MXN a tu siguiente cobro.`,
+  });
+  revalidatePath(`/admin/reintegros/${req.id}`);
+  return { ok: true as const, centavos };
 }

@@ -529,3 +529,48 @@ export async function cambiarIntervaloDePeludo(
   revalidatePath("/app/peludos");
   return { ok: true as const };
 }
+
+/**
+ * Garantía de 90 días de UN peludo (sección 6). El sistema calcula el monto
+ * (lo cobrado menos lo reintegrado) y deja la solicitud; el equipo confirma y
+ * reembolsa desde el panel. «Sin preguntas»: el comentario es opcional.
+ */
+export async function pedirGarantia(subscriptionId: string, comentario: string) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  const { estadoDeGarantia } = await import("@/lib/garantia");
+  const estado = await estadoDeGarantia(ctx.admin, ctx.sub.id);
+  if (!estado?.aplica) return { error: "Esta membresía no tiene garantía." };
+  if (!estado.dentroDelPlazo) return { error: "El plazo de la garantía ya terminó." };
+  if (estado.solicitud?.status === "pendiente")
+    return { error: "Ya pediste la garantía de esta membresía; el equipo la está confirmando." };
+
+  const { error } = await ctx.admin.from("guarantee_requests").insert({
+    user_id: ctx.userId,
+    subscription_id: ctx.sub.id,
+    pet_id: ctx.sub.pet_id,
+    paid_cents: estado.pagadoCents,
+    reimbursed_cents: estado.reintegradoCents,
+    refund_cents: estado.reembolsoCents,
+    member_comment: comentario.trim() || null,
+  });
+  if (error) return { error: "No pudimos registrar tu solicitud. Intenta de nuevo." };
+
+  const pesos = (c: number) => `$${(c / 100).toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
+  await ctx.admin.from("notifications").insert({
+    user_id: ctx.userId,
+    type: "plan_changed",
+    title: `Recibimos tu solicitud de garantía para ${ctx.petName}`,
+    message: `Te devolveremos ${pesos(estado.reembolsoCents)} MXN (lo pagado menos lo reintegrado). El equipo lo confirma y te avisa cuando se haga el reembolso.`,
+  });
+  await notifyTeam(
+    "notify_memberships",
+    `Garantía de 90 días solicitada: ${ctx.petName}`,
+    `<h2 style="color:#1E5350">Solicitud de garantía</h2>
+     <p><strong>${ctx.petName}</strong> · pagado ${pesos(estado.pagadoCents)} · reintegrado ${pesos(estado.reintegradoCents)} · <strong>a reembolsar ${pesos(estado.reembolsoCents)}</strong></p>
+     ${comentario.trim() ? `<p>Comentario: «${comentario.trim()}»</p>` : ""}
+     <p>Confírmala en el panel → Finanzas → Garantías.</p>`,
+  );
+  revalidatePath("/app/cuenta");
+  return { ok: true as const, reembolsoCents: estado.reembolsoCents };
+}

@@ -54,6 +54,12 @@ export default async function CuentaPage() {
     .not("pet_id", "is", null)
     .order("created_at", { ascending: true });
   const vivas599 = (porPeludo ?? []).filter((s) => ESTADOS_VIVOS.includes(s.status ?? ""));
+  const { estadoDeGarantia } = await import("@/lib/garantia");
+  const garantias = new Map(
+    await Promise.all(
+      vivas599.map(async (s) => [s.id, await estadoDeGarantia(createAdminClient(), s.id)] as const),
+    ),
+  );
   const membresias599: MembresiaDePeludo[] = vivas599.map((s) => ({
     id: s.id,
     petId: s.pet_id!,
@@ -66,6 +72,16 @@ export default async function CuentaPage() {
     estado: s.status ?? "",
     cancelaAlCorte: !!s.cancel_at_period_end,
     corte: s.current_period_end ? formatDateEs(s.current_period_end) : null,
+    garantia: (() => {
+      const g = garantias.get(s.id);
+      if (!g?.aplica) return null;
+      return {
+        dentroDelPlazo: g.dentroDelPlazo,
+        venceEl: g.venceEl ? formatDateEs(g.venceEl) : null,
+        reembolsoCents: g.solicitud?.status === "pendiente" ? g.solicitud.refundCents : g.reembolsoCents,
+        solicitud: g.solicitud?.status ?? null,
+      };
+    })(),
   }));
   // `.limit(1)` devuelve arreglo. Con `maybeSingle()`, un miembro con dos
   // suscripciones vivas veía otra vez su cuenta como si no tuviera membresía.

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MesGratisBoton } from "./MesGratisBoton";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -28,7 +29,7 @@ export default async function ReviewPage({
   const { data: req } = await admin
     .from("reimbursements")
     .select(
-      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, care_concepts, plan_balance, due_business_date, sla_breached_at, high_amount_alert_at, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
+      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, care_concepts, plan_balance, due_business_date, sla_breached_at, high_amount_alert_at, free_month_applied_at, free_month_cents, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
     )
     .eq("id", id)
     .single();
@@ -241,6 +242,13 @@ export default async function ReviewPage({
                 </span>
               </div>
             </div>
+            {req.sla_breached_at && (
+              <MesGratisBoton
+                reimbursementId={req.id}
+                aplicadoEl={req.free_month_applied_at}
+                montoCentavos={req.free_month_cents}
+              />
+            )}
             {es599 && estado599 && rubro599 && (
               <div className="flex flex-col gap-1.5 rounded-[12px] border-[1.5px] border-border-input p-3 text-[12.5px] text-ink-body">
                 <span className="text-[10.5px] font-extrabold tracking-[.05em] text-ink-tertiary">

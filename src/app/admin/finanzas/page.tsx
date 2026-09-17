@@ -332,6 +332,14 @@ export default async function AdminFinanzasPage() {
         <div className="flex flex-wrap gap-2">
           {isSuper && (
             <Link
+              href="/admin/garantias"
+              className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
+            >
+              🛡️ Garantías de 90 días →
+            </Link>
+          )}
+          {isSuper && (
+            <Link
               href="/admin/costos"
               className="grid h-9 place-items-center rounded-full bg-teal px-4 text-xs font-bold text-white transition-colors hover:bg-teal-deep"
             >
