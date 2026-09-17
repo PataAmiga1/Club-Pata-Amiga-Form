@@ -41,6 +41,7 @@ export function renglonesDeLaOferta599(
       : []),
     `  · Emergencia veterinaria: desde el mes ${p.emergencia.aperturaMes} con ${$(p.emergencia.inicial)}; sube ${$(p.emergencia.incremento)} por cada mes pagado hasta ${$(p.emergencia.tope)}.`,
     `  · Despedida: ${$(p.despedida.monto)} desde el día ${p.despedida.aperturaDia}.`,
+    `- El anual se puede pagar a 3 o 6 MESES SIN INTERESES con tarjetas de crédito participantes; la opción aparece en la pantalla de pago de Stripe, después de escribir la tarjeta. El mensual no.`,
     `- Los días y meses se cuentan desde que el comité aprueba al peludo. Solo suman los meses pagados.`,
     `- Sin límite de edad. Peludos senior (8 años o más): certificado médico veterinario al registrarlos.`,
     `- Reintegro en máximo ${p.diasHabiles} días hábiles; si nos tardamos más, ese mes de ese peludo es gratis.`,

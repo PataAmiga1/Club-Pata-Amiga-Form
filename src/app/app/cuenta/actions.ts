@@ -450,7 +450,7 @@ async function suscripcionPropiaDePeludo(subscriptionId: string) {
   const admin = createAdminClient();
   const { data: sub } = await admin
     .from("subscriptions")
-    .select("id, user_id, pet_id, status, plan, price_tier, stripe_subscription_id, cancel_at_period_end, pets(name)")
+    .select("id, user_id, pet_id, status, plan, price_tier, stripe_subscription_id, stripe_customer_id, cancel_at_period_end, anual_prepagado, msi_meses, current_period_end, pets(name)")
     .eq("id", subscriptionId)
     .maybeSingle();
   if (!sub || sub.user_id !== user.id || !sub.pet_id || !sub.stripe_subscription_id) return null;
@@ -515,6 +515,11 @@ export async function cambiarIntervaloDePeludo(
   const ctx = await suscripcionPropiaDePeludo(subscriptionId);
   if (!ctx) return { error: "No encontramos esa membresía." };
   if (ctx.sub.plan === target) return { ok: true as const };
+  // Año pagado por adelantado: no hay nada que prorratear hasta el aniversario.
+  if (ctx.sub.anual_prepagado)
+    return {
+      error: `Pagaste el año de ${ctx.petName} por adelantado. Puedes cambiar a mensual en su renovación.`,
+    };
   if (ctx.sub.status !== "active")
     return { error: "Esta membresía tiene un pago pendiente; primero actualiza tu método de pago." };
 
@@ -559,6 +564,62 @@ export async function cambiarIntervaloDePeludo(
   revalidatePath("/app/cuenta");
   revalidatePath("/app/peludos");
   return { ok: true as const };
+}
+
+/**
+ * Renovar por adelantado el año, a meses sin intereses (17-sep-2026).
+ *
+ * El año en curso se pagó de una vez, así que la suscripción no cobra hasta el
+ * aniversario. Con esto la persona vuelve a pagar el año ANTES de esa fecha,
+ * otra vez a meses si su tarjeta lo permite, y el aniversario se recorre 12
+ * meses (lo hace el webhook). Si no lo usa, en el aniversario se le cobra el
+ * anual de corrido: nadie se queda sin membresía.
+ */
+export async function renovarAnualConMSI(subscriptionId: string) {
+  const ctx = await suscripcionPropiaDePeludo(subscriptionId);
+  if (!ctx) return { error: "No encontramos esa membresía." };
+  if (ctx.sub.plan !== "annual" || !ctx.sub.anual_prepagado)
+    return { error: "Esta membresía no se paga por año adelantado." };
+  if (ctx.sub.cancel_at_period_end)
+    return { error: "Tu membresía está por terminar. Reactívala antes de renovar." };
+  const { anualParaMSI, sesionDePagoAnual, puedeAdelantarRenovacion, DIAS_PARA_ADELANTAR } =
+    await import("@/lib/plans/msi");
+  // Stripe no admite programar un cobro a más de 2 años, así que la renovación
+  // se adelanta en los últimos 60 días del año pagado, no antes.
+  const corte = ctx.sub.current_period_end ? new Date(ctx.sub.current_period_end) : null;
+  if (!puedeAdelantarRenovacion(ctx.sub.current_period_end)) {
+    const desde = corte ? new Date(corte.getTime() - DIAS_PARA_ADELANTAR * 86_400_000) : null;
+    return {
+      error: desde
+        ? `Podrás adelantar tu renovación a partir del ${desde.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}.`
+        : "Todavía no puedes adelantar tu renovación.",
+    };
+  }
+
+  const nivel = ctx.sub.price_tier === "adicional" ? "adicional" : "principal";
+  const anual = await anualParaMSI(ctx.admin, nivel);
+  if (!anual) return { error: "La membresía anual no está disponible en este momento." };
+
+  const sitio = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const url = await sesionDePagoAnual({
+    anual,
+    clienteStripe: ctx.sub.stripe_customer_id ?? null,
+    correo: null,
+    descripcion: `Renovación anual · ${ctx.petName}`,
+    metadata: {
+      user_id: ctx.userId,
+      plan: "annual",
+      pet_id: ctx.sub.pet_id!,
+      price_tier: nivel,
+      plan_version_id: anual.planVersionId,
+      msi: "1",
+      renovacion_de: ctx.sub.id,
+    },
+    successUrl: `${sitio}/app/cuenta?renovada=1`,
+    cancelUrl: `${sitio}/app/cuenta`,
+  });
+  if (!url) return { error: "No pudimos abrir el pago. Intenta de nuevo." };
+  return { ok: true as const, url };
 }
 
 /**

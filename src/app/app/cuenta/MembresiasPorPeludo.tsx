@@ -8,6 +8,7 @@ import {
   cancelarMembresiaDePeludo,
   pedirGarantia,
   reactivarMembresiaDePeludo,
+  renovarAnualConMSI,
 } from "./actions";
 
 /**
@@ -26,6 +27,12 @@ export type MembresiaDePeludo = {
   cancelaAlCorte: boolean;
   /** Fecha legible del próximo cobro o del fin de la membresía. */
   corte: string | null;
+  /** El año en curso se pagó de una vez (meses sin intereses). */
+  anualPrepagado: boolean;
+  /** En cuántos meses sin intereses quedó ese pago. */
+  msiMeses: number | null;
+  /** Ya se puede adelantar la renovación (últimos 45 días del año). */
+  puedeRenovar: boolean;
   /** Garantía de 90 días (sección 6). null si no aplica. */
   garantia: {
     dentroDelPlazo: boolean;
@@ -84,6 +91,11 @@ export function MembresiasPorPeludo({ membresias }: { membresias: MembresiaDePel
               </div>
               <span className="text-[12.5px] text-ink-secondary">
                 {m.plan === "annual" ? "Plan anual" : "Plan mensual"}
+                {m.anualPrepagado
+                  ? m.msiMeses
+                    ? ` · pagado a ${m.msiMeses} meses sin intereses`
+                    : " · pagado por adelantado"
+                  : ""}
                 {m.nivel === "adicional" ? " · peludo adicional (15% menos)" : ""}
                 {enMora
                   ? " · pago pendiente"
@@ -92,9 +104,27 @@ export function MembresiasPorPeludo({ membresias }: { membresias: MembresiaDePel
                       ? ` · termina el ${m.corte}`
                       : " · cancelada al corte"
                     : m.corte
-                      ? ` · próximo cobro el ${m.corte}`
+                      ? m.anualPrepagado
+                        ? ` · se renueva el ${m.corte}`
+                        : ` · próximo cobro el ${m.corte}`
                       : ""}
               </span>
+              {m.puedeRenovar && (
+                <button
+                  type="button"
+                  disabled={pendiente}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const r = await renovarAnualConMSI(m.id);
+                      if ("error" in r && r.error) setAviso({ texto: r.error, error: true });
+                      else if ("url" in r && r.url) window.location.assign(r.url);
+                    })
+                  }
+                  className="self-start rounded-full bg-teal px-4 py-2 text-[12.5px] font-bold text-white disabled:opacity-50"
+                >
+                  Renovar su año a meses sin intereses
+                </button>
+              )}
               <div className="flex flex-wrap gap-2">
                 {m.cancelaAlCorte ? (
                   <button

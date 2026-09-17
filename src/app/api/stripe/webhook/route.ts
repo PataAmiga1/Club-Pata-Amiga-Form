@@ -3,7 +3,8 @@ import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTemplatedEmail } from "@/lib/email/send";
-import { reportError } from "@/lib/alerts";
+import { notifyTeam, reportError } from "@/lib/alerts";
+import { formatMxn } from "@/lib/format";
 import { AMBASSADOR_COMMISSION_MXN } from "@/lib/constants";
 import { petWaitingPeriodDays } from "@/lib/waiting-period";
 import { crmEventoDeUsuario, marcarComoMiembro } from "@/lib/crm/sync";
@@ -14,6 +15,7 @@ import {
 } from "@/lib/plans/resolve";
 import { esModelo599 } from "@/lib/plans/montos";
 import {
+  ESTADOS_VIVOS,
   nombreDelIntervalo,
   type NivelDePrecio,
   queEsEstePrecio,
@@ -23,12 +25,24 @@ import {
   controlarAltaDePeludo,
   reacomodarPrecioPrincipal,
   registrarCobro,
+  registrarSuscripcionDePeludo,
 } from "@/lib/plans/peludos-599";
+import { acumularComisionDelPeriodo } from "@/lib/comisiones";
+import { anualParaMSI, mesesDelPago, siguienteAniversario } from "@/lib/plans/msi";
+import { diaEnMexico } from "@/lib/zona-horaria";
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
   if (!userId) return;
   const supabase = createAdminClient();
+
+  // Anual pagado de una sola vez, a meses sin intereses (17-sep-2026). Es otro
+  // camino: no hay suscripción que Stripe haya cobrado, la creamos nosotros con
+  // el primer cobro a 12 meses.
+  if (session.mode === "payment" && session.metadata?.msi === "1") {
+    await handleAnualPrepagado(session, supabase, userId);
+    return;
+  }
 
   // 0. Beneficios de la versión contratada. Sin versión (o si algo falla) son
   //    los valores por omisión, que son las reglas de siempre.
@@ -292,6 +306,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
           ? (item.price.unit_amount * (item.quantity ?? 1)) / 100
           : undefined,
       status: subscription.status,
+      // Se acabó el año pagado por adelantado y Stripe ya cobró: desde aquí es
+      // una anualidad normal, que se renueva sola (17-sep-2026).
+      ...(subscription.status === "active" ? { anual_prepagado: false, msi_meses: null } : {}),
       cancel_at_period_end: subscription.cancel_at_period_end,
       current_period_start: item?.current_period_start
         ? new Date(item.current_period_start * 1000).toISOString()
@@ -399,6 +416,335 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
           firstName: perfil.first_name ?? "",
         });
     }
+  }
+}
+
+/**
+ * ALTA (O RENOVACIÓN) DEL ANUAL PAGADO DE UNA VEZ — meses sin intereses.
+ *
+ * Stripe no admite MSI dentro de una suscripción, así que el año entra como un
+ * pago único y aquí se arma todo lo demás:
+ *   · alta: se crea la suscripción anual con `trial_end` a 12 meses (no cobra
+ *     nada hasta el aniversario) y se guarda el año en el libro de cobros;
+ *   · renovación: se recorre el aniversario otros 12 meses.
+ *
+ * Idempotente: si el evento llega dos veces, la suscripción y el cobro ya
+ * existen y no se duplican.
+ */
+async function handleAnualPrepagado(
+  session: Stripe.Checkout.Session,
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+) {
+  const petId = session.metadata?.pet_id ?? null;
+  const planVersionId = session.metadata?.plan_version_id ?? null;
+  const pagado = session.amount_total ?? 0;
+  const facturaId =
+    typeof session.invoice === "string" ? session.invoice : (session.invoice?.id ?? null);
+  const pagoId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : (session.payment_intent?.id ?? null);
+  const clienteId = typeof session.customer === "string" ? session.customer : (session.customer?.id ?? null);
+  if (!petId || !clienteId || pagado <= 0) {
+    await reportError("webhook: anual a meses sin intereses incompleto", new Error("faltan datos"), {
+      userId,
+      session: session.id,
+      pet_id: petId,
+      customer: clienteId,
+    });
+    return;
+  }
+  const stripe = getStripe();
+  const meses = await mesesDelPago(pagoId);
+  const renovacionDe = session.metadata?.renovacion_de ?? null;
+
+  // La tarjeta del pago queda como la de cobro de la persona: con ella se
+  // renueva dentro de un año.
+  try {
+    const pi = await stripe.paymentIntents.retrieve(pagoId!);
+    const metodo = typeof pi.payment_method === "string" ? pi.payment_method : pi.payment_method?.id;
+    if (metodo)
+      await stripe.customers.update(clienteId, {
+        invoice_settings: { default_payment_method: metodo },
+      });
+  } catch (e) {
+    await reportError("webhook: guardar la tarjeta del anual", e, { userId, session: session.id });
+  }
+
+  let filaId: string | null = null;
+  let suscripcionId: string | null = null;
+  let inicioDelAnio = new Date();
+  /** Lo que quedó cobrado después de devolver la diferencia, si la hubo. */
+  let cobradoDeVerdad = pagado;
+
+  if (renovacionDe) {
+    // ---- Renovación: se recorre el aniversario ----
+    const { data: fila } = await supabase
+      .from("subscriptions")
+      .select("id, stripe_subscription_id, current_period_end")
+      .eq("id", renovacionDe)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!fila?.stripe_subscription_id) {
+      await reportError("webhook: renovación sin suscripción", new Error("no se encontró la fila"), {
+        userId,
+        renovacion_de: renovacionDe,
+      });
+      return;
+    }
+    inicioDelAnio = fila.current_period_end ? new Date(fila.current_period_end) : new Date();
+    const nuevoCorte = siguienteAniversario(inicioDelAnio > new Date() ? inicioDelAnio : new Date());
+    let actualizada;
+    try {
+      actualizada = await stripe.subscriptions.update(fila.stripe_subscription_id, {
+        trial_end: nuevoCorte,
+        proration_behavior: "none",
+      });
+    } catch (e) {
+      // Si Stripe no acepta la fecha (su tope es 2 años), no nos quedamos con
+      // el dinero: se devuelve y se avisa.
+      try {
+        await stripe.refunds.create(
+          { payment_intent: pagoId!, metadata: { motivo: "renovacion_no_aplicada" } },
+          { idempotencyKey: `renov-msi-${session.id}` },
+        );
+      } catch { /* lo reporta el error de abajo */ }
+      await reportError("webhook: renovación anual no aplicada", e, {
+        userId,
+        session: session.id,
+        pendiente: "revisar el reembolso en Stripe y la fecha de renovación",
+      });
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        type: "plan_changed",
+        title: "No pudimos aplicar tu renovación",
+        message: "Te devolvimos el pago a tu tarjeta. Escríbenos y lo resolvemos contigo.",
+      });
+      return;
+    }
+    await supabase
+      .from("subscriptions")
+      .update({
+        status: actualizada.status,
+        anual_prepagado: true,
+        msi_meses: meses,
+        amount: pagado / 100,
+        current_period_start: inicioDelAnio.toISOString(),
+        current_period_end: new Date(nuevoCorte * 1000).toISOString(),
+      })
+      .eq("id", fila.id);
+    filaId = fila.id;
+    suscripcionId = fila.stripe_subscription_id;
+  } else {
+    // ---- Alta ----
+    // Aquí el dinero YA entró, así que un choque no se arregla cambiando el
+    // precio de una suscripción: se devuelve lo cobrado de más.
+    const nivelPagado = session.metadata?.price_tier === "adicional" ? "adicional" : "principal";
+    const { data: suyas } = await supabase
+      .from("subscriptions")
+      .select("pet_id, status")
+      .eq("user_id", userId)
+      .not("pet_id", "is", null);
+    const otrasVivas = (suyas ?? []).filter((x) => ESTADOS_VIVOS.includes(x.status ?? ""));
+
+    if (otrasVivas.some((x) => x.pet_id === petId)) {
+      // Ese peludo ya tenía membresía: se devuelve el año completo.
+      const { data: pet } = await supabase.from("pets").select("name").eq("id", petId).maybeSingle();
+      try {
+        await stripe.refunds.create(
+          { payment_intent: pagoId!, metadata: { motivo: "alta_duplicada" } },
+          { idempotencyKey: `dup-msi-${session.id}` },
+        );
+      } catch (e) {
+        await reportError("webhook: devolver el anual duplicado", e, {
+          userId,
+          session: session.id,
+          pendiente: "reembolsar el pago a mano en Stripe",
+        });
+      }
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        type: "plan_changed",
+        title: `${pet?.name ?? "Tu peludo"} ya tenía su membresía`,
+        message: `Se registró un segundo pago para ${pet?.name ?? "tu peludo"}, que ya tenía membresía. Lo cancelamos y te devolvimos lo que pagaste.`,
+      });
+      await notifyTeam(
+        "notify_memberships",
+        `Pago anual duplicado de ${pet?.name ?? "un peludo"}: reembolsado`,
+        `<p>Llegó un segundo pago anual para <strong>${pet?.name ?? "un peludo"}</strong>, que ya tenía membresía viva. La plataforma devolvió el pago completo.</p>`,
+      );
+      return;
+    }
+
+    // Pagó como primer peludo pero ya tiene otro: le toca el 15% de descuento,
+    // y la diferencia se le devuelve.
+    const nivel: "principal" | "adicional" = otrasVivas.length > 0 ? "adicional" : "principal";
+    const anual = await anualParaMSI(supabase, nivel);
+    if (nivel !== nivelPagado && anual && pagado > anual.centavos) {
+      const diferencia = pagado - anual.centavos;
+      try {
+        await stripe.refunds.create(
+          { payment_intent: pagoId!, amount: diferencia, metadata: { motivo: "nivel_corregido" } },
+          { idempotencyKey: `nivel-msi-${session.id}` },
+        );
+        await supabase.from("notifications").insert({
+          user_id: userId,
+          type: "plan_changed",
+          title: "Te devolvimos la diferencia de tu segundo peludo",
+          message: `Como ya tienes otro peludo con membresía, a este le toca el 15% de descuento. Te devolvimos ${formatMxn(diferencia / 100)} MXN a tu tarjeta.`,
+        });
+      } catch (e) {
+        await reportError("webhook: devolver la diferencia del 15%", e, {
+          userId,
+          session: session.id,
+          pendiente: `reembolsar ${diferencia / 100} MXN a mano en Stripe`,
+        });
+      }
+    }
+    const pagadoNeto = nivel !== nivelPagado && anual ? Math.min(pagado, anual.centavos) : pagado;
+    cobradoDeVerdad = pagadoNeto;
+    if (!anual) {
+      await reportError("webhook: anual a meses sin intereses sin precio", new Error("sin versión"), {
+        userId,
+        session: session.id,
+      });
+      return;
+    }
+    const corte = siguienteAniversario(new Date());
+    const suscripcion = await stripe.subscriptions.create(
+      {
+        customer: clienteId,
+        items: [{ price: anual.precioRecurrente, quantity: 1 }],
+        // El año ya está pagado: Stripe no cobra nada hasta el aniversario.
+        trial_end: corte,
+        proration_behavior: "none",
+        metadata: {
+          user_id: userId,
+          plan: "annual",
+          plan_slug: session.metadata?.plan_slug ?? "",
+          pet_id: petId,
+          price_tier: nivel,
+          plan_version_id: anual.planVersionId,
+          anual_prepagado: "1",
+        },
+      },
+      { idempotencyKey: `anual-msi-${session.id}` },
+    );
+    filaId = await registrarSuscripcionDePeludo(supabase, {
+      userId,
+      petId,
+      nivel,
+      plan: "annual",
+      planVersionId: anual.planVersionId,
+      suscripcion,
+    });
+    suscripcionId = suscripcion.id;
+    if (filaId)
+      await supabase
+        .from("subscriptions")
+        .update({ anual_prepagado: true, msi_meses: meses, amount: pagadoNeto / 100 })
+        .eq("id", filaId);
+  }
+
+  if (!suscripcionId) return;
+
+  // El año, en el libro de cobros: de aquí salen los meses pagados que hacen
+  // crecer los montos del peludo.
+  const finDelAnio = new Date(inicioDelAnio);
+  finDelAnio.setFullYear(finDelAnio.getFullYear() + 1);
+  await supabase.from("subscription_payments").upsert(
+    {
+      stripe_invoice_id: facturaId ?? pagoId ?? session.id,
+      stripe_subscription_id: suscripcionId,
+      amount_paid_cents: cobradoDeVerdad,
+      currency: (session.currency ?? "mxn").toUpperCase(),
+      period_start: inicioDelAnio.toISOString(),
+      period_end: finDelAnio.toISOString(),
+      billing_reason: meses ? `anual_msi_${meses}` : "anual_prepagado",
+      paid_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_invoice_id", ignoreDuplicates: true },
+  );
+  await acumularComisionDelPeriodo(supabase, {
+    stripeSubscriptionId: suscripcionId,
+    stripeInvoiceId: facturaId ?? pagoId ?? session.id,
+    pagadoCentavos: cobradoDeVerdad,
+    inicio: diaEnMexico(inicioDelAnio),
+    fin: diaEnMexico(finDelAnio),
+    cobradoEl: new Date().toISOString(),
+  });
+
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("email, first_name")
+    .eq("id", userId)
+    .single();
+
+  if (renovacionDe) {
+    await supabase.from("notifications").insert({
+      user_id: userId,
+      type: "plan_changed",
+      title: "Renovamos tu membresía por un año más 🐾",
+      message: meses
+        ? `Tu año quedó pagado a ${meses} meses sin intereses. Tu siguiente renovación es el ${diaEnMexico(finDelAnio)}.`
+        : `Tu año quedó pagado. Tu siguiente renovación es el ${diaEnMexico(finDelAnio)}.`,
+    });
+    return;
+  }
+
+  // Alta: lo mismo que cualquier otra, pero sin pasar por la suscripción.
+  const esAdicional = (session.metadata?.price_tier ?? "principal") === "adicional";
+  await supabase
+    .from("profiles")
+    .update({
+      membership_status: "active",
+      ...(esAdicional ? {} : { member_since: new Date().toISOString() }),
+      ...(session.metadata?.ambassador_code
+        ? { ambassador_code_used: session.metadata.ambassador_code }
+        : {}),
+    })
+    .eq("id", userId);
+
+  if (session.metadata?.ambassador_code && !esAdicional && filaId) {
+    const { data: ambassador } = await supabase
+      .from("ambassadors")
+      .select("id")
+      .eq("referral_code", session.metadata.ambassador_code)
+      .eq("status", "approved")
+      .maybeSingle();
+    if (ambassador)
+      await supabase.from("referrals").upsert(
+        {
+          ambassador_id: ambassador.id,
+          referred_user_id: userId,
+          subscription_id: filaId,
+          commission_amount: 0,
+          status: "pending",
+        },
+        { onConflict: "referred_user_id", ignoreDuplicates: true },
+      );
+  }
+
+  await crmEventoDeUsuario(supabase, {
+    userId,
+    kind: "pago_confirmado",
+    summary: `Pago confirmado — anual${meses ? ` a ${meses} meses sin intereses` : ""}`,
+    stageKey: "pago_procesado",
+    interval: "year",
+    payload: { sessionId: session.id, amount: pagado, msi: meses },
+  });
+  await marcarComoMiembro(supabase, userId);
+
+  if (perfil?.email && !esAdicional) {
+    const { data: pet } = await supabase.from("pets").select("name").eq("id", petId).maybeSingle();
+    const beneficios = await beneficiosDeVersion(supabase, planVersionId ?? undefined);
+    await sendTemplatedEmail("welcome", perfil.email, {
+      firstName: perfil.first_name ?? "",
+      petNotice: pet?.name
+        ? `<strong>${pet.name}</strong> entra a revisión del comité. En cuanto su perfil sea aprobado empiezan a contar sus beneficios: los cuidados cotidianos y la despedida se abren el día ${beneficios.cuidados_apertura_dias}, y la emergencia veterinaria en el mes ${beneficios.emergencia_apertura_mes}.`
+        : "",
+    });
   }
 }
 
