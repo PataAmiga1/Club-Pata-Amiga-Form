@@ -123,7 +123,8 @@ export const getCenterContext = cache(async function getCenterContext(): Promise
     menuEntries: [
       ...(isMember
         ? [{ href: "/app", icon: "🐾", label: "Panel de miembro", short: "Miembro" }]
-        : []),
+        : // Chat abierto a toda cuenta (equipo, 17-sep-2026), en su propia página.
+          [{ href: "/orientacion", icon: "💬", label: "Orientación veterinaria 24/7", short: "Vet 24/7" }]),
       ...(ambassadorRows?.length
         ? [
             {

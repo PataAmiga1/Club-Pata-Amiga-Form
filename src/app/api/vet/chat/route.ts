@@ -5,6 +5,7 @@ import { getLLMProvider, isUrgent, type ChatMessage } from "@/lib/llm";
 import { puedeResponderIA, registrarUso } from "@/lib/llm/gobierno";
 import { reportError } from "@/lib/alerts";
 import { esMiembro599 } from "@/lib/reintegros-599";
+import { estadoDelChatVet, LIMITE_DIARIO_SIN_MEMBRESIA } from "@/lib/chat-vet";
 
 const HISTORY_LIMIT = 20;
 
@@ -22,8 +23,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Mensaje inválido" }, { status: 400 });
   }
 
-  // Vet orientation is exclusive to active memberships (available from day 1)
-  const [{ data: profile }, { data: pets }, { data: phoneRow }] = await Promise.all([
+  // Abierto a toda cuenta (equipo, 17-sep-2026 — juntas/75): quien no es
+  // miembro chatea con límite diario y el chat no le promete beneficios.
+  const admin = createAdminClient();
+  const [{ data: profile }, { data: pets }, { data: phoneRow }, estado] = await Promise.all([
     supabase
       .from("profiles")
       .select("first_name, membership_status")
@@ -40,12 +43,22 @@ export async function POST(request: Request) {
       .select("value")
       .eq("key", "emergency_phone")
       .maybeSingle(),
+    estadoDelChatVet(admin, user.id),
   ]);
 
-  if (profile?.membership_status !== "active") {
+  if (!estado.esMiembro && !estado.tieneTelefono) {
     return NextResponse.json(
-      { error: "La orientación veterinaria 24/7 es exclusiva de membresías activas." },
-      { status: 403 },
+      { error: "Registra tu teléfono para usar la orientación veterinaria.", motivo: "sin_telefono" },
+      { status: 400 },
+    );
+  }
+  if (estado.restantes === 0) {
+    return NextResponse.json(
+      {
+        error: `Usaste tus ${LIMITE_DIARIO_SIN_MEMBRESIA} mensajes de hoy. Con la membresía de Pata Amiga la orientación veterinaria es sin límite, las 24 horas.`,
+        motivo: "limite",
+      },
+      { status: 429 },
     );
   }
 
@@ -85,7 +98,6 @@ export async function POST(request: Request) {
   }));
   const messages: ChatMessage[] = [...history, { role: "user", content: message }];
 
-  const admin = createAdminClient();
   const veredicto = await puedeResponderIA(admin, {
     canal: "vet",
     conversationId: convId,
@@ -111,7 +123,8 @@ export async function POST(request: Request) {
     })),
     urgent,
     emergencyPhone: phoneRow?.value ?? null,
-    es599: await esMiembro599(admin, user.id),
+    es599: estado.esMiembro ? await esMiembro599(admin, user.id) : false,
+    esMiembro: estado.esMiembro,
   };
 
   let reply: string;
@@ -141,5 +154,11 @@ export async function POST(request: Request) {
     tokensOut: Math.ceil(reply.length / 4),
   });
 
-  return NextResponse.json({ conversationId: convId, reply, urgent });
+  return NextResponse.json({
+    conversationId: convId,
+    reply,
+    urgent,
+    esMiembro: estado.esMiembro,
+    restantes: estado.restantes === null ? null : Math.max(0, estado.restantes - 1),
+  });
 }
