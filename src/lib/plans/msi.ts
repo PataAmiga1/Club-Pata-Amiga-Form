@@ -35,6 +35,7 @@ export const MESES_MSI = [3, 6] as const;
 export type PagoAnualEnUnaExhibicion = {
   /** Precio de lista del año para ese nivel, en centavos. */
   centavos: number;
+  nivel: NivelDePrecio;
   productoStripe: string;
   /** El precio recurrente que usará la suscripción cuando toque renovar. */
   precioRecurrente: string;
@@ -52,9 +53,18 @@ export async function anualParaMSI(
   const centavos =
     nivel === "principal" ? version?.price_cents : (version?.additional_price_cents ?? null);
   if (!version?.stripe_product_id || !precioRecurrente || !centavos) return null;
+  // Producto propio del anual a meses sin intereses (equipo, 17-sep-2026): así
+  // esas ventas se ven aparte en Stripe. Sin él, se cobra sobre el producto de
+  // la membresía, como antes.
+  const { data: ajuste } = await admin
+    .from("site_settings")
+    .select("value")
+    .eq("key", "stripe_producto_msi")
+    .maybeSingle();
   return {
     centavos,
-    productoStripe: version.stripe_product_id,
+    nivel,
+    productoStripe: ajuste?.value?.trim() || version.stripe_product_id,
     precioRecurrente,
     planVersionId: version.id,
   };
@@ -74,18 +84,10 @@ export async function sesionDePagoAnual(input: {
   descripcion: string;
 }): Promise<string | null> {
   const stripe = getStripe();
+  const precio = await precioDeUnaExhibicion(input.anual);
   const sesion = await stripe.checkout.sessions.create({
     mode: "payment",
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "mxn",
-          product: input.anual.productoStripe,
-          unit_amount: input.anual.centavos,
-        },
-      },
-    ],
+    line_items: [{ quantity: 1, price: precio }],
     ...(input.clienteStripe
       ? { customer: input.clienteStripe }
       : { customer_email: input.correo ?? undefined, customer_creation: "always" as const }),
@@ -104,6 +106,31 @@ export async function sesionDePagoAnual(input: {
     cancel_url: input.cancelUrl,
   });
   return sesion.url;
+}
+
+/**
+ * El precio de una sola exhibición del año para ese nivel, sobre el producto
+ * del anual a meses sin intereses. Se busca por `lookup_key` (lleva el monto,
+ * así que si cambia el precio de la versión nace uno nuevo) y se crea la
+ * primera vez: no hay que darlo de alta a mano en Stripe.
+ */
+async function precioDeUnaExhibicion(anual: PagoAnualEnUnaExhibicion): Promise<string> {
+  const stripe = getStripe();
+  const clave = `pa_anual_msi_${anual.nivel}_${anual.centavos}_${anual.productoStripe}`;
+  const { data } = await stripe.prices.list({ lookup_keys: [clave], active: true, limit: 1 });
+  if (data[0]) return data[0].id;
+  const nuevo = await stripe.prices.create({
+    product: anual.productoStripe,
+    currency: "mxn",
+    unit_amount: anual.centavos,
+    lookup_key: clave,
+    nickname:
+      anual.nivel === "principal"
+        ? "Anual en una exhibición · primer peludo"
+        : "Anual en una exhibición · peludo adicional (15% menos)",
+    metadata: { uso: "anual_msi", nivel: anual.nivel },
+  });
+  return nuevo.id;
 }
 
 /** En cuántos meses quedó el pago (3, 6…). `null` si se pagó de corrido. */
