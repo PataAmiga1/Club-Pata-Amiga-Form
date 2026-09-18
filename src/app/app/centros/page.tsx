@@ -1,8 +1,14 @@
 import { fetchApprovedCenters } from "@/lib/centers";
 import { CentersExplorer } from "@/components/centros/CentersExplorer";
+import { CentrosProximamente } from "@/components/centros/CentrosProximamente";
+import { fetchSiteSettings } from "@/lib/site";
+import { valorAbierto } from "@/lib/registro";
 
 export default async function CentrosPage() {
-  const centers = await fetchApprovedCenters();
+  // «Próximamente» mientras no haya centros reales (equipo, 17-sep-2026).
+  const ajustes = await fetchSiteSettings();
+  const abierto = valorAbierto(ajustes.directorio_centros_abierto);
+  const centers = abierto ? await fetchApprovedCenters() : [];
   return (
     <div className="flex flex-col gap-4 px-5 py-6 md:px-[30px] md:py-[26px]">
       <div className="flex flex-col gap-1">
@@ -14,7 +20,7 @@ export default async function CentrosPage() {
           seguir con tu veterinario de confianza.
         </p>
       </div>
-      <CentersExplorer centers={centers} />
+      {abierto ? <CentersExplorer centers={centers} /> : <CentrosProximamente />}
     </div>
   );
 }

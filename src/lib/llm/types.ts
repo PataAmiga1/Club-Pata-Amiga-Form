@@ -22,6 +22,12 @@ export type VetContext = {
    * monto de emergencia que crece y que cada peludo ve en Reintegros.
    */
   es599?: boolean;
+  /**
+   * Quien escribe tiene membresía activa. Sin ella (cuenta registrada que no ha
+   * pagado, 17-sep-2026) el bot orienta igual, pero no promete reintegros ni
+   * ofrece el enlace telefónico, y cierra invitando a unirse. Por omisión: sí.
+   */
+  esMiembro?: boolean;
 };
 
 /**

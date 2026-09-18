@@ -199,6 +199,15 @@ export async function executeDemoTool(
     }
 
     case "centros_aliados_resumen": {
+      // Mientras el directorio diga «Próximamente» (17-sep-2026), el demo no
+      // cuenta centros: los que hay son de prueba.
+      const { data: interruptor } = await admin
+        .from("site_settings")
+        .select("value")
+        .eq("key", "directorio_centros_abierto")
+        .maybeSingle();
+      if (!/^(s[ií]|true|1|abierto)$/i.test((interruptor?.value ?? "").trim()))
+        return "La red de centros aliados llega muy pronto. Puedes seguir con tu veterinario de siempre: la membresía no te obliga a cambiarlo.";
       // Solo el resumen: nombres y contactos son de los centros, no del demo.
       const { data } = await admin
         .from("wellness_centers")

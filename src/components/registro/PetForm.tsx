@@ -157,13 +157,10 @@ export function PetForm({
       );
       return;
     }
-    // $599: sin certificado no hay alta de un senior (decisión del equipo, 17-sep).
-    if (modelo599 && showsSeniorNote && !cert) {
-      setError(
-        `Como tu ${comoLeDicen(species)} tiene ${SENIOR_PET_AGE_YEARS} años o más, sube su certificado médico para inscribirlo.`,
-      );
-      return;
-    }
+    // El certificado del senior YA NO frena el alta (equipo, 17-sep-2026, tarde):
+    // se puede subir aquí o después desde su perfil. Lo que sí sigue igual es
+    // que el comité no aprueba a un senior sin él (resolvePet), así que sus
+    // beneficios empiezan a contar cuando lo sube.
     if (mode === "registro") {
       for (const [i, p] of extras.entries()) {
         if (!p.name.trim()) {
@@ -440,12 +437,13 @@ export function PetForm({
               ? "A tus otros peludos los agregas después del pago desde tu cuenta, cada uno con 15% de descuento. Los demás datos —raza, sexo, colores y su foto— te los pedimos después del pago."
               : `Si tienes más de un peludo, puedes registrarlo ahora o más adelante desde tu cuenta (hasta ${MAX_ACTIVE_PETS}). Los demás datos —raza, sexo, colores y su foto— te los pedimos después del pago.`}
           </span>
-          {/* $599: el certificado del senior se pide YA en el alta. */}
+          {/* $599: el certificado del senior se ofrece en el alta, pero es opcional. */}
           {modelo599 && showsSeniorNote && (
             <div className="flex flex-col gap-2.5 rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
               <span>
                 Como tu {comoLeDicen(species)} tiene {SENIOR_PET_AGE_YEARS} años o
-                más, para inscribirlo necesitamos su certificado médico. 🐾
+                más, necesitamos su certificado médico para aprobar su perfil. Puedes
+                subirlo ahora o después desde su perfil. 🐾
               </span>
               <input
                 ref={certRef}
@@ -640,7 +638,7 @@ export function PetForm({
         <div className="flex flex-col gap-2.5 rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-normal text-[#8A5A12]">
           <span>
             {modelo599
-              ? `Como tu peludo tiene ${SENIOR_PET_AGE_YEARS} años o más, para inscribirlo necesitamos su certificado médico. 🐾`
+              ? `Como tu peludo tiene ${SENIOR_PET_AGE_YEARS} años o más, necesitamos su certificado médico para aprobar su perfil. Puedes subirlo aquí mismo o después desde su perfil. 🐾`
               : `Como tu peludo tiene ${SENIOR_PET_AGE_YEARS} años o más, te pedimos un certificado veterinario para conocer su estado de salud. Puedes subirlo aquí mismo o después desde su perfil. 🐾`}
           </span>
           <input

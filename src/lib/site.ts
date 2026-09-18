@@ -50,6 +50,14 @@ export const SITE_SETTINGS = [
     // 17-sep-2026: el $159 dejó de venderse y el $599 aún no está listo.
     // Cerrado, /registro manda a la lista de interesados y el checkout no
     // cobra. Ver src/lib/registro.ts.
+    // 17-sep-2026: en producción solo había centros de prueba. Mientras diga
+    // «no», /centros y /app/centros enseñan «Próximamente» en lugar del
+    // directorio. Se abre con «si» cuando haya centros reales.
+    key: "directorio_centros_abierto",
+    label: "Directorio de centros aliados visible («si» o «no»)",
+    default: "no",
+  },
+  {
     key: "registro_abierto",
     label: "Registro de nuevos miembros abierto («si» o «no»)",
     default: "no",

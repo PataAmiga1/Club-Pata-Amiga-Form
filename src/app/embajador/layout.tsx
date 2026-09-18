@@ -102,7 +102,9 @@ export default async function EmbajadorLayout({
   const entries: DashboardEntry[] = [
     ...(isMember
       ? [{ href: "/app", icon: "🐾", label: "Panel de miembro", short: "Miembro" }]
-      : []),
+      : // El chat está abierto a toda cuenta (equipo, 17-sep-2026). Quien no es
+        // miembro no entra a /app, así que lo abre en su propia página.
+        [{ href: "/orientacion", icon: "💬", label: "Orientación veterinaria 24/7", short: "Vet 24/7" }]),
     ...(centerRows?.length
       ? [{ href: "/centro", icon: "🏪", label: "Mi centro aliado", short: "Mi centro" }]
       : []),
