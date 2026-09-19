@@ -8,12 +8,15 @@ import {
   getCampaign,
   campaignCouponKey,
   campaignPdfSlot,
+  EDAD_MINIMA_LANDING,
 } from "@/lib/landings";
 
 export type LeadInput = {
   campaign: string;
   firstName: string;
   lastName: string;
+  /** Edad de la persona, solo en landings que la preguntan (ExpoCan). */
+  age?: string;
   email: string;
   phone: string;
   consent: boolean;
@@ -30,6 +33,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
  * con gracia en lugar de mostrar huecos.
  */
 async function buildGiftBlocks(slug: string) {
+  const pdfLabel = getCampaign(slug)?.pdfLabel ?? "📘 Descargar tu guía de cuidado";
   const admin = createAdminClient();
   const [{ data: couponRow }, { data: pdfRow }] = await Promise.all([
     admin
@@ -50,7 +54,7 @@ async function buildGiftBlocks(slug: string) {
     : `<div style="background:#FDF9EF;border-radius:14px;padding:14px;text-align:center;margin:8px 0;color:#6B7C79;font-size:14px">Tu cupón de descuento está por activarse — te lo enviaremos a este mismo correo muy pronto. 🐾</div>`;
 
   const pdfBlock = pdfRow?.url
-    ? `<p style="text-align:center;margin:16px 0"><a href="${pdfRow.url}" style="background:#1CBCAD;color:#ffffff;padding:14px 28px;border-radius:999px;font-weight:700;text-decoration:none;display:inline-block">📘 Descargar tu guía de cuidado</a></p>`
+    ? `<p style="text-align:center;margin:16px 0"><a href="${pdfRow.url}" style="background:#1CBCAD;color:#ffffff;padding:14px 28px;border-radius:999px;font-weight:700;text-decoration:none;display:inline-block">${pdfLabel}</a></p>`
     : `<p style="text-align:center;color:#6B7C79;font-size:14px;margin:12px 0">📘 Tu guía de cuidado llegará a este correo en los próximos días.</p>`;
 
   return { couponBlock, pdfBlock };
@@ -62,13 +66,28 @@ export async function registerLead(input: LeadInput) {
   if (!campaign || !campaign.active)
     return { error: "Esta campaña ya no está activa." };
 
+  const pideApellidos = campaign.campos?.apellidos !== false;
+  const pideEdad = campaign.campos?.edad === true;
   const firstName = input.firstName?.trim();
-  const lastName = input.lastName?.trim();
+  // Sin apellidos en el formulario la columna queda vacía (es NOT NULL).
+  const lastName = pideApellidos ? input.lastName?.trim() : "";
+  const age = pideEdad ? Number(input.age) : null;
   const email = input.email?.trim().toLowerCase();
   const phone = input.phone?.trim();
 
-  if (!firstName || !lastName)
-    return { error: "Escribe tu nombre y apellidos." };
+  if (!firstName || (pideApellidos && !lastName))
+    return {
+      error: pideApellidos ? "Escribe tu nombre y apellidos." : "Escribe tu nombre.",
+    };
+  if (pideEdad) {
+    if (!Number.isInteger(age) || age === null || age < 1 || age > 110)
+      return { error: "Escribe tu edad en años." };
+    if (age < EDAD_MINIMA_LANDING)
+      return {
+        error:
+          "Para registrarte necesitas ser mayor de edad. Pídele a un adulto que deje sus datos.",
+      };
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email ?? ""))
     return { error: "Revisa tu correo electrónico." };
   if (!phone || phone.replace(/\D/g, "").length < 10)
@@ -78,7 +97,9 @@ export async function registerLead(input: LeadInput) {
       error:
         campaign.tipo === "lista_espera"
           ? "Necesitamos tu consentimiento para avisarte."
-          : "Necesitamos tu consentimiento para enviarte el regalo.",
+          : campaign.tipo === "guia"
+            ? "Necesitamos tu consentimiento para enviarte la guía."
+            : "Necesitamos tu consentimiento para enviarte el regalo.",
     };
 
   // Se guarda tal cual llegó, solo si parece un código: al abrir la membresía
@@ -96,6 +117,7 @@ export async function registerLead(input: LeadInput) {
       last_name: lastName,
       email,
       phone,
+      ...(pideEdad ? { age } : {}),
       utm_source: input.utm?.source?.slice(0, 100) || null,
       utm_medium: input.utm?.medium?.slice(0, 100) || null,
       utm_campaign: input.utm?.campaign?.slice(0, 100) || null,
@@ -107,18 +129,22 @@ export async function registerLead(input: LeadInput) {
 
   if (error) {
     // Índice único (campaign, email): registro repetido
-    if (error.code === "23505")
+    if (error.code === "23505") {
+      // En el stand la gente se vuelve a registrar para bajar la guía: se le
+      // deja descargar sin mandarle otro correo.
+      if (campaign.tipo === "guia") return { ok: true as const, repetido: true };
       return {
         error:
           campaign.tipo === "lista_espera"
             ? "¡Ya estás en la lista! Te avisaremos a este correo en cuanto abra el registro."
             : "¡Ya estás registrado! Revisa tu correo (y la carpeta de spam) — ahí está tu regalo.",
       };
+    }
     return { error: "No pudimos registrarte. Intenta de nuevo." };
   }
 
   await sendGiftEmail(lead.id, campaign.slug, email, firstName);
-  return { ok: true as const };
+  return { ok: true as const, repetido: false };
 }
 
 /** Envía (o reenvía) el correo de regalo y actualiza el estatus del lead. */
@@ -130,17 +156,27 @@ export async function sendGiftEmail(
 ) {
   const admin = createAdminClient();
   // La lista de espera no lleva cupón ni PDF: solo confirma que quedó apuntada.
+  // La guía lleva el PDF sin cupón.
+  const tipo = getCampaign(slug)?.tipo;
+  const comunes = {
+    firstName,
+    registroUrl: `${SITE_URL}/registro`,
+    terceraCaracteristica: ALTAS_SON_599
+      ? MEMBERSHIP_FEATURES_599[2]
+      : MEMBERSHIP_FEATURES[2],
+  };
   const sent =
-    getCampaign(slug)?.tipo === "lista_espera"
+    tipo === "lista_espera"
       ? await sendTemplatedEmail("lista_espera", email, { firstName })
-      : await sendTemplatedEmail("campaign_gift", email, {
-          firstName,
-          ...(await buildGiftBlocks(slug)),
-          registroUrl: `${SITE_URL}/registro`,
-          terceraCaracteristica: ALTAS_SON_599
-            ? MEMBERSHIP_FEATURES_599[2]
-            : MEMBERSHIP_FEATURES[2],
-        });
+      : tipo === "guia"
+        ? await sendTemplatedEmail("campaign_guide", email, {
+            ...comunes,
+            pdfBlock: (await buildGiftBlocks(slug)).pdfBlock,
+          })
+        : await sendTemplatedEmail("campaign_gift", email, {
+            ...comunes,
+            ...(await buildGiftBlocks(slug)),
+          });
   await admin
     .from("campaign_leads")
     .update(

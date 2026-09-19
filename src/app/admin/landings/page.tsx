@@ -126,6 +126,8 @@ export default async function AdminLandingsPage({
                 </span>
               ) : (
               <>
+              {/* Las landings de guía (ExpoCan) no llevan cupón: solo el PDF. */}
+              {camp.tipo !== "guia" && (
               <form
                 action={updateSiteSettings}
                 className="flex items-end gap-2"
@@ -151,10 +153,11 @@ export default async function AdminLandingsPage({
                   Guardar
                 </button>
               </form>
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-[12px] font-semibold text-ink-title">
-                  Guía PDF del regalo
+                  {camp.tipo === "guia" ? "Guía PDF (se descarga al registrarse y va por correo)" : "Guía PDF del regalo"}
                 </span>
                 {pdfUrl ? (
                   <a
@@ -274,10 +277,15 @@ export default async function AdminLandingsPage({
                     </span>
                   );
                 })()}
-                {!activeFilter && (
+                {(!activeFilter || l.age) && (
                   <span className="block text-[11px] text-ink-tertiary">
-                    {l.campaign}
-                    {l.utm_source ? ` · ${l.utm_source}` : ""}
+                    {[
+                      !activeFilter ? l.campaign : null,
+                      l.age ? `${l.age} años` : null,
+                      !activeFilter ? l.utm_source : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 )}
               </span>

@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   let query = ctx.admin
     .from("campaign_leads")
     .select(
-      "campaign, first_name, last_name, email, phone, utm_source, utm_medium, utm_campaign, gift_email_status, created_at",
+      "campaign, first_name, last_name, age, email, phone, utm_source, utm_medium, utm_campaign, gift_email_status, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(5000);
@@ -19,12 +19,13 @@ export async function GET(request: Request) {
   const { data } = await query;
 
   const header =
-    "CAMPAÑA,NOMBRE,APELLIDOS,CORREO,TELÉFONO,UTM_SOURCE,UTM_MEDIUM,UTM_CAMPAIGN,CORREO_REGALO,FECHA";
+    "CAMPAÑA,NOMBRE,APELLIDOS,EDAD,CORREO,TELÉFONO,UTM_SOURCE,UTM_MEDIUM,UTM_CAMPAIGN,CORREO_REGALO,FECHA";
   const lines = (data ?? []).map((l) =>
     [
       csvCell(l.campaign),
       csvCell(l.first_name),
       csvCell(l.last_name),
+      csvCell(l.age == null ? "" : String(l.age)),
       csvCell(l.email),
       csvCell(l.phone),
       csvCell(l.utm_source ?? ""),
