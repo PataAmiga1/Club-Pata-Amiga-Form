@@ -143,7 +143,8 @@ Nothing in the webhook changes: Stripe records the discount on the subscription 
 ## 8. Verification
 
 The repo has no test runner — only `npm run typecheck` and `npm run lint`, both of which must pass.
-Then by hand on a Vercel preview with Stripe **test** keys:
+Then by hand, locally (`npm run build && npm start`, as `docs/PRODUCCION.md` says — staging is frozen
+on Hobby) with Stripe **test** keys:
 
 1. An ambassador code → "Te invitó", checkout, the webhook creates the referral as before.
 2. A test promotion code (100 % off, once, monthly only) → "primer mes gratis", checkout shows $0
