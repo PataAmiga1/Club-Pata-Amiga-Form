@@ -20,8 +20,17 @@ export type Campaign = {
    * `regalo`: manda el correo con cupón y PDF (lo de siempre).
    * `lista_espera`: solo apunta a la persona y le confirma por correo; sin
    * cupón ni PDF. Nació el 17-sep-2026 para el registro cerrado.
+   * `guia`: manda solo el PDF (sin cupón) y deja descargarlo en la misma
+   * pantalla al terminar. Nació el 19-sep-2026 para el stand de ExpoCan.
    */
-  tipo: "regalo" | "lista_espera";
+  tipo: "regalo" | "lista_espera" | "guia";
+  /**
+   * Qué se pregunta además de nombre, correo y teléfono. Sin nada: nombre y
+   * apellidos, como siempre. ExpoCan pidió nombre, edad, correo y teléfono.
+   */
+  campos?: { apellidos?: boolean; edad?: boolean };
+  /** Texto del botón para descargar el PDF (en la página y en el correo). */
+  pdfLabel?: string;
   /** Copy de la página. */
   headline: string;
   subheadline: string;
@@ -65,7 +74,29 @@ export const CAMPAIGNS: Campaign[] = [
     ],
     emailSubject: "🐾 Ya estás en la lista — Club Pata Amiga",
   },
+  {
+    // Stand de ExpoCan (19 al 21-sep-2026). Se llega por el QR del stand
+    // (utm_source=expocan). Sin cupón, a petición del equipo.
+    slug: "expocan",
+    name: "ExpoCan 2026 — Mini Guía Interactiva",
+    active: true,
+    tipo: "guia",
+    campos: { apellidos: false, edad: true },
+    pdfLabel: "📘 Descargar la Mini Guía Interactiva",
+    headline: "Tu Mini Guía Interactiva para cuidar a tu peludo 📘",
+    subheadline:
+      "Gracias por visitarnos en ExpoCan. Déjanos tus datos: te mandamos la guía a tu correo y también la puedes descargar al momento.",
+    perks: [
+      { emoji: "📘", text: "Mini Guía Interactiva de Pata Amiga (PDF)" },
+      { emoji: "🩺", text: "Mantienes a tu veterinario de confianza" },
+      { emoji: "💬", text: "Orientación veterinaria 24/7 para la manada" },
+    ],
+    emailSubject: "📘 Tu Mini Guía Interactiva — Club Pata Amiga",
+  },
 ];
+
+/** Edad mínima para dejar datos en una landing que pregunta la edad. */
+export const EDAD_MINIMA_LANDING = 18;
 
 export function getCampaign(slug: string): Campaign | undefined {
   return CAMPAIGNS.find((c) => c.slug === slug);

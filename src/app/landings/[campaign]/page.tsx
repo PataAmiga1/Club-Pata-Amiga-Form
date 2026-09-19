@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { getCampaign } from "@/lib/landings";
+import { getCampaign, campaignPdfSlot } from "@/lib/landings";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { ALTAS_SON_599 } from "@/lib/plans/planes";
 import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
@@ -19,6 +20,8 @@ type SearchParams = {
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
+    /** `?kiosco=1`: la tablet del stand; el formulario se limpia solo. */
+    kiosco?: string;
   }>;
 };
 
@@ -38,9 +41,21 @@ export default async function CampaignLandingPage({
   searchParams,
 }: Params & SearchParams) {
   const { campaign: slug } = await params;
-  const { utm_source, utm_medium, utm_campaign } = await searchParams;
+  const { utm_source, utm_medium, utm_campaign, kiosco } = await searchParams;
   const campaign = getCampaign(slug);
   if (!campaign || !campaign.active) notFound();
+
+  // Las landings de guía dejan bajar el PDF al terminar el registro.
+  const pdfUrl =
+    campaign.tipo === "guia"
+      ? ((
+          await createAdminClient()
+            .from("site_assets")
+            .select("url")
+            .eq("slot", campaignPdfSlot(campaign.slug))
+            .maybeSingle()
+        ).data?.url ?? null)
+      : null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-teal">
@@ -88,6 +103,10 @@ export default async function CampaignLandingPage({
           <LeadForm
             campaign={campaign.slug}
             tipo={campaign.tipo}
+            campos={campaign.campos}
+            pdfUrl={pdfUrl}
+            pdfLabel={campaign.pdfLabel}
+            kiosco={kiosco === "1"}
             utm={{
               source: utm_source,
               medium: utm_medium,
@@ -100,7 +119,9 @@ export default async function CampaignLandingPage({
             se usan para{" "}
             {campaign.tipo === "lista_espera"
               ? "avisarte cuando abra el registro"
-              : "enviarte tu regalo"}{" "}
+              : campaign.tipo === "guia"
+                ? "enviarte tu guía"
+                : "enviarte tu regalo"}{" "}
             y novedades de Club Pata Amiga.
           </p>
         </div>

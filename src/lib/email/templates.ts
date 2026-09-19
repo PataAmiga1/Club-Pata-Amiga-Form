@@ -134,6 +134,32 @@ const CAMPAIGN_GIFT_HTML = `<!-- Correo "Obtén tu regalo" · Club Pata Amiga --
   </td></tr>
 </table>`;
 
+/**
+ * Correo de la guía (landings tipo `guia`, ExpoCan 19-sep-2026): el mismo
+ * diseño del regalo, sin cupón. Se arma a partir de él para que no se separen.
+ */
+const CAMPAIGN_GUIDE_HTML = CAMPAIGN_GIFT_HTML.replace(
+  "<!-- Correo \"Obtén tu regalo\" · Club Pata Amiga -->",
+  "<!-- Correo \"Tu guía\" · Club Pata Amiga -->",
+)
+  .replace(
+    "¡Tu regalo está aquí, {{firstName}}! 🎁",
+    "¡Aquí está tu guía, {{firstName}}! 📘",
+  )
+  .replace(
+    "Gracias por registrarte. Esto es lo que preparamos para ti y tu peludo:",
+    "Gracias por visitarnos. Esta es la guía que preparamos para ti y tu peludo:",
+  )
+  .replace("{{couponBlock}}", "")
+  .replace(
+    "Usa tu cupón al unirte a la manada — membresía de salud para tu peludo (michi o lomito):",
+    "¿Quieres cuidarlo todavía mejor? Únete a la manada — membresía de salud para tu peludo (michi o lomito):",
+  )
+  .replace(
+    "Recibiste este correo porque te registraste para recibir tu regalo de bienvenida.",
+    "Recibiste este correo porque te registraste para recibir nuestra guía.",
+  );
+
 export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
   {
     key: "welcome",
@@ -488,6 +514,28 @@ ${BOTON("{{siteUrl}}/embajador/cuenta", "Ver mi cuenta")}`),
     html: CAMPAIGN_GIFT_HTML,
   },
   {
+    key: "campaign_guide",
+    name: "Guía PDF de campaña (sin cupón)",
+    description:
+      "Se envía al registrarse en una landing de guía (/landings/expocan). El botón de descarga se arma solo con el PDF cargado en Admin → Landings.",
+    variables: {
+      firstName: "Nombre del registrado",
+      pdfBlock: "Botón de descarga de la guía PDF (o aviso si aún no se sube)",
+      registroUrl: "URL del registro de la membresía",
+      terceraCaracteristica:
+        "La tercera de las 5 características: «Segunda mascota con 15% de descuento» ($599)",
+    },
+    sample: {
+      firstName: "Cipatli",
+      pdfBlock:
+        '<p style="text-align:center;margin:16px 0"><a href="#" style="background:#1CBCAD;color:#fff;padding:14px 28px;border-radius:999px;font-weight:700;text-decoration:none">📘 Descargar la Mini Guía Interactiva</a></p>',
+      registroUrl: "https://pataamiga.mx/registro",
+      terceraCaracteristica: "Segunda mascota con 15% de descuento",
+    },
+    subject: "📘 Tu Mini Guía Interactiva — Club Pata Amiga",
+    html: CAMPAIGN_GUIDE_HTML,
+  },
+  {
     key: "lista_espera",
     name: "Lista de espera — nueva membresía",
     description:
@@ -763,6 +811,7 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   center_info_request: "centros",
   campaign_gift: "campanas",
   lista_espera: "campanas",
+  campaign_guide: "campanas",
   birthday_member: "celebraciones",
   birthday_pet: "celebraciones",
 };
