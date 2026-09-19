@@ -342,7 +342,9 @@ export function PlanSelector599({
             ¿Tienes un código de embajador?
           </span>
           <span className="text-[12.5px] text-ink-tertiary">
-            Aplícalo antes de pagar.
+            Aplícalo antes de pagar. ¿Tienes un código de promoción, como
+            EXPOCAN? Ese se escribe en la página de pago, en el recuadro de
+            código promocional.
           </span>
         </div>
         <div className="flex gap-3">
@@ -371,7 +373,9 @@ export function PlanSelector599({
       )}
       {codeStatus === "invalid" && (
         <div className="-mt-3 rounded-[12px] bg-error-bg px-4 py-2.5 text-sm text-error-text sm:-mt-5">
-          No encontramos ese código. Revísalo e intenta de nuevo.
+          No encontramos ese código de embajador. Si es un código de promoción
+          (como EXPOCAN), escríbelo en la página de pago, en el recuadro de
+          código promocional.
         </div>
       )}
       {error && (
