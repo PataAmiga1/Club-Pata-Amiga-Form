@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
-import { getTemplateDef, renderTemplate } from "./templates";
+import { escapeHtml, getTemplateDef, renderTemplate } from "./templates";
 
 /**
  * Base de las ligas de los correos. El respaldo es el dominio de producción y
@@ -15,14 +15,22 @@ const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.pataamiga.mx";
  * personalizó la plantilla en /admin/comunicados se usa esa versión; si no,
  * la versión por defecto en código. Nunca lanza: un correo fallido no debe
  * romper el flujo que lo dispara.
+ *
+ * `escapar`: variables que escribió alguien de fuera (el nombre de una
+ * landing, p. ej.) y que deben ir como texto, no como HTML. Se escapan solo
+ * en el cuerpo; el asunto es texto plano y ahí quedan tal cual. Las demás
+ * variables siguen crudas porque varias llevan HTML armado en el servidor
+ * (couponBlock, itemsList…).
  */
 export async function sendTemplatedEmail(
   key: string,
   to: string,
   vars: Record<string, string> = {},
-  // Opcional y al final: los ~40 llamados existentes no cambian. Lo usa el
-  // correo de testimonio, que se contesta a miembros@ y no a no-responder.
-  opciones: { replyTo?: string } = {},
+  // Opcional y al final: los ~40 llamados existentes no cambian.
+  // · replyTo: el correo de testimonio se contesta a miembros@.
+  // · escapar: variables con texto del usuario que se escapan en el cuerpo
+  //   (no en el asunto) — los correos de campaña escapan firstName.
+  opciones: { replyTo?: string; escapar?: string[] } = {},
 ): Promise<boolean> {
   const def = getTemplateDef(key);
   if (!def) {
@@ -44,7 +52,11 @@ export async function sendTemplatedEmail(
     // URL de quien manda el correo. Si quien llama la trae, gana la suya.
     const conSitio = { siteUrl: SITIO, ...vars };
     const subject = renderTemplate(override?.subject ?? def.subject, conSitio);
-    const html = renderTemplate(override?.html ?? def.html, conSitio);
+    const paraHtml: Record<string, string> = { ...conSitio };
+    for (const nombre of opciones.escapar ?? [])
+      if (paraHtml[nombre] !== undefined)
+        paraHtml[nombre] = escapeHtml(paraHtml[nombre]);
+    const html = renderTemplate(override?.html ?? def.html, paraHtml);
 
     const { error } = await getResend().emails.send({
       from: EMAIL_FROM,

@@ -1719,7 +1719,7 @@ export async function resendGiftEmail(leadId: string) {
     .single();
   if (!lead) throw new Error("Lead no encontrado");
 
-  const { sendGiftEmail } = await import("@/app/landings/[campaign]/actions");
+  const { sendGiftEmail } = await import("@/lib/landings-envio");
   const sent = await sendGiftEmail(
     lead.id,
     lead.campaign,
