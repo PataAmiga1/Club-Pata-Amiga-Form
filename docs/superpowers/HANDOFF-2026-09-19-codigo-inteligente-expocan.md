@@ -2,7 +2,31 @@
 
 Self-contained: a new session can pick this up without the conversation it came from.
 
-## Where things stand
+## Where things stand — UPDATE, same day (later session)
+
+**Built and verified locally** on `codigo-inteligente-expocan` (design approved by Pablo). Not in
+production yet: that needs Pablo's go for the merge **and** for running the backfill script on
+production.
+
+- **Smart field** «¿Tienes un código?»: `src/lib/plans/codigos.ts` (recognises ambassador first, then an
+  active Stripe promotion code), `src/lib/plans/promocion-texto.ts` (`describirPromocion`, client-safe),
+  `GET /api/codigos/validar` (signed-in only), `PlanSelector599.tsx` (one box, a chip per code).
+- **Checkout** re-validates both codes server-side; a promotion goes as `discounts` (no
+  `allow_promotion_codes`), same on the MSI path; Stripe refusals → Spanish 400.
+- **Free month = month 1** (Pablo, 19-sep): `registrarCobro` now records a $0 invoice when a discount
+  made it $0 (`esMesDePromocion`); the MSI trial $0 invoice (no discount) is still skipped.
+  `scripts/asentar-meses-de-promocion.ts` fills the 9 production subscriptions that were skipped
+  between 17 and 19 Sep (dry-run by default, `--aplicar` to write; idempotent).
+- **Guide email** carries the code: `src/lib/landings-correo.ts`; Admin → Landings now shows the coupon
+  box for guide landings too. Turn it on by setting `EXPOCAN` there.
+- **Real EXPOCAN (live, read 19-sep):** $599 off, once, not product-restricted, 18/1,000 used,
+  **expires 20-sep 23:59 Mexico** — PM to extend. On annual it is $599 off, never a free year.
+
+Corrections to the section below: staging is **not** frozen (it deployed the ExpoCan landing on
+19-sep; the PRODUCCION.md note is from July), and production Supabase **is** reachable from this
+machine's MCP (`hjvhntxjkuuobgfslzlf`).
+
+## Where things stood (original)
 
 - **Branch:** `codigo-inteligente-expocan`, created from `staging` (`569a5a1`, the ExpoCan landing merge).
   Two commits, both docs only: `b198c74` (the design) and `7d4baa3` (verify locally). **Nothing is built.**

@@ -24,6 +24,11 @@ type Admin = ReturnType<typeof createAdminClient>;
  * se da de baja, el siguiente sube a $599».
  */
 
+/** ¿La factura quedó en $0 porque una promoción la cubrió? */
+export function esMesDePromocion(invoice: Stripe.Invoice): boolean {
+  return (invoice.total_discount_amounts ?? []).some((d) => d.amount > 0);
+}
+
 /** Asienta una factura pagada en el libro de cobros. Idempotente por factura. */
 export async function registrarCobro(admin: Admin, invoice: Stripe.Invoice) {
   const subId =
@@ -35,7 +40,12 @@ export async function registrarCobro(admin: Admin, invoice: Stripe.Invoice) {
   // suscripción que todavía no cobra (el anual pagado por adelantado, sección
   // de meses sin intereses). Si se asentara, esos meses contarían dos veces.
   // Ojo: un cobro cubierto con saldo a favor SÍ cuenta — ahí el total es > 0.
-  if ((invoice.total ?? 0) <= 0) return;
+  //
+  // Excepción (19-sep-2026, cupón EXPOCAN): un mes que sale en $0 por una
+  // PROMOCIÓN sí es un mes de membresía, y cuenta como el mes 1 para que los
+  // montos crezcan igual que a quien lo pagó. Se distingue del anual pagado
+  // por adelantado porque esa factura no trae descuento.
+  if ((invoice.total ?? 0) <= 0 && !esMesDePromocion(invoice)) return;
 
   const linea = lineaDelCobro(invoice);
   await admin.from("subscription_payments").upsert(

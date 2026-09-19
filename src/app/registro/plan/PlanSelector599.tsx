@@ -5,6 +5,7 @@ import { Stepper } from "@/components/registro/Stepper";
 import { useValorLocal } from "@/lib/hooks";
 import type { GrupoCatalogo } from "@/lib/catalogo-cuidados";
 import type { Oferta599 } from "@/lib/plans/oferta";
+import { describirPromocion, type Promocion } from "@/lib/plans/promocion-texto";
 
 /**
  * Selector de plan de la membresía $599 (sección 2, 17-sep-2026).
@@ -45,41 +46,69 @@ export function PlanSelector599({
   const [error, setError] = useState<string | null>(null);
   const [catalogoAbierto, setCatalogoAbierto] = useState(false);
 
-  // Código de embajador: mismo comportamiento que el selector del $159.
+  // «¿Tienes un código?» (19-sep-2026): una casilla para los dos tipos. Se
+  // puede tener uno de cada uno: el del embajador que la invitó y una
+  // promoción. El del embajador también llega solo, por su enlace (?codigo=).
   const guardado = useValorLocal("pa_ambassador_code");
-  const codigoPrellenado = initialCode?.trim() || guardado?.trim() || "";
-  const [codeEscrito, setCodeEscrito] = useState<string | null>(null);
-  const code = codeEscrito ?? codigoPrellenado;
-  const [estadoRevisado, setEstadoRevisado] = useState<
-    "idle" | "checking" | "valid" | "invalid" | null
-  >(null);
-  const codeStatus = estadoRevisado ?? (codigoPrellenado ? "checking" : "idle");
+  const codigoPrellenado = (initialCode?.trim() || guardado?.trim() || "").toUpperCase();
+  const [texto, setTexto] = useState("");
+  const [revisando, setRevisando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [embajador, setEmbajador] = useState<string | null>(null);
+  const [promo, setPromo] = useState<Promocion | null>(null);
+  // El del enlace se revisa una vez; si lo quitan, no vuelve.
+  const [prellenadoQuitado, setPrellenadoQuitado] = useState(false);
+  const [prellenadoValido, setPrellenadoValido] = useState<boolean | null>(null);
+  const embajadorVigente =
+    embajador ?? (!prellenadoQuitado && prellenadoValido ? codigoPrellenado : null);
 
   useEffect(() => {
     if (!codigoPrellenado) return;
     let cancelado = false;
-    fetch(`/api/referrals/validate?code=${encodeURIComponent(codigoPrellenado)}`)
-      .then((r) => r.json())
-      .then(({ valid }) => {
-        if (!cancelado) setEstadoRevisado(valid ? "valid" : "invalid");
+    reconocerCodigo(codigoPrellenado)
+      .then((r) => {
+        if (!cancelado) setPrellenadoValido(r?.tipo === "embajador");
       })
       .catch(() => {
-        if (!cancelado) setEstadoRevisado("idle");
+        if (!cancelado) setPrellenadoValido(false);
       });
     return () => {
       cancelado = true;
     };
   }, [codigoPrellenado]);
 
-  async function applyCode() {
-    if (!code.trim()) return;
-    setEstadoRevisado("checking");
-    const res = await fetch(
-      `/api/referrals/validate?code=${encodeURIComponent(code.trim())}`,
-    );
-    const { valid } = await res.json();
-    setEstadoRevisado(valid ? "valid" : "invalid");
+  async function aplicarCodigo() {
+    const codigo = texto.trim().toUpperCase();
+    if (!codigo) return;
+    setRevisando(true);
+    setAviso(null);
+    try {
+      const r = await reconocerCodigo(codigo);
+      if (r?.tipo === "embajador") {
+        setEmbajador(r.codigo);
+        setPrellenadoQuitado(true);
+        setTexto("");
+      } else if (r?.tipo === "promocion") {
+        setPromo(r.promocion);
+        setTexto("");
+      } else {
+        setAviso("Ese código no existe o ya no está activo. Revísalo e intenta de nuevo.");
+      }
+    } catch {
+      setAviso("No pudimos revisar el código. Intenta de nuevo.");
+    } finally {
+      setRevisando(false);
+    }
   }
+
+  // Qué hace la promoción en cada plan: EXPOCAN es el primer mes gratis en el
+  // mensual y $599 menos en el anual.
+  const promoMensual = promo
+    ? describirPromocion(promo, { centavos: Math.round(oferta.mensualPesos * 100), intervalo: "month" })
+    : null;
+  const promoAnual = promo
+    ? describirPromocion(promo, { centavos: Math.round(oferta.anualPesos * 100), intervalo: "year" })
+    : null;
 
   async function checkout(plan: Cobro) {
     setError(null);
@@ -89,7 +118,8 @@ export function PlanSelector599({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         plan,
-        ambassadorCode: codeStatus === "valid" ? code.trim() : undefined,
+        ambassadorCode: embajadorVigente ?? undefined,
+        promotionCode: promo?.codigo,
       }),
     });
     const cuerpo = await res.json().catch(() => ({}));
@@ -335,49 +365,84 @@ export function PlanSelector599({
         </div>
       </section>
 
-      {/* Código de embajador */}
-      <div className="flex flex-col gap-3 rounded-[16px] bg-white px-4 py-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:gap-4 sm:px-5">
-        <div className="flex flex-1 flex-col gap-0.5">
-          <span className="text-sm font-bold text-ink-title">
-            ¿Tienes un código de embajador?
-          </span>
-          <span className="text-[12.5px] text-ink-tertiary">
-            Aplícalo antes de pagar. ¿Tienes un código de promoción, como
-            EXPOCAN? Ese se escribe en la página de pago, en el recuadro de
-            código promocional.
-          </span>
-        </div>
-        <div className="flex gap-3">
-          <input
-            value={code}
-            onChange={(e) => {
-              setCodeEscrito(e.target.value.toUpperCase());
-              setEstadoRevisado("idle");
+      {/* ¿Tienes un código? — de promoción o de embajador */}
+      <div className="flex flex-col gap-3 rounded-[16px] bg-white px-4 py-4 shadow-[var(--shadow-card)] sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex flex-1 flex-col gap-0.5">
+            <span className="text-sm font-bold text-ink-title">¿Tienes un código?</span>
+            <span className="text-[12.5px] text-ink-tertiary">
+              De promoción (como EXPOCAN) o de la persona embajadora que te
+              invitó. Aplícalo antes de pagar.
+            </span>
+          </div>
+          <form
+            className="flex gap-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              aplicarCodigo();
             }}
-            placeholder="CÓDIGO"
-            className="h-[46px] w-full rounded-[12px] border-[1.5px] border-dashed border-[#C9C3B4] bg-white px-3.5 text-sm tracking-[.1em] text-ink-title placeholder:text-ink-placeholder outline-none focus:border-solid focus:border-teal sm:w-[220px]"
-          />
-          <button
-            type="button"
-            onClick={applyCode}
-            className="grid h-[46px] flex-none place-items-center rounded-full bg-info-bg px-5 text-sm font-bold text-info-text transition-colors hover:bg-teal hover:text-white"
           >
-            {codeStatus === "checking" ? "…" : "Aplicar"}
-          </button>
+            <input
+              value={texto}
+              onChange={(e) => {
+                setTexto(e.target.value.toUpperCase());
+                setAviso(null);
+              }}
+              placeholder="CÓDIGO"
+              aria-label="Código de promoción o de embajador"
+              className="h-[46px] w-full rounded-[12px] border-[1.5px] border-dashed border-[#C9C3B4] bg-white px-3.5 text-sm tracking-[.1em] text-ink-title placeholder:text-ink-placeholder outline-none focus:border-solid focus:border-teal sm:w-[220px]"
+            />
+            <button
+              type="submit"
+              disabled={revisando}
+              className="grid h-[46px] flex-none place-items-center rounded-full bg-info-bg px-5 text-sm font-bold text-info-text transition-colors hover:bg-teal hover:text-white disabled:opacity-60"
+            >
+              {revisando ? "…" : "Aplicar"}
+            </button>
+          </form>
         </div>
+        {(promo || embajadorVigente) && (
+          <div className="flex flex-wrap gap-2">
+            {promo && (
+              <span className="inline-flex items-center gap-2 rounded-[14px] bg-success-bg py-1.5 pl-3.5 pr-2 text-[13px] font-semibold leading-snug text-success-text">
+                ✓ {promo.codigo}:{" "}
+                {promoMensual === promoAnual
+                  ? promoMensual
+                  : `${promoMensual} en el mensual · ${promoAnual?.replace(/ en tu primer pago$/, "")} en el anual`}
+                <button
+                  type="button"
+                  onClick={() => setPromo(null)}
+                  aria-label={`Quitar ${promo.codigo}`}
+                  className="grid size-6 place-items-center rounded-full hover:bg-white/60"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+            {embajadorVigente && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-info-bg py-1.5 pl-3.5 pr-2 text-[13px] font-semibold text-info-text">
+                ✓ Te invitó: <span className="font-mono">{embajadorVigente}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmbajador(null);
+                    setPrellenadoQuitado(true);
+                  }}
+                  aria-label={`Quitar ${embajadorVigente}`}
+                  className="grid size-6 place-items-center rounded-full hover:bg-white/60"
+                >
+                  ✕
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+        {aviso && (
+          <div className="rounded-[12px] bg-error-bg px-4 py-2.5 text-sm text-error-text">
+            {aviso}
+          </div>
+        )}
       </div>
-      {codeStatus === "valid" && (
-        <div className="-mt-3 rounded-[12px] bg-success-bg px-4 py-2.5 text-sm font-semibold text-success-text sm:-mt-5">
-          ✓ Código {code} aplicado
-        </div>
-      )}
-      {codeStatus === "invalid" && (
-        <div className="-mt-3 rounded-[12px] bg-error-bg px-4 py-2.5 text-sm text-error-text sm:-mt-5">
-          No encontramos ese código de embajador. Si es un código de promoción
-          (como EXPOCAN), escríbelo en la página de pago, en el recuadro de
-          código promocional.
-        </div>
-      )}
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">
           {error}
@@ -404,4 +469,16 @@ export function PlanSelector599({
       </div>
     </>
   );
+}
+
+type CodigoReconocido =
+  | { tipo: "embajador"; codigo: string }
+  | { tipo: "promocion"; codigo: string; promocion: Promocion }
+  | { tipo: "invalido"; codigo: string };
+
+/** Pregunta al servidor si la palabra es de un embajador, una promoción o ninguna. */
+async function reconocerCodigo(codigo: string): Promise<CodigoReconocido | null> {
+  const res = await fetch(`/api/codigos/validar?code=${encodeURIComponent(codigo)}`);
+  if (!res.ok) return null;
+  return (await res.json()) as CodigoReconocido;
 }
