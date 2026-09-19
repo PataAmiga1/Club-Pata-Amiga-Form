@@ -8,6 +8,7 @@ import { ALTAS_SON_599, PLAN_159, PLAN_DE_ALTAS } from "@/lib/plans/planes";
 import { ESTADOS_VIVOS, type NivelDePrecio } from "@/lib/plans/suscripciones";
 import { registroAbierto } from "@/lib/registro";
 import { anualParaMSI, sesionDePagoAnual } from "@/lib/plans/msi";
+import { buscarPromocion, esCodigoDeEmbajador, limpiarCodigo } from "@/lib/plans/codigos";
 
 const PRICE_BY_PLAN: Record<string, string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { plan: planPedido, ambassadorCode, petId } = await request.json();
+  const { plan: planPedido, ambassadorCode, promotionCode, petId } = await request.json();
   // «annual_msi» es el MISMO plan anual, pagado de una vez y a meses sin
   // intereses (17-sep-2026). Stripe no admite MSI dentro de una suscripción,
   // así que cambia CÓMO se cobra, no qué se contrata: de ahí `plan` para todo
@@ -208,15 +209,24 @@ export async function POST(request: Request) {
 
   // Ambassador code is optional; only forward it if it is real and approved
   let validCode: string | undefined;
-  if (ambassadorCode) {
-    const admin = createAdminClient();
-    const { data } = await admin
-      .from("ambassadors")
-      .select("id")
-      .eq("referral_code", ambassadorCode)
-      .eq("status", "approved")
-      .maybeSingle();
-    if (data) validCode = ambassadorCode;
+  const codigoEmbajador = limpiarCodigo(ambassadorCode);
+  if (codigoEmbajador && (await esCodigoDeEmbajador(guard, codigoEmbajador)))
+    validCode = codigoEmbajador;
+
+  // Código de promoción de la casilla «¿Tienes un código?» (19-sep-2026). Llega
+  // la PALABRA y se vuelve a buscar en Stripe: el id nunca viene del navegador.
+  // Con él, el descuento va ya puesto en el pago; sin él, la casilla de Stripe
+  // en la página de pago sigue ahí, como siempre.
+  let promotionCodeId: string | undefined;
+  const palabraPromo = limpiarCodigo(promotionCode);
+  if (palabraPromo) {
+    const promo = await buscarPromocion(palabraPromo).catch(() => null);
+    if (!promo)
+      return NextResponse.json(
+        { error: "Ese código de promoción ya no está activo.", motivo: "promocion_invalida" },
+        { status: 400 },
+      );
+    promotionCodeId = promo.promotionCodeId;
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -233,30 +243,37 @@ export async function POST(request: Request) {
         { error: "La membresía anual no está disponible en este momento." },
         { status: 400 },
       );
-    const url = await sesionDePagoAnual({
-      anual,
-      clienteStripe: peludo.customerId,
-      correo: user.email ?? null,
-      descripcion: "Membresía Pata Amiga · un año",
-      metadata: {
-        user_id: user.id,
-        plan: "annual",
-        plan_slug: PLAN_DE_ALTAS,
-        pet_id: peludo.id,
-        price_tier: peludo.nivel,
-        plan_version_id: anual.planVersionId,
-        msi: "1",
-        ...(validCode ? { ambassador_code: validCode } : {}),
-      },
-      successUrl:
-        peludo.nivel === "adicional"
-          ? `${siteUrl}/app/peludos?membresia=1`
-          : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl:
-        peludo.nivel === "adicional"
-          ? `${siteUrl}/app/peludos/${peludo.id}/membresia`
-          : `${siteUrl}/registro/plan`,
-    });
+    let url: string | null;
+    try {
+      url = await sesionDePagoAnual({
+        anual,
+        promotionCodeId,
+        clienteStripe: peludo.customerId,
+        correo: user.email ?? null,
+        descripcion: "Membresía Pata Amiga · un año",
+        metadata: {
+          user_id: user.id,
+          plan: "annual",
+          plan_slug: PLAN_DE_ALTAS,
+          pet_id: peludo.id,
+          price_tier: peludo.nivel,
+          plan_version_id: anual.planVersionId,
+          msi: "1",
+          ...(validCode ? { ambassador_code: validCode } : {}),
+        },
+        successUrl:
+          peludo.nivel === "adicional"
+            ? `${siteUrl}/app/peludos?membresia=1`
+            : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl:
+          peludo.nivel === "adicional"
+            ? `${siteUrl}/app/peludos/${peludo.id}/membresia`
+            : `${siteUrl}/registro/plan`,
+      });
+    } catch (e) {
+      if (promotionCodeId) return errorDePromocion(e);
+      throw e;
+    }
     if (!url) return NextResponse.json({ error: "No pudimos abrir el pago." }, { status: 502 });
     await crmEventoDeUsuario(guard, {
       userId: user.id,
@@ -291,45 +308,53 @@ export async function POST(request: Request) {
       console.error("[checkout] no se pudieron expirar las sesiones abiertas", e);
     }
   }
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price, quantity: 1 }],
-    ...(peludo?.customerId
-      ? { customer: peludo.customerId }
-      : { customer_email: user.email }),
-    // Campo "código de promoción" en el checkout — aquí viven los cupones
-    // de las landings (se crean manualmente en Stripe → Promotion codes)
-    allow_promotion_codes: true,
-    // Un peludo adicional se paga desde la cuenta: vuelve a sus peludos, no
-    // a la bienvenida del alta.
-    success_url:
-      peludo?.nivel === "adicional"
-        ? `${siteUrl}/app/peludos?membresia=1`
-        : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url:
-      peludo?.nivel === "adicional"
-        ? `${siteUrl}/app/peludos/${peludo.id}/membresia`
-        : `${siteUrl}/registro/plan`,
-    metadata: {
-      user_id: user.id,
-      plan,
-      plan_slug: PLAN_DE_ALTAS,
-      ...(peludo ? { pet_id: peludo.id, price_tier: peludo.nivel } : {}),
-      // Viaja la versión para que el webhook NUNCA tenga que adivinar de qué
-      // versión fue este pago al tomar la foto de beneficios.
-      ...(versionPublicada ? { plan_version_id: versionPublicada.id } : {}),
-      ...(validCode ? { ambassador_code: validCode } : {}),
-    },
-    subscription_data: {
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price, quantity: 1 }],
+      ...(peludo?.customerId
+        ? { customer: peludo.customerId }
+        : { customer_email: user.email }),
+      // Con un código ya aplicado en nuestra página va como descuento; si no, el
+      // campo "código de promoción" de Stripe. Stripe no acepta los dos juntos.
+      ...(promotionCodeId
+        ? { discounts: [{ promotion_code: promotionCodeId }] }
+        : { allow_promotion_codes: true }),
+      // Un peludo adicional se paga desde la cuenta: vuelve a sus peludos, no
+      // a la bienvenida del alta.
+      success_url:
+        peludo?.nivel === "adicional"
+          ? `${siteUrl}/app/peludos?membresia=1`
+          : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url:
+        peludo?.nivel === "adicional"
+          ? `${siteUrl}/app/peludos/${peludo.id}/membresia`
+          : `${siteUrl}/registro/plan`,
       metadata: {
         user_id: user.id,
         plan,
         plan_slug: PLAN_DE_ALTAS,
         ...(peludo ? { pet_id: peludo.id, price_tier: peludo.nivel } : {}),
+        // Viaja la versión para que el webhook NUNCA tenga que adivinar de qué
+        // versión fue este pago al tomar la foto de beneficios.
         ...(versionPublicada ? { plan_version_id: versionPublicada.id } : {}),
+        ...(validCode ? { ambassador_code: validCode } : {}),
       },
-    },
-  });
+      subscription_data: {
+        metadata: {
+          user_id: user.id,
+          plan,
+          plan_slug: PLAN_DE_ALTAS,
+          ...(peludo ? { pet_id: peludo.id, price_tier: peludo.nivel } : {}),
+          ...(versionPublicada ? { plan_version_id: versionPublicada.id } : {}),
+        },
+      },
+    });
+  } catch (e) {
+    if (promotionCodeId) return errorDePromocion(e);
+    throw e;
+  }
 
   // CRM: llegó al checkout. La tarjeta entra a "Registro iniciado" y, si en 24 h
   // no hay pago, la tarea diaria la pasa a "Carrito abandonado" — el embudo que
@@ -345,4 +370,21 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ url: session.url });
+}
+
+/**
+ * Stripe rechaza abrir el pago cuando la promoción no aplica a ese precio
+ * (restringida a otro producto, monto mínimo, solo primera compra…). La
+ * persona ve por qué, no un error 500.
+ */
+function errorDePromocion(e: unknown) {
+  console.error("[checkout] Stripe rechazó el código de promoción", e);
+  return NextResponse.json(
+    {
+      error:
+        "Ese código de promoción no aplica a este plan. Prueba con el otro plan o quítalo para continuar.",
+      motivo: "promocion_no_aplica",
+    },
+    { status: 400 },
+  );
 }
