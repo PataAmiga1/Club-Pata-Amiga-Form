@@ -10,6 +10,7 @@ import {
   campaignPdfSlot,
   EDAD_MINIMA_LANDING,
 } from "@/lib/landings";
+import { bloqueDeCodigoDeGuia } from "@/lib/landings-correo";
 
 export type LeadInput = {
   campaign: string;
@@ -49,7 +50,15 @@ async function buildGiftBlocks(slug: string) {
   ]);
 
   const coupon = couponRow?.value?.trim();
-  const couponBlock = coupon
+  // Una landing de guía nunca prometió cupón: sin código configurado el
+  // bloque va vacío, no «por activarse». Con código, dice qué hace y dónde
+  // se escribe (EXPOCAN, 19-sep-2026).
+  const couponBlock =
+    getCampaign(slug)?.tipo === "guia"
+      ? coupon
+        ? await bloqueDeCodigoDeGuia(admin, coupon)
+        : ""
+      : coupon
     ? `<div style="background:#FDF9EF;border:2px dashed #1CBCAD;border-radius:14px;padding:16px;text-align:center;margin:8px 0"><span style="font-size:12px;color:#6B7C79;letter-spacing:.08em">TU CUPÓN DE DESCUENTO</span><br><span style="font-size:26px;font-weight:800;color:#1E5350;letter-spacing:.06em">${coupon}</span></div>`
     : `<div style="background:#FDF9EF;border-radius:14px;padding:14px;text-align:center;margin:8px 0;color:#6B7C79;font-size:14px">Tu cupón de descuento está por activarse — te lo enviaremos a este mismo correo muy pronto. 🐾</div>`;
 
@@ -171,7 +180,7 @@ export async function sendGiftEmail(
       : tipo === "guia"
         ? await sendTemplatedEmail("campaign_guide", email, {
             ...comunes,
-            pdfBlock: (await buildGiftBlocks(slug)).pdfBlock,
+            ...(await buildGiftBlocks(slug)),
           })
         : await sendTemplatedEmail("campaign_gift", email, {
             ...comunes,

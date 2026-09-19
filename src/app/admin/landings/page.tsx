@@ -126,8 +126,6 @@ export default async function AdminLandingsPage({
                 </span>
               ) : (
               <>
-              {/* Las landings de guía (ExpoCan) no llevan cupón: solo el PDF. */}
-              {camp.tipo !== "guia" && (
               <form
                 action={updateSiteSettings}
                 className="flex items-end gap-2"
@@ -136,7 +134,9 @@ export default async function AdminLandingsPage({
                   <span className="text-[12px] font-semibold text-ink-title">
                     Palabra cupón{" "}
                     <span className="font-normal text-ink-tertiary">
-                      (vacío = «por activarse» en el correo)
+                      {camp.tipo === "guia"
+                        ? "(opcional: sale en el correo con lo que hace y dónde se escribe)"
+                        : "(vacío = «por activarse» en el correo)"}
                     </span>
                   </span>
                   <input
@@ -153,7 +153,6 @@ export default async function AdminLandingsPage({
                   Guardar
                 </button>
               </form>
-              )}
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-[12px] font-semibold text-ink-title">

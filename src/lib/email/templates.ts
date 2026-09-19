@@ -136,7 +136,8 @@ const CAMPAIGN_GIFT_HTML = `<!-- Correo "Obtén tu regalo" · Club Pata Amiga --
 
 /**
  * Correo de la guía (landings tipo `guia`, ExpoCan 19-sep-2026): el mismo
- * diseño del regalo, sin cupón. Se arma a partir de él para que no se separen.
+ * diseño del regalo. Se arma a partir de él para que no se separen. El código de
+ * promoción es opcional: sin código en Admin → Landings, su bloque va vacío.
  */
 const CAMPAIGN_GUIDE_HTML = CAMPAIGN_GIFT_HTML.replace(
   "<!-- Correo \"Obtén tu regalo\" · Club Pata Amiga -->",
@@ -150,7 +151,6 @@ const CAMPAIGN_GUIDE_HTML = CAMPAIGN_GIFT_HTML.replace(
     "Gracias por registrarte. Esto es lo que preparamos para ti y tu peludo:",
     "Gracias por visitarnos. Esta es la guía que preparamos para ti y tu peludo:",
   )
-  .replace("{{couponBlock}}", "")
   .replace(
     "Usa tu cupón al unirte a la manada — membresía de salud para tu peludo (michi o lomito):",
     "¿Quieres cuidarlo todavía mejor? Únete a la manada — membresía de salud para tu peludo (michi o lomito):",
@@ -515,11 +515,13 @@ ${BOTON("{{siteUrl}}/embajador/cuenta", "Ver mi cuenta")}`),
   },
   {
     key: "campaign_guide",
-    name: "Guía PDF de campaña (sin cupón)",
+    name: "Guía PDF de campaña",
     description:
-      "Se envía al registrarse en una landing de guía (/landings/expocan). El botón de descarga se arma solo con el PDF cargado en Admin → Landings.",
+      "Se envía al registrarse en una landing de guía (/landings/expocan). El botón de descarga y el código de promoción se arman solos con lo cargado en Admin → Landings.",
     variables: {
       firstName: "Nombre del registrado",
+      couponBlock:
+        "Código de promoción de la landing con lo que hace y dónde se escribe (vacío si no hay código en Admin → Landings)",
       pdfBlock: "Botón de descarga de la guía PDF (o aviso si aún no se sube)",
       registroUrl: "URL del registro de la membresía",
       terceraCaracteristica:
@@ -527,6 +529,8 @@ ${BOTON("{{siteUrl}}/embajador/cuenta", "Ver mi cuenta")}`),
     },
     sample: {
       firstName: "Cipatli",
+      couponBlock:
+        '<div style="background:#FDF9EF;border:2px dashed #1CBCAD;border-radius:14px;padding:18px 16px;text-align:center;margin:8px 0 14px"><span style="font-size:12px;color:#6B7C79">TU CÓDIGO DE PROMOCIÓN</span><br><span style="font-size:28px;font-weight:800;color:#1E5350">EXPOCAN</span><p style="margin:8px 0 0;font-size:15px;font-weight:700;color:#1E5350">Primer mes gratis en la membresía mensual.</p><p style="margin:10px 0 0;font-size:13px;color:#3D524F">Escríbelo en <strong>«¿Tienes un código?»</strong> al elegir tu plan.</p></div>',
       pdfBlock:
         '<p style="text-align:center;margin:16px 0"><a href="#" style="background:#1CBCAD;color:#fff;padding:14px 28px;border-radius:999px;font-weight:700;text-decoration:none">📘 Descargar la Mini Guía Interactiva</a></p>',
       registroUrl: "https://pataamiga.mx/registro",

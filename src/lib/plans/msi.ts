@@ -76,6 +76,8 @@ export async function anualParaMSI(
  */
 export async function sesionDePagoAnual(input: {
   anual: PagoAnualEnUnaExhibicion;
+  /** Promoción ya reconocida en la página del plan (casilla «¿Tienes un código?»). */
+  promotionCodeId?: string;
   clienteStripe: string | null;
   correo: string | null;
   metadata: Record<string, string>;
@@ -100,7 +102,10 @@ export async function sesionDePagoAnual(input: {
       metadata: input.metadata,
     },
     invoice_creation: { enabled: true },
-    allow_promotion_codes: true,
+    // Stripe no acepta un descuento puesto y la casilla de promoción a la vez.
+    ...(input.promotionCodeId
+      ? { discounts: [{ promotion_code: input.promotionCodeId }] }
+      : { allow_promotion_codes: true }),
     metadata: input.metadata,
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
