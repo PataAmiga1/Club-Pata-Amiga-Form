@@ -14,6 +14,7 @@ import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 import { PetResolveButtons } from "../../mascotas/PetResolveButtons";
 import { NOTA_HEREDADO_ADMIN } from "@/lib/membresia";
 import { EditMemberButton, EditPetButton } from "./EditPanels";
+import { DetailItem, DetailModal } from "@/components/panel/DetailModal";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
   active: { text: "ACTIVO", cls: "bg-success-bg text-success-text" },
@@ -405,85 +406,166 @@ export default async function AdminMiembroDetailPage({
           return (
             <div key={p.id} className="flex flex-col gap-1.5 border-b border-[#F2EEE4] pb-3 last:border-0">
               <div className="flex items-start gap-3 text-[13px] text-ink-body">
-                {/* Expediente completo de la mascota: foto, datos y documentos */}
-                {p.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={p.photo_url}
-                    alt={p.name}
-                    className="size-[52px] flex-none rounded-[12px] object-cover"
-                  />
-                ) : (
-                  <span
-                    className="grid size-[52px] flex-none place-items-center rounded-[12px] bg-info-bg text-[20px]"
-                    aria-hidden
+                {/* La tarjeta abre el mismo popup «Perfil de …» de Mascotas
+                    (equipo, 20-sep): en el celular la ficha en línea se lee
+                    apretada y la foto es una miniatura. Los botones de resolver
+                    se quedan fuera del disparador — un botón no puede vivir
+                    dentro de otro — y se repiten dentro del popup. */}
+                <div className="min-w-0 flex-1">
+                  <DetailModal
+                    title={`Perfil de ${p.name}`}
+                    trigger={
+                      <div className="flex items-start gap-3 p-1">
+                        {p.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={p.photo_url}
+                            alt={p.name}
+                            className="size-[52px] flex-none rounded-[12px] object-cover"
+                          />
+                        ) : (
+                          <span
+                            className="grid size-[52px] flex-none place-items-center rounded-[12px] bg-info-bg text-[20px]"
+                            aria-hidden
+                          >
+                            {p.species === "dog" ? "🐕" : "🐈"}
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1 text-[13px] text-ink-body">
+                          <strong className="text-ink-title">{p.name}</strong>
+                          {p.breed ? ` · ${p.breed}` : ""}
+                          {p.age_years
+                            ? ` · ${p.age_years} año${p.age_years === 1 ? "" : "s"}`
+                            : p.age_months
+                              ? ` · ${p.age_months} meses`
+                              : ""}
+                          {p.sex ? ` · ${p.sex === "male" ? "macho" : "hembra"}` : ""}
+                          {!p.is_active
+                            ? ` · 🕊️ dada de baja${p.deactivation_reason ? ` (${p.deactivation_reason})` : ""}`
+                            : ""}
+                          <span className="block text-[11.5px] text-ink-tertiary">
+                            {[
+                              p.coat_color ? `pelaje ${p.coat_color}` : null,
+                              p.eye_color ? `ojos ${p.eye_color}` : null,
+                              p.nose_color ? `nariz ${p.nose_color}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "sin señas registradas"}
+                          </span>
+                          <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {p.is_adopted && (
+                              <span className="rounded-full bg-success-bg px-2 py-0.5 text-[9.5px] font-extrabold text-success-text">
+                                🏠 ADOPTADO
+                              </span>
+                            )}
+                            {p.is_senior && (
+                              <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[9.5px] font-extrabold text-warning-text">
+                                👴 SENIOR
+                              </span>
+                            )}
+                            <span className="text-[10.5px] font-bold text-teal-deep underline">
+                              Ver perfil completo
+                            </span>
+                          </span>
+                        </span>
+                      </div>
+                    }
                   >
-                    {p.species === "dog" ? "🐕" : "🐈"}
-                  </span>
-                )}
-                <span className="flex-1">
-                  <strong className="text-ink-title">{p.name}</strong>
-                  {p.breed ? ` · ${p.breed}` : ""}
-                  {p.age_years
-                    ? ` · ${p.age_years} año${p.age_years === 1 ? "" : "s"}`
-                    : p.age_months
-                      ? ` · ${p.age_months} meses`
-                      : ""}
-                  {p.sex ? ` · ${p.sex === "male" ? "macho" : "hembra"}` : ""}
-                  {!p.is_active
-                    ? ` · 🕊️ dada de baja${p.deactivation_reason ? ` (${p.deactivation_reason})` : ""}`
-                    : ""}
-                  {p.waiting_period_end_date
-                    ? ` · espera termina ${formatDateEs(p.waiting_period_end_date)}`
-                    : ""}
-                  <span className="block text-[11.5px] text-ink-tertiary">
-                    {[
-                      p.coat_color ? `pelaje ${p.coat_color}` : null,
-                      p.eye_color ? `ojos ${p.eye_color}` : null,
-                      p.nose_color ? `nariz ${p.nose_color}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || "sin señas registradas"}
-                  </span>
-                  <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {p.is_adopted && (
-                      <span className="rounded-full bg-success-bg px-2 py-0.5 text-[9.5px] font-extrabold text-success-text">
-                        🏠 ADOPTADO
-                      </span>
-                    )}
-                    {p.is_senior && (
-                      <span className="rounded-full bg-warning-bg px-2 py-0.5 text-[9.5px] font-extrabold text-warning-text">
-                        👴 SENIOR
-                      </span>
-                    )}
-                    {p.vet_certificate_url && (
-                      <a
-                        href={p.vet_certificate_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10.5px] font-bold text-teal-deep hover:underline"
-                      >
-                        🏥 Certificado vet
-                      </a>
-                    )}
-                    {(p.gallery_photos ?? []).map((g: string, gi: number) => (
-                      <a
-                        key={g}
-                        href={g}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10.5px] font-bold text-teal-deep hover:underline"
-                      >
-                        📸 Foto {gi + 1}
-                      </a>
-                    ))}
-                  </span>
-                  {p.adoption_story && (
-                    <span className="mt-1 block rounded-[8px] bg-cream px-2.5 py-1.5 text-[11.5px] italic text-ink-secondary">
-                      «{p.adoption_story}»
-                    </span>
-                  )}
-                </span>
+                    <div className="flex flex-col gap-4">
+                      {p.photo_url && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.photo_url}
+                          alt={p.name}
+                          // object-contain: el comité necesita VER la foto
+                          // completa, no un recorte (equipo, 5-ago)
+                          className="h-[180px] w-full rounded-[14px] bg-cream object-contain"
+                        />
+                      )}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                        <DetailItem label="NOMBRE" value={p.name} />
+                        <DetailItem
+                          label="TIPO"
+                          value={p.species === "dog" ? "Perro" : "Gato"}
+                        />
+                        <DetailItem label="RAZA" value={p.breed} />
+                        <DetailItem
+                          label="EDAD"
+                          value={
+                            p.age_months
+                              ? `${p.age_months} meses`
+                              : p.age_years
+                                ? `${p.age_years} año${p.age_years === 1 ? "" : "s"}`
+                                : null
+                          }
+                        />
+                        <DetailItem
+                          label="SEXO"
+                          value={
+                            p.sex === "male" ? "Macho" : p.sex === "female" ? "Hembra" : null
+                          }
+                        />
+                        <DetailItem label="COLOR DE PELAJE" value={p.coat_color} />
+                        <DetailItem label="COLOR DE OJOS" value={p.eye_color} />
+                        <DetailItem label="COLOR DE NARIZ" value={p.nose_color} />
+                        <DetailItem label="ADOPTADO" value={p.is_adopted ? "Sí 🏠" : "No"} />
+                        <DetailItem label="SENIOR" value={p.is_senior ? "Sí 👴" : "No"} />
+                        <DetailItem
+                          label="ESTADO"
+                          value={!p.is_active ? "Dada de baja 🕊️" : pchip.text}
+                        />
+                        <DetailItem
+                          label="TIEMPO DE ESPERA"
+                          value={
+                            p.waiting_period_end_date
+                              ? `termina el ${formatDateEs(p.waiting_period_end_date)}`
+                              : null
+                          }
+                        />
+                        <DetailItem
+                          label="MOTIVO DE LA BAJA"
+                          value={!p.is_active ? p.deactivation_reason : null}
+                        />
+                      </div>
+                      {p.adoption_story && (
+                        <p className="rounded-[10px] bg-cream px-3.5 py-2.5 text-[12.5px] italic leading-relaxed text-ink-secondary">
+                          «{p.adoption_story}»
+                        </p>
+                      )}
+                      {(p.vet_certificate_url || (p.gallery_photos ?? []).length > 0) && (
+                        <div className="flex flex-wrap gap-2">
+                          {p.vet_certificate_url && (
+                            <a
+                              href={p.vet_certificate_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-full border-[1.5px] border-border-input px-3 py-1.5 text-[11.5px] font-bold text-teal-deep hover:border-teal"
+                            >
+                              🏥 Certificado veterinario
+                            </a>
+                          )}
+                          {(p.gallery_photos ?? []).map((g: string, gi: number) => (
+                            <a
+                              key={g}
+                              href={g}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-full border-[1.5px] border-border-input px-3 py-1.5 text-[11.5px] font-bold text-teal-deep hover:border-teal"
+                            >
+                              📸 Foto {gi + 1}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {/* Resolver sin salir del popup, como en Mascotas */}
+                      {p.is_active && p.approval_status === "pending" && (
+                        <div className="border-t border-border-divider pt-3">
+                          <PetResolveButtons petId={p.id} />
+                        </div>
+                      )}
+                    </div>
+                  </DetailModal>
+                </div>
                 <span className="flex flex-none flex-col items-end gap-2">
                   <span className={`rounded-full px-2.5 py-[3px] text-[10.5px] font-extrabold ${pchip.cls}`}>
                     {!p.is_active ? "🕊️ BAJA" : pchip.text}
