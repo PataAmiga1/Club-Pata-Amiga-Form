@@ -39,6 +39,19 @@ export const SITE_SETTINGS = [
     default: "7,1",
   },
   {
+    // Secuencia del alta (Pablo, 21-sep-2026): TRES avisos y se acaba. Los
+    // dias se cuentan desde que la membresia se activo (perfil) o desde que
+    // se creo la cuenta (pago). Vacio = apagado.
+    key: "profile_reminder_days",
+    label: "Recordatorios de perfil incompleto (dias tras activar, separados por coma)",
+    default: "1,4,10",
+  },
+  {
+    key: "payment_reminder_days",
+    label: "Recordatorios de registro sin pagar (dias tras registrarse)",
+    default: "1,3,7",
+  },
+  {
     // El anual pagado por adelantado (meses sin intereses) se avisa antes: si
     // quiere volver a pagar a meses, tiene que hacerlo ANTES del aniversario,
     // porque Stripe no ofrece meses sin intereses en un cobro automático.

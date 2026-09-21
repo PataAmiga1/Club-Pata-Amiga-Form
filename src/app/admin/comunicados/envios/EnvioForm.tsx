@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   sendExtraordinaryEmail,
   sendMissingDocsReminders,
+  sendPendingPaymentReminders,
   sendRenewalReminders,
   type EmailAudience,
 } from "@/app/admin/actions";
@@ -26,10 +27,16 @@ const AUDIENCES: { value: EmailAudience; label: string }[] = [
 export function EnvioForm({
   isSuper,
   diasConfigurados,
+  diasPerfil,
+  diasPago,
 }: {
   isSuper: boolean;
   /** Lo que hoy dice el ajuste de /admin/sitio, para no mandar a ciegas. */
   diasConfigurados: string;
+  /** Días de la secuencia de perfil incompleto (21-sep). */
+  diasPerfil: string;
+  /** Días de la secuencia de registro sin pagar (21-sep). */
+  diasPago: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [subject, setSubject] = useState("");
@@ -39,6 +46,7 @@ export function EnvioForm({
   const [preview, setPreview] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [reminderMsg, setReminderMsg] = useState<string | null>(null);
+  const [pagoMsg, setPagoMsg] = useState<string | null>(null);
   const [renovMsg, setRenovMsg] = useState<string | null>(null);
 
   const field =
@@ -161,11 +169,13 @@ export function EnvioForm({
         </span>
         <p className="text-[13px] leading-normal text-ink-secondary">
           Envía el correo «Recordatorio de datos faltantes» (editable en
-          Comunicados) a todos los miembros activos con el perfil incompleto,
-          con la lista exacta de lo que le falta a cada quien.{" "}
-          <strong>Sale solo cada lunes</strong> a las 10:30 de la mañana
-          (agendado el 2-sep; antes solo salía si alguien apretaba este botón).
-          Este botón sigue sirviendo para adelantarlo.
+          Comunicados) a los miembros activos con el perfil incompleto, con la
+          lista exacta de lo que le falta a cada quien. <strong>Son tres avisos
+          por persona y se acaban</strong>: los días se configuran en Sitio web
+          → «Recordatorios de perfil incompleto» (hoy: {diasPerfil || "apagado"}).
+          Sale solo todos los días a las 10:30 de la mañana; este botón sirve
+          para adelantarlo y es seguro apretarlo de más — cada aviso queda
+          registrado y no se manda dos veces.
         </p>
         {isSuper && (
           <button
@@ -202,6 +212,65 @@ export function EnvioForm({
             className={`text-xs font-semibold ${reminderMsg.includes("✓") ? "text-success-text" : "text-error-text"}`}
           >
             {reminderMsg}
+          </span>
+        )}
+      </div>
+
+      {/* REGISTRO SIN PAGAR (21-sep): el embudo más caro. Misma mecánica que
+          el de perfil — tres avisos por persona, asentados en la base. */}
+      <div className="flex flex-col gap-3 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
+        <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
+          REGISTRO SIN PAGAR
+        </span>
+        <p className="text-[13px] leading-normal text-ink-secondary">
+          Envía el correo «Registro sin pagar» a quien creó su cuenta en los
+          últimos 30 días y no terminó el pago. <strong>Son tres avisos por
+          persona</strong>; los días se configuran en Sitio web →
+          «Recordatorios de registro sin pagar» (hoy: {diasPago || "apagado"}).
+          No lo recibe quien ya tiene una membresía viva.
+        </p>
+        {isSuper && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                setPagoMsg(null);
+                const res = await sendPendingPaymentReminders();
+                const r = res as {
+                  enviados: number;
+                  candidatos: number;
+                  bloqueados?: number;
+                  yaAlDia?: number;
+                  dias?: number[];
+                };
+                if (!r.dias?.length) {
+                  setPagoMsg(
+                    "No hay días configurados: revisa Sitio web → Recordatorios de registro sin pagar.",
+                  );
+                  return;
+                }
+                const partes = [
+                  `Enviados ${r.enviados} avisos (de ${r.candidatos} registros sin pagar) ✓`,
+                ];
+                if (r.yaAlDia) partes.push(`${r.yaAlDia} ya estaban al día`);
+                if (r.bloqueados)
+                  partes.push(
+                    `${r.bloqueados} bloqueado${r.bloqueados === 1 ? "" : "s"} por la reja de pruebas`,
+                  );
+                setPagoMsg(partes.join(" · "));
+              })
+            }
+            className="self-start rounded-full bg-teal px-5 py-2 text-[12.5px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
+          >
+            {pending ? "Enviando…" : "Enviar avisos de registro sin pagar"}
+          </button>
+        )}
+        {pagoMsg && (
+          <span
+            className={`text-xs font-semibold ${pagoMsg.includes("✓") ? "text-success-text" : "text-error-text"}`}
+          >
+            {pagoMsg}
           </span>
         )}
       </div>

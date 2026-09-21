@@ -14,6 +14,8 @@ export default async function AdminEnviosPage() {
   // dispare los recordatorios sin saber con cuántos días van a salir.
   const ajustes = await fetchSiteSettings();
   const diasConfigurados = (ajustes.renewal_reminder_days ?? "").trim();
+  const diasPerfil = (ajustes.profile_reminder_days ?? "").trim();
+  const diasPago = (ajustes.payment_reminder_days ?? "").trim();
 
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
@@ -28,7 +30,12 @@ export default async function AdminEnviosPage() {
           Envíos dirigidos
         </h1>
       </div>
-      <EnvioForm isSuper={isSuper} diasConfigurados={diasConfigurados} />
+      <EnvioForm
+        isSuper={isSuper}
+        diasConfigurados={diasConfigurados}
+        diasPerfil={diasPerfil}
+        diasPago={diasPago}
+      />
     </div>
   );
 }
