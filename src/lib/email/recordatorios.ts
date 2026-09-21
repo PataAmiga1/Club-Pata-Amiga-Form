@@ -32,8 +32,12 @@ type Admin = ReturnType<typeof createAdminClient>;
  * vuelva a intentar — un fallo de Resend no debe quemarle un aviso a nadie.
  */
 
-/** Días entre un aviso y el siguiente, pase lo que pase. */
-const MIN_DIAS_ENTRE_AVISOS = 2;
+/**
+ * Días entre un aviso y el siguiente, pase lo que pase. Importa sobre todo
+ * para quien se dio de alta hace semanas: como ya rebasó los tres días de la
+ * lista, sin este piso recibiría los tres avisos casi seguidos.
+ */
+const MIN_DIAS_ENTRE_AVISOS = 3;
 
 /** Quien se registró hace mucho ya no recibe el recordatorio de pago. */
 const MAX_DIAS_PARA_EL_PAGO = 30;
