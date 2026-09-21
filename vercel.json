@@ -38,7 +38,7 @@
     },
     {
       "path": "/api/cron/documentos",
-      "schedule": "30 16 * * 1"
+      "schedule": "30 16 * * *"
     },
     {
       "path": "/api/cron/plazos-reintegro",
