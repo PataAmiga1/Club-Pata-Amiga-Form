@@ -524,6 +524,20 @@ export async function sendMissingDocsReminders() {
 }
 
 /**
+ * Recordatorios de registro sin pagar — botón "enviar ahora" (21-sep). SOLO
+ * super admin, igual que los otros dos. Es seguro apretarlo de más: cada
+ * aviso queda asentado en `member_reminders` con restricción única.
+ */
+export async function sendPendingPaymentReminders() {
+  const { admin } = await requireAdmin(true);
+  const { enviarRecordatoriosDePagoPendiente } = await import(
+    "@/lib/email/recordatorios"
+  );
+  const result = await enviarRecordatoriosDePagoPendiente(admin);
+  return { ok: true as const, ...result };
+}
+
+/**
  * Recordatorios de renovación — botón "enviar ahora" (2-sep). SOLO super
  * admin, igual que el de datos faltantes.
  *

@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { enviarRecordatoriosDatosFaltantes } from "@/lib/email/recordatorios";
+import {
+  enviarRecordatoriosDatosFaltantes,
+  enviarRecordatoriosDePagoPendiente,
+} from "@/lib/email/recordatorios";
 
 /**
  * Cron de recordatorios de datos faltantes (equipo, 5-ago): correo periódico
  * a miembros activos con el perfil incompleto.
+ *
+ * DIARIO DESDE EL 21-SEP, `30 16 * * *` — 10:30 CDMX. Semanal no alcanzaba:
+ * la gente se registra todos los días y quien entraba un martes esperaba seis
+ * días su primer recordatorio (gerencia de ventas, 21-sep). Corre las DOS
+ * secuencias: perfil incompleto y registro sin pagar.
  *
  * AGENDADO EL 2-SEP, `30 16 * * 1` — lunes 10:30 CDMX. La nota vieja decía
  * "cuando la cuenta sea Pro"; la cuenta ya lo es desde hace tiempo y esto
@@ -12,11 +20,9 @@ import { enviarRecordatoriosDatosFaltantes } from "@/lib/email/recordatorios";
  * alguien apretaba el botón de Comunicados → Envíos. Ese botón sigue ahí para
  * adelantarlo.
  *
- * ⚠ NO LLEVA CONTROL DE REPETICIÓN, a diferencia de `/api/cron/renovaciones`:
- * manda a TODOS los del perfil incompleto cada vez que corre. Semanal quiere
- * decir que quien nunca lo complete va a recibirlo todos los lunes. Si eso
- * empieza a molestar, la solución es un tope por persona (tabla de registro
- * como `renewal_reminders`), no bajar la frecuencia.
+ * YA LLEVA CONTROL DE REPETICIÓN (21-sep): cada aviso queda asentado en
+ * `member_reminders`, y son TRES por persona y por tipo. Antes le escribía a
+ * todos los incompletos cada lunes, para siempre.
  *
  * OJO: la entrada del calendario vive en el `vercel.json` de `main`, no en el
  * de `staging` — allá hay 2 crons a propósito y editarlo apagaría los de
@@ -43,6 +49,7 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminClient();
-  const result = await enviarRecordatoriosDatosFaltantes(admin);
-  return NextResponse.json(result);
+  const perfil = await enviarRecordatoriosDatosFaltantes(admin);
+  const pago = await enviarRecordatoriosDePagoPendiente(admin);
+  return NextResponse.json({ perfil, pago });
 }

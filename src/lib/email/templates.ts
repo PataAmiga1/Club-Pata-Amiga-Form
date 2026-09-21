@@ -426,7 +426,7 @@ ${BOTON("{{siteUrl}}/app/cuenta", "Ver mi cuenta")}`),
     key: "profile_incomplete_reminder",
     name: "Recordatorio de datos faltantes",
     description:
-      "Recordatorio periódico a miembros con el perfil incompleto: sin esos datos no se habilitan los reintegros. Se envía desde Comunicados → Envíos (o el cron semanal).",
+      "Secuencia de 3 recordatorios a miembros con el perfil incompleto: sin esos datos el comité no aprueba a su peludo ni se habilitan los reintegros. Se envía desde Comunicados → Envíos (o la tarea diaria).",
     variables: {
       firstName: "Nombre del miembro",
       missingList: "Lista de lo que falta (CURP, domicilio, etc.)",
@@ -435,12 +435,35 @@ ${BOTON("{{siteUrl}}/app/cuenta", "Ver mi cuenta")}`),
       firstName: "Cipatli",
       missingList: "fecha de nacimiento · nacionalidad · domicilio",
     },
-    subject: "Te falta poco para habilitar tus reintegros 🐾",
+    subject: "Te falta poco para que aprobemos a tu peludo 🐾",
     html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
-<p>Tu membresía de Club Pata Amiga está activa, pero aún nos faltan algunos datos para habilitar tus reintegros:</p>
+<p>Tu membresía de Club Pata Amiga está activa. Para que el comité pueda aprobar a tu peludo y para habilitar tus reintegros, todavía nos faltan algunos datos tuyos:</p>
 <p style="background:#FDF3E0;border-radius:12px;padding:12px 16px"><strong>{{missingList}}</strong></p>
-<p>Completa tu perfil en un par de minutos y tu manada queda protegida al 100%.</p>
+<p>Se llenan en un par de minutos y en cuanto estén, tu peludo entra a revisión.</p>
 ${BOTON("{{siteUrl}}/app/perfil", "Completar mi perfil")}`),
+  },
+  {
+    key: "pago_pendiente_alta",
+    name: "Registro sin pagar",
+    description:
+      "Secuencia de 3 recordatorios a quien creó su cuenta (casi siempre con su peludo ya registrado) y no completó el pago. Solo altas de los últimos 30 días.",
+    variables: {
+      firstName: "Nombre de quien se registró",
+      petName: "Nombre de su peludo (o «tu peludo» si aún no lo registra)",
+      continuarUrl: "URL para terminar: el plan, o el alta del peludo si le falta",
+    },
+    sample: {
+      firstName: "Cipatli",
+      petName: "Max",
+      continuarUrl: "https://pataamiga.mx/registro/plan",
+    },
+    subject: "{{petName}} está a un paso de tener su membresía 🐾",
+    html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
+<p>Ya creaste tu cuenta en Club Pata Amiga, pero la membresía de <strong>{{petName}}</strong> todavía no está activa: falta elegir tu plan y terminar el pago.</p>
+<p>Al activarla tienes orientación veterinaria 24/7, mantienes a tu veterinario de confianza y tus montos para cuidados cotidianos, emergencia veterinaria y despedida empiezan a correr.</p>
+<p style="background:#E9F7F5;border-radius:12px;padding:12px 16px">¿Tienes un código de promoción o de una persona embajadora? Escríbelo en <strong>«¿Tienes un código?»</strong> al elegir tu plan.</p>
+${BOTON("{{continuarUrl}}", "Terminar mi registro")}
+<p style="font-size:13px;color:#6B7C79">Si ya lo hiciste, ignora este mensaje.</p>`),
   },
   {
     key: "ambassador_info_request",
@@ -816,6 +839,7 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   campaign_gift: "campanas",
   lista_espera: "campanas",
   campaign_guide: "campanas",
+  pago_pendiente_alta: "membresia",
   birthday_member: "celebraciones",
   birthday_pet: "celebraciones",
 };
