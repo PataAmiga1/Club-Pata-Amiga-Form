@@ -24,6 +24,8 @@ export type LeadInput = {
   utm?: { source?: string; medium?: string; campaign?: string };
   /** Código de embajador con el que llegó (link ?codigo=…), si lo trae. */
   ambassadorCode?: string;
+  /** Respuestas, solo en las landings de encuesta. */
+  respuestas?: Record<string, string>;
 };
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
@@ -75,6 +77,7 @@ export async function registerLead(input: LeadInput) {
   if (!campaign || !campaign.active)
     return { error: "Esta campaña ya no está activa." };
 
+  const esEncuesta = campaign.tipo === "encuesta";
   const pideApellidos = campaign.campos?.apellidos !== false;
   const pideEdad = campaign.campos?.edad === true;
   const firstName = input.firstName?.trim();
@@ -86,7 +89,11 @@ export async function registerLead(input: LeadInput) {
 
   if (!firstName || (pideApellidos && !lastName))
     return {
-      error: pideApellidos ? "Escribe tu nombre y apellidos." : "Escribe tu nombre.",
+      error: pideApellidos
+        ? "Escribe tu nombre y apellidos."
+        : esEncuesta
+          ? "Escribe tu nombre o tu @usuario."
+          : "Escribe tu nombre.",
     };
   if (pideEdad) {
     if (!Number.isInteger(age) || age === null || age < 1 || age > 110)
@@ -99,7 +106,8 @@ export async function registerLead(input: LeadInput) {
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email ?? ""))
     return { error: "Revisa tu correo electrónico." };
-  if (!phone || phone.replace(/\D/g, "").length < 10)
+  // Una encuesta no pide teléfono: a esa gente ya la conocemos.
+  if (!esEncuesta && (!phone || phone.replace(/\D/g, "").length < 10))
     return { error: "Escribe un teléfono válido (10 dígitos)." };
   if (!input.consent)
     return {
@@ -108,7 +116,9 @@ export async function registerLead(input: LeadInput) {
           ? "Necesitamos tu consentimiento para avisarte."
           : campaign.tipo === "guia"
             ? "Necesitamos tu consentimiento para enviarte la guía."
-            : "Necesitamos tu consentimiento para enviarte el regalo.",
+            : esEncuesta
+              ? "Necesitamos tu consentimiento para guardar tus respuestas."
+              : "Necesitamos tu consentimiento para enviarte el regalo.",
     };
 
   // Se guarda tal cual llegó, solo si parece un código: al abrir la membresía
@@ -125,7 +135,8 @@ export async function registerLead(input: LeadInput) {
       first_name: firstName,
       last_name: lastName,
       email,
-      phone,
+      phone: phone || "",
+      ...(esEncuesta ? { respuestas: input.respuestas ?? {}, gift_email_status: "no_aplica" } : {}),
       ...(pideEdad ? { age } : {}),
       utm_source: input.utm?.source?.slice(0, 100) || null,
       utm_medium: input.utm?.medium?.slice(0, 100) || null,
@@ -139,6 +150,19 @@ export async function registerLead(input: LeadInput) {
   if (error) {
     // Índice único (campaign, email): registro repetido
     if (error.code === "23505") {
+      // Contestar dos veces no es un error: se guarda la última versión.
+      if (esEncuesta) {
+        await admin
+          .from("campaign_leads")
+          .update({
+            first_name: firstName,
+            respuestas: input.respuestas ?? {},
+            ...(ambassadorCode ? { ambassador_code: ambassadorCode } : {}),
+          })
+          .eq("campaign", campaign.slug)
+          .eq("email", email);
+        return { ok: true as const, repetido: true };
+      }
       // En el stand la gente se vuelve a registrar para bajar la guía: se le
       // deja descargar sin mandarle otro correo.
       if (campaign.tipo === "guia") return { ok: true as const, repetido: true };
@@ -152,7 +176,8 @@ export async function registerLead(input: LeadInput) {
     return { error: "No pudimos registrarte. Intenta de nuevo." };
   }
 
-  await sendGiftEmail(lead.id, campaign.slug, email, firstName);
+  // La encuesta no manda correo: la persona ya sabe que contestó.
+  if (!esEncuesta) await sendGiftEmail(lead.id, campaign.slug, email, firstName);
   return { ok: true as const, repetido: false };
 }
 

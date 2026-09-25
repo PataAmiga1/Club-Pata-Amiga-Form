@@ -7,6 +7,7 @@ import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { ALTAS_SON_599 } from "@/lib/plans/planes";
 import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
 import { LeadForm } from "./LeadForm";
+import { SurveyForm } from "./SurveyForm";
 
 /**
  * Landing de campaña (ads / patrocinadores) — página de conversión aislada
@@ -22,6 +23,9 @@ type SearchParams = {
     utm_campaign?: string;
     /** `?kiosco=1`: la tablet del stand; el formulario se limpia solo. */
     kiosco?: string;
+    /** Las ligas de encuesta llegan prellenadas desde el DM. */
+    nombre?: string;
+    correo?: string;
   }>;
 };
 
@@ -41,7 +45,7 @@ export default async function CampaignLandingPage({
   searchParams,
 }: Params & SearchParams) {
   const { campaign: slug } = await params;
-  const { utm_source, utm_medium, utm_campaign, kiosco } = await searchParams;
+  const { utm_source, utm_medium, utm_campaign, kiosco, nombre, correo } = await searchParams;
   const campaign = getCampaign(slug);
   if (!campaign || !campaign.active) notFound();
 
@@ -98,8 +102,90 @@ export default async function CampaignLandingPage({
             ))}
           </div>
 
+          {/* La escalera, explicada antes de preguntar: para casi todos es la
+              primera vez que la ven, y nadie opina bien de lo que no entiende
+              (equipo, 24-sep-2026). */}
+          {campaign.explicacion && (
+            <section className="flex w-full flex-col gap-4 rounded-[20px] bg-white p-5 text-left shadow-[0_16px_44px_rgba(30,83,80,.25)] sm:p-6">
+              <div className="flex flex-col gap-1.5">
+                <h2 className="font-display text-[22px] leading-tight text-ink-title">
+                  {campaign.explicacion.titulo}
+                </h2>
+                <p className="text-[14px] leading-relaxed text-ink-secondary">
+                  {campaign.explicacion.intro}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                {campaign.explicacion.escalones.map((e, i) => (
+                  <div
+                    key={e.nivel}
+                    className="flex items-start gap-3 rounded-[14px] border-[1.5px] border-border-input p-3.5"
+                  >
+                    <span
+                      className="grid size-[46px] flex-none place-items-center rounded-[12px] bg-info-bg text-center text-[13px] font-extrabold leading-tight text-teal-deep"
+                      aria-hidden
+                    >
+                      {e.meta.split(" ")[0]}
+                      <span className="block text-[9.5px] font-bold tracking-[.04em]">
+                        {e.meta.split(" ")[1]?.toUpperCase()}
+                      </span>
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-[11px] font-extrabold tracking-[.06em] text-ink-tertiary">
+                        NIVEL {i + 1} · {e.nivel.toUpperCase()}
+                      </span>
+                      <span className="text-[15px] font-bold leading-snug text-ink-title">
+                        {e.premio}
+                      </span>
+                      {e.extra && (
+                        <span className="text-[12.5px] leading-snug text-ink-secondary">
+                          {e.extra}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col gap-2 rounded-[14px] bg-cream p-4">
+                <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
+                  CÓMO FUNCIONA
+                </span>
+                {campaign.explicacion.reglas.map((r) => (
+                  <span key={r} className="flex gap-2.5 text-[13px] leading-snug text-ink-body">
+                    <span className="font-extrabold text-teal" aria-hidden>
+                      ✓
+                    </span>
+                    {r}
+                  </span>
+                ))}
+              </div>
+
+              {campaign.explicacion.cierre && (
+                <p className="rounded-[12px] bg-warning-bg px-4 py-3 text-[13px] leading-snug text-warning-text">
+                  {campaign.explicacion.cierre}
+                </p>
+              )}
+            </section>
+          )}
+
           {/* Links de embajador redirigidos desde /registro?codigo=… */}
           <StashAmbassadorCode />
+          {campaign.tipo === "encuesta" ? (
+            <SurveyForm
+              campaign={campaign.slug}
+              preguntas={campaign.preguntas ?? []}
+              botonLabel={campaign.botonLabel}
+              gracias={campaign.gracias}
+              prellenado={{ nombre, correo }}
+              utm={{
+                source: utm_source,
+                medium: utm_medium,
+                campaign: utm_campaign,
+              }}
+            />
+          ) : (
           <LeadForm
             campaign={campaign.slug}
             tipo={campaign.tipo}
@@ -113,6 +199,7 @@ export default async function CampaignLandingPage({
               campaign: utm_campaign,
             }}
           />
+          )}
 
           <p className="max-w-[420px] text-[11.5px] leading-relaxed text-white/60">
             Membresía de salud para tu peludo — no es un seguro. Tus datos solo
@@ -121,7 +208,9 @@ export default async function CampaignLandingPage({
               ? "avisarte cuando abra el registro"
               : campaign.tipo === "guia"
                 ? "enviarte tu guía"
-                : "enviarte tu regalo"}{" "}
+                : campaign.tipo === "encuesta"
+                  ? "tomar en cuenta tu opinión"
+                  : "enviarte tu regalo"}{" "}
             y novedades de Club Pata Amiga.
           </p>
         </div>
@@ -130,7 +219,7 @@ export default async function CampaignLandingPage({
       {/* La banda del $159 dice «hasta 3 peludos», que ya no aplica a la
           membresía nueva: en la lista de espera no se muestra. Con las altas
           del $599 la banda ya trae su propia tercera característica. */}
-      {(campaign.tipo !== "lista_espera" || ALTAS_SON_599) && (
+      {campaign.tipo !== "encuesta" && (campaign.tipo !== "lista_espera" || ALTAS_SON_599) && (
         <BenefitsMarquee es599={ALTAS_SON_599} />
       )}
     </div>

@@ -118,7 +118,25 @@ export default async function AdminLandingsPage({
                 registros
               </span>
 
-              {camp.tipo === "lista_espera" ? (
+              {camp.tipo === "encuesta" ? (
+                <>
+                  <span className="text-[12.5px] leading-snug text-ink-secondary">
+                    Encuesta de {camp.preguntas?.length ?? 0} preguntas. Las
+                    respuestas se guardan junto al registro de cada persona y se
+                    bajan aquí, con una columna por pregunta.
+                  </span>
+                  <a
+                    href={`/api/admin/landings/export?c=${camp.slug}`}
+                    className="grid h-10 place-items-center self-start rounded-full bg-teal px-5 text-xs font-bold text-white transition-colors hover:bg-teal-deep"
+                  >
+                    ⬇ Exportar respuestas (CSV)
+                  </a>
+                  <span className="text-[11.5px] leading-snug text-ink-tertiary">
+                    La liga se puede personalizar por persona:{" "}
+                    <span className="font-mono">?nombre=Ana&amp;correo=ana@correo.com&amp;codigo=SUCODIGO</span>
+                  </span>
+                </>
+              ) : camp.tipo === "lista_espera" ? (
                 <span className="text-[12.5px] leading-snug text-ink-secondary">
                   Lista de espera: quien se apunta recibe un correo de
                   confirmación (plantilla «Lista de espera» en Comunicados). Sin
