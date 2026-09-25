@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   let query = ctx.admin
     .from("campaign_leads")
     .select(
-      "campaign, first_name, last_name, age, email, phone, utm_source, utm_medium, utm_campaign, gift_email_status, created_at, ambassador_code, respuestas",
+      "campaign, first_name, last_name, age, handle, email, phone, utm_source, utm_medium, utm_campaign, gift_email_status, created_at, ambassador_code, respuestas",
     )
     .order("created_at", { ascending: false })
     .limit(5000);
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const { data } = await query;
 
   const header = [
-    "CAMPAÑA,NOMBRE,APELLIDOS,EDAD,CORREO,TELÉFONO,UTM_SOURCE,UTM_MEDIUM,UTM_CAMPAIGN,CORREO_REGALO,FECHA,CÓDIGO_EMBAJADOR",
+    "CAMPAÑA,NOMBRE,APELLIDOS,EDAD,INSTAGRAM,CORREO,TELÉFONO,UTM_SOURCE,UTM_MEDIUM,UTM_CAMPAIGN,CORREO_REGALO,FECHA,CÓDIGO_EMBAJADOR",
     ...preguntas.map((q) => csvCell(q.texto)),
   ].join(",");
   const lines = (data ?? []).map((l) =>
@@ -32,7 +32,8 @@ export async function GET(request: Request) {
       csvCell(l.first_name),
       csvCell(l.last_name),
       csvCell(l.age == null ? "" : String(l.age)),
-      csvCell(l.email),
+      csvCell(l.handle ?? ""),
+      csvCell(l.email ?? ""),
       csvCell(l.phone),
       csvCell(l.utm_source ?? ""),
       csvCell(l.utm_medium ?? ""),

@@ -26,6 +26,7 @@ type SearchParams = {
     /** Las ligas de encuesta llegan prellenadas desde el DM. */
     nombre?: string;
     correo?: string;
+    handle?: string;
   }>;
 };
 
@@ -45,7 +46,8 @@ export default async function CampaignLandingPage({
   searchParams,
 }: Params & SearchParams) {
   const { campaign: slug } = await params;
-  const { utm_source, utm_medium, utm_campaign, kiosco, nombre, correo } = await searchParams;
+  const { utm_source, utm_medium, utm_campaign, kiosco, nombre, correo, handle } =
+    await searchParams;
   const campaign = getCampaign(slug);
   if (!campaign || !campaign.active) notFound();
 
@@ -178,7 +180,9 @@ export default async function CampaignLandingPage({
               preguntas={campaign.preguntas ?? []}
               botonLabel={campaign.botonLabel}
               gracias={campaign.gracias}
-              prellenado={{ nombre, correo }}
+              prellenado={{ nombre, correo, handle }}
+              pideHandle={campaign.campos?.handle === true}
+              correoObligatorio={campaign.campos?.correo !== false}
               utm={{
                 source: utm_source,
                 medium: utm_medium,

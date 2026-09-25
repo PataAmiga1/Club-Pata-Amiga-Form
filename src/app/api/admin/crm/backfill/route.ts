@@ -181,6 +181,9 @@ export async function POST(request: Request) {
 
   for (const l of leads ?? []) {
     resumen.leads.revisados += 1;
+    // Las encuestas por DM se contestan solo con su @: sin correo ni teléfono
+    // no hay identidad que ligar en el CRM, y `resolveContact` truena.
+    if (!l.email && !l.phone) continue;
     try {
       const { contactId, created, possibleDuplicate } = await resolveContact(admin, {
         identities: { email: l.email, phone: l.phone },
