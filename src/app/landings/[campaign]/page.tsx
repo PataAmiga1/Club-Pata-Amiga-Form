@@ -7,6 +7,7 @@ import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { ALTAS_SON_599 } from "@/lib/plans/planes";
 import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
 import { LeadForm } from "./LeadForm";
+import { SurveyForm } from "./SurveyForm";
 
 /**
  * Landing de campaña (ads / patrocinadores) — página de conversión aislada
@@ -22,6 +23,9 @@ type SearchParams = {
     utm_campaign?: string;
     /** `?kiosco=1`: la tablet del stand; el formulario se limpia solo. */
     kiosco?: string;
+    /** Las ligas de encuesta llegan prellenadas desde el DM. */
+    nombre?: string;
+    correo?: string;
   }>;
 };
 
@@ -41,7 +45,7 @@ export default async function CampaignLandingPage({
   searchParams,
 }: Params & SearchParams) {
   const { campaign: slug } = await params;
-  const { utm_source, utm_medium, utm_campaign, kiosco } = await searchParams;
+  const { utm_source, utm_medium, utm_campaign, kiosco, nombre, correo } = await searchParams;
   const campaign = getCampaign(slug);
   if (!campaign || !campaign.active) notFound();
 
@@ -100,6 +104,20 @@ export default async function CampaignLandingPage({
 
           {/* Links de embajador redirigidos desde /registro?codigo=… */}
           <StashAmbassadorCode />
+          {campaign.tipo === "encuesta" ? (
+            <SurveyForm
+              campaign={campaign.slug}
+              preguntas={campaign.preguntas ?? []}
+              botonLabel={campaign.botonLabel}
+              gracias={campaign.gracias}
+              prellenado={{ nombre, correo }}
+              utm={{
+                source: utm_source,
+                medium: utm_medium,
+                campaign: utm_campaign,
+              }}
+            />
+          ) : (
           <LeadForm
             campaign={campaign.slug}
             tipo={campaign.tipo}
@@ -113,6 +131,7 @@ export default async function CampaignLandingPage({
               campaign: utm_campaign,
             }}
           />
+          )}
 
           <p className="max-w-[420px] text-[11.5px] leading-relaxed text-white/60">
             Membresía de salud para tu peludo — no es un seguro. Tus datos solo
@@ -121,7 +140,9 @@ export default async function CampaignLandingPage({
               ? "avisarte cuando abra el registro"
               : campaign.tipo === "guia"
                 ? "enviarte tu guía"
-                : "enviarte tu regalo"}{" "}
+                : campaign.tipo === "encuesta"
+                  ? "tomar en cuenta tu opinión"
+                  : "enviarte tu regalo"}{" "}
             y novedades de Club Pata Amiga.
           </p>
         </div>
@@ -130,7 +151,7 @@ export default async function CampaignLandingPage({
       {/* La banda del $159 dice «hasta 3 peludos», que ya no aplica a la
           membresía nueva: en la lista de espera no se muestra. Con las altas
           del $599 la banda ya trae su propia tercera característica. */}
-      {(campaign.tipo !== "lista_espera" || ALTAS_SON_599) && (
+      {campaign.tipo !== "encuesta" && (campaign.tipo !== "lista_espera" || ALTAS_SON_599) && (
         <BenefitsMarquee es599={ALTAS_SON_599} />
       )}
     </div>
