@@ -36,6 +36,12 @@ export type Campaign = {
   pdfLabel?: string;
   /** Preguntas, solo en las landings de encuesta. */
   preguntas?: Pregunta[];
+  /**
+   * Lo que se explica ANTES de preguntar. En la consulta de la escalera es
+   * imprescindible: para la mayoría de los embajadores es la primera vez que
+   * ven el programa, y nadie opina bien de algo que no entiende.
+   */
+  explicacion?: Explicacion;
   /** Texto del botón de enviar, si el de siempre no encaja. */
   botonLabel?: string;
   /** Lo que se lee en la pantalla de «gracias». */
@@ -65,6 +71,18 @@ export type Pregunta = {
   /** Solo en `opcion`: además de las opciones, deja escribir. */
   permiteOtro?: boolean;
   requerida?: boolean;
+};
+
+/** Cómo se explica un programa antes de preguntar por él. */
+export type Explicacion = {
+  titulo: string;
+  intro: string;
+  /** Los escalones, del más cercano al más lejano. */
+  escalones: { meta: string; nivel: string; premio: string; extra?: string }[];
+  /** Las reglas en corto, para que nadie suponga de más. */
+  reglas: string[];
+  /** Aviso final: esto todavía se puede cambiar, por eso preguntamos. */
+  cierre?: string;
 };
 
 export const CAMPAIGNS: Campaign[] = [
@@ -139,6 +157,45 @@ export const CAMPAIGNS: Campaign[] = [
       { emoji: "💰", text: "La comisión del 3% se mantiene sobre todo lo que paguen tus socios" },
       { emoji: "🎯", text: "Las metas se acercaron, para que el primer beneficio no quede lejos" },
     ],
+    explicacion: {
+      titulo: "Así quedaría el programa",
+      intro:
+        "Hoy ganas 3% de comisión cada mes sobre todo lo que paguen los socios que traigas. A eso le sumamos un beneficio para tu propia manada: entre más socios sostienes, menos pagas por tu membresía.",
+      escalones: [
+        {
+          meta: "1 socio",
+          nivel: "Aliado",
+          premio: "Tu membresía a mitad de precio",
+          extra: "Pagas $299 en lugar de $599",
+        },
+        {
+          meta: "5 socios",
+          nivel: "Embajador",
+          premio: "Tu membresía gratis",
+          extra: "Dejas de pagar · y tu nombre y tu historia en nuestras redes",
+        },
+        {
+          meta: "12 socios",
+          nivel: "Embajador Oro",
+          premio: "Dos membresías gratis",
+          extra: "Para dos de tus peludos",
+        },
+        {
+          meta: "25 socios",
+          nivel: "Círculo Fundador",
+          premio: "Tres membresías gratis",
+          extra: "Y voz en el catálogo de cuidados cada trimestre",
+        },
+      ],
+      reglas: [
+        "Un socio cuenta desde su primer pago con tu código — no desde que se registra.",
+        "Si ese socio cancela, deja de contar.",
+        "La comisión del 3% sigue igual, además del beneficio: son dos cosas distintas.",
+        "Con 5 socios dejas de pagar tus $599 y además recibes alrededor de $90 al mes de comisión.",
+      ],
+      cierre:
+        "Nada de esto está publicado todavía: por eso te preguntamos antes. Lo que nos digas puede cambiarlo.",
+    },
     gracias: {
       titulo: "¡Gracias!",
       texto:
