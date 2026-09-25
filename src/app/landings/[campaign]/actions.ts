@@ -18,6 +18,8 @@ export type LeadInput = {
   lastName: string;
   /** Edad de la persona, solo en landings que la preguntan (ExpoCan). */
   age?: string;
+  /** @ de redes, cuando la campaña lo pide (encuesta por DM de Instagram). */
+  handle?: string;
   email: string;
   phone: string;
   consent: boolean;
@@ -86,6 +88,13 @@ export async function registerLead(input: LeadInput) {
   const age = pideEdad ? Number(input.age) : null;
   const email = input.email?.trim().toLowerCase();
   const phone = input.phone?.trim();
+  const pideHandle = campaign.campos?.handle === true;
+  const correoObligatorio = campaign.campos?.correo !== false;
+  // Se guarda siempre con arroba y en minúsculas: así «Corgi», «@corgi» y
+  // «CORGI» son la misma persona y contestar dos veces no duplica.
+  const handle = pideHandle
+    ? "@" + (input.handle ?? "").trim().replace(/^@+/, "").toLowerCase()
+    : null;
 
   if (!firstName || (pideApellidos && !lastName))
     return {
@@ -104,7 +113,10 @@ export async function registerLead(input: LeadInput) {
           "Para registrarte necesitas ser mayor de edad. Pídele a un adulto que deje sus datos.",
       };
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email ?? ""))
+  if (pideHandle && (handle === null || handle.length < 3))
+    return { error: "Escribe tu @ de Instagram." };
+  // Sin correo obligatorio (encuesta por DM), solo se revisa si lo escribieron.
+  if ((correoObligatorio || email) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email ?? ""))
     return { error: "Revisa tu correo electrónico." };
   // Una encuesta no pide teléfono: a esa gente ya la conocemos.
   if (!esEncuesta && (!phone || phone.replace(/\D/g, "").length < 10))
@@ -134,7 +146,8 @@ export async function registerLead(input: LeadInput) {
       campaign: campaign.slug,
       first_name: firstName,
       last_name: lastName,
-      email,
+      email: email || null,
+      ...(handle ? { handle } : {}),
       phone: phone || "",
       ...(esEncuesta ? { respuestas: input.respuestas ?? {}, gift_email_status: "no_aplica" } : {}),
       ...(pideEdad ? { age } : {}),
@@ -152,15 +165,17 @@ export async function registerLead(input: LeadInput) {
     if (error.code === "23505") {
       // Contestar dos veces no es un error: se guarda la última versión.
       if (esEncuesta) {
-        await admin
+        // La identidad es el @ cuando la campaña lo pide; si no, el correo.
+        const donde = admin
           .from("campaign_leads")
           .update({
             first_name: firstName,
             respuestas: input.respuestas ?? {},
+            ...(email ? { email } : {}),
             ...(ambassadorCode ? { ambassador_code: ambassadorCode } : {}),
           })
-          .eq("campaign", campaign.slug)
-          .eq("email", email);
+          .eq("campaign", campaign.slug);
+        await (handle ? donde.ilike("handle", handle) : donde.eq("email", email!));
         return { ok: true as const, repetido: true };
       }
       // En el stand la gente se vuelve a registrar para bajar la guía: se le

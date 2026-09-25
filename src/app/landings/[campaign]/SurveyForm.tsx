@@ -21,18 +21,24 @@ export function SurveyForm({
   gracias,
   prellenado,
   pideTelefono = false,
+  pideHandle = false,
+  correoObligatorio = true,
   utm,
 }: {
   campaign: string;
   preguntas: Pregunta[];
   botonLabel?: string;
   gracias?: { titulo: string; texto: string };
-  prellenado?: { nombre?: string; correo?: string };
+  prellenado?: { nombre?: string; correo?: string; handle?: string };
+  /** Pide el @ de redes: en un DM de Instagram es como se identifican. */
+  pideHandle?: boolean;
+  correoObligatorio?: boolean;
   /** La consulta a embajadores no pide teléfono: ya lo tenemos. */
   pideTelefono?: boolean;
   utm: { source?: string; medium?: string; campaign?: string };
 }) {
   const [firstName, setFirstName] = useState(prellenado?.nombre ?? "");
+  const [handle, setHandle] = useState(prellenado?.handle ?? "");
   const [email, setEmail] = useState(prellenado?.correo ?? "");
   const [phone, setPhone] = useState("");
   const [respuestas, setRespuestas] = useState<Record<string, string>>({});
@@ -87,6 +93,7 @@ export function SurveyForm({
             campaign,
             firstName,
             lastName: "",
+            handle,
             email,
             phone,
             consent,
@@ -119,16 +126,33 @@ export function SurveyForm({
           required
           className={inputCls}
         />
-        <span className="-mt-1 text-[12px] leading-snug text-ink-tertiary">
-          Como prefieras que te digamos: tu nombre, tu @ o los dos.
-        </span>
+        {/* La encuesta se manda por DM de Instagram: el @ es cómo sabemos quién
+            contestó, y pedir correo ahí cuesta respuestas (equipo, 25-sep). */}
+        {pideHandle && (
+          <>
+            <input
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              placeholder="Tu @ de Instagram"
+              aria-label="Tu @ de Instagram"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              required
+              className={inputCls}
+            />
+            <span className="-mt-1 text-[12px] leading-snug text-ink-tertiary">
+              Así sabemos que eres tú y te mandamos tu código por ahí mismo.
+            </span>
+          </>
+        )}
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="Tu correo"
+          placeholder={correoObligatorio ? "Tu correo" : "Tu correo (opcional)"}
           autoComplete="email"
-          required
+          required={correoObligatorio}
           className={inputCls}
         />
         {pideTelefono && <PhoneField value={phone} onChange={setPhone} required />}

@@ -61,7 +61,8 @@ export default async function AdminLandingsPage({
     (allLeads ?? []).filter((l) => l.campaign === slug).length;
 
   // Conversión: leads cuyo correo ya tiene cuenta de miembro
-  const leadEmails = (leads ?? []).map((l) => l.email);
+  // Una encuesta por DM se contesta sin correo: esos no se cruzan con miembros.
+  const leadEmails = (leads ?? []).map((l) => l.email).filter(Boolean);
   const { data: converted } = leadEmails.length
     ? await admin
         .from("profiles")
@@ -306,7 +307,7 @@ export default async function AdminLandingsPage({
                   </span>
                 )}
               </span>
-              <span className="truncate">{l.email}</span>
+              <span className="truncate">{l.email || l.handle || "—"}</span>
               <span>{l.phone}</span>
               <span>
                 {new Intl.DateTimeFormat("es-MX", {
