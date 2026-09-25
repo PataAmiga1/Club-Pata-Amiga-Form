@@ -31,7 +31,14 @@ export type Campaign = {
    * Qué se pregunta además de nombre, correo y teléfono. Sin nada: nombre y
    * apellidos, como siempre. ExpoCan pidió nombre, edad, correo y teléfono.
    */
-  campos?: { apellidos?: boolean; edad?: boolean };
+  campos?: {
+    apellidos?: boolean;
+    edad?: boolean;
+    /** El @ de redes. En la encuesta de embajadores es la identidad principal. */
+    handle?: boolean;
+    /** El correo se puede volver opcional (encuesta por DM de Instagram). */
+    correo?: boolean;
+  };
   /** Texto del botón para descargar el PDF (en la página y en el correo). */
   pdfLabel?: string;
   /** Preguntas, solo en las landings de encuesta. */
@@ -147,7 +154,9 @@ export const CAMPAIGNS: Campaign[] = [
     name: "Embajadores — consulta de la escalera de niveles",
     active: true,
     tipo: "encuesta",
-    campos: { apellidos: false },
+    // Se manda por DM de Instagram: ahí la identidad es el @, no el correo
+    // (equipo, 25-sep). El correo queda opcional para no perder respuestas.
+    campos: { apellidos: false, handle: true, correo: false },
     botonLabel: "Enviar mis respuestas",
     headline: "Tu opinión, antes de publicarlo 🐾",
     subheadline:
