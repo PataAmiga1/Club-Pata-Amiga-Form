@@ -89,7 +89,11 @@ export async function registerLead(input: LeadInput) {
 
   if (!firstName || (pideApellidos && !lastName))
     return {
-      error: pideApellidos ? "Escribe tu nombre y apellidos." : "Escribe tu nombre.",
+      error: pideApellidos
+        ? "Escribe tu nombre y apellidos."
+        : esEncuesta
+          ? "Escribe tu nombre o tu @usuario."
+          : "Escribe tu nombre.",
     };
   if (pideEdad) {
     if (!Number.isInteger(age) || age === null || age < 1 || age > 110)

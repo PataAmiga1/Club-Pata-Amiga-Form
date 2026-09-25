@@ -108,14 +108,20 @@ export function SurveyForm({
     >
       <div className="flex flex-col gap-3">
         <span className="font-display text-[19px] text-ink-title">Tus datos</span>
+        {/* Nombre o arroba: a muchos embajadores se les conoce por su cuenta,
+            no por su nombre, y es como quieren que les hablemos (24-sep). */}
         <input
           value={firstName}
           onChange={(e) => setFirstName(e.target.value)}
-          placeholder="Tu nombre"
+          placeholder="Tu nombre o tu @usuario"
+          aria-label="Tu nombre o tu @usuario"
           autoComplete="name"
           required
           className={inputCls}
         />
+        <span className="-mt-1 text-[12px] leading-snug text-ink-tertiary">
+          Como prefieras que te digamos: tu nombre, tu @ o los dos.
+        </span>
         <input
           type="email"
           value={email}
