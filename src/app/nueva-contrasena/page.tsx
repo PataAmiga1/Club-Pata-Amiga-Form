@@ -16,6 +16,8 @@ export default function NuevaContrasenaPage() {
   const [estado, setEstado] = useState<"revisando" | "lista" | "sin-sesion">(
     "revisando",
   );
+  /** Por qué no hay sesión: cambia lo que se le explica a la persona. */
+  const [motivo, setMotivo] = useState<"usada" | "vencida" | "otra" | null>(null);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
@@ -23,11 +25,64 @@ export default function NuevaContrasenaPage() {
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
 
+  /**
+   * La liga del correo puede llegar de TRES formas distintas, y antes solo se
+   * entendía una (reporte de una socia, 28-sep-2026: «la liga nunca funcionó»):
+   *
+   *  · `?code=…`            — la que produce el formulario del sitio. La canjea
+   *                           `auth/recuperar` en el servidor, y aquí ya hay sesión.
+   *  · `#access_token=…`    — la que produce un enlace hecho desde el panel de
+   *                           Supabase o desde la migración. Viene en el TROZO de
+   *                           la URL, que el servidor NUNCA ve: hay que leerlo aquí.
+   *  · `?token_hash=…`      — el formato nuevo de las plantillas de Supabase.
+   *
+   * Con las dos últimas la persona veía «esta liga ya venció» aunque su liga
+   * estuviera perfecta y sin usar. Eso es lo que se arregla.
+   */
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setEstado(user ? "lista" : "sin-sesion");
-    });
+    (async () => {
+      const trozo = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const query = new URLSearchParams(window.location.search);
+      const codigoDeError =
+        trozo.get("error_code") ?? query.get("error_code") ?? query.get("error");
+      const accessToken = trozo.get("access_token");
+      const refreshToken = trozo.get("refresh_token");
+      const tokenHash = query.get("token_hash");
+
+      try {
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+        } else if (tokenHash) {
+          await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "recovery" });
+        }
+      } catch {
+        // Da igual por qué falló: abajo se decide qué ve la persona.
+      }
+      // La liga trae credenciales: no deben quedarse en la barra ni en el
+      // historial una vez usadas.
+      if (accessToken || tokenHash)
+        window.history.replaceState(null, "", window.location.pathname);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        setEstado("lista");
+        return;
+      }
+      setMotivo(
+        codigoDeError === "otp_expired"
+          ? "vencida"
+          : codigoDeError
+            ? "usada"
+            : "otra",
+      );
+      setEstado("sin-sesion");
+    })();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -103,8 +158,19 @@ export default function NuevaContrasenaPage() {
           {estado === "sin-sesion" && (
             <div className="flex flex-col gap-4 rounded-[20px] bg-white p-5 shadow-[var(--shadow-card)] sm:p-7">
               <p className="text-[15px] leading-relaxed text-ink-body">
-                Esta liga ya venció o se usó antes. Pide una nueva y vuelve a
-                intentarlo — solo toma un minuto.
+                {motivo === "vencida"
+                  ? "Esta liga ya venció. Pide una nueva y vuelve a intentarlo — solo toma un minuto."
+                  : motivo === "usada"
+                    ? "Esta liga ya se había usado. Pide una nueva y vuelve a intentarlo — solo toma un minuto."
+                    : "No pudimos validar tu liga. Pide una nueva y vuelve a intentarlo — solo toma un minuto."}
+              </p>
+              {/* Con la liga de siempre (la del formulario), el canje solo
+                  funciona en el MISMO navegador donde se pidió: si abrió el
+                  correo en otra app, aquí no hay sesión y nada de lo anterior
+                  se lo explica. */}
+              <p className="text-[13.5px] leading-relaxed text-ink-secondary">
+                Un consejo: pide la liga y ábrela <strong>en el mismo navegador</strong>.
+                Si abriste el correo desde otra aplicación, vuelve a pedirla desde aquí.
               </p>
               <Link
                 href="/recuperar-contrasena"
