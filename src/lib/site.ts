@@ -147,24 +147,27 @@ export type SiteAssetSlot = (typeof SITE_ASSET_SLOTS)[number]["slot"];
  */
 export const MATERIAL_SLOTS = [
   {
-    // La LLAVE `material-pack-historias` no cambia: es la que apunta al
-    // archivo ya subido en site_assets. Solo cambian etiqueta y descripción.
+    // Las LLAVES no cambian: son las que apuntan al archivo ya subido en
+    // site_assets. Solo cambian etiqueta y descripción, para que digan lo que
+    // de verdad se descarga (30-sep-2026: se cargó el primer material real).
     slot: "material-pack-historias",
-    label: "Kit historias IG",
+    label: "Logo de Pata Amiga",
     emoji: "🖼️",
-    hint: "Recursos para historias de IG.",
+    hint: "PNG y SVG, en sus tres versiones. Incluye cómo usarlo.",
   },
   {
+    // Nació pensando en un video que nunca se grabó. Hoy guarda la guía del
+    // producto, que es lo que la gente pide para saber qué contestar.
     slot: "material-video-reintegro",
-    label: "Video «Cómo funciona el reintegro»",
-    emoji: "🎬",
-    hint: "MP4 corto para redes.",
+    label: "Guía rápida del producto",
+    emoji: "📘",
+    hint: "Qué es Pata Amiga, qué decir y qué no. 31 páginas.",
   },
   {
     slot: "material-guia-marca",
-    label: "Guía de tono de marca",
-    emoji: "📋",
-    hint: "PDF con lineamientos de comunicación.",
+    label: "Manual de identidad visual",
+    emoji: "🎨",
+    hint: "Colores, tipografías y estilo de foto de la marca.",
   },
   {
     slot: "material-campana",
