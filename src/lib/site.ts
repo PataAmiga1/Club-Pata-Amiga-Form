@@ -170,6 +170,14 @@ export const MATERIAL_SLOTS = [
     hint: "Colores, tipografías y estilo de foto de la marca.",
   },
   {
+    // Las piezas que el equipo de diseño subió el 2-oct: historias de IG en
+    // 1080x1920, que es justo lo que pidieron @maya y @kora en la encuesta.
+    slot: "material-piezas-redes",
+    label: "Piezas para tus historias",
+    emoji: "📱",
+    hint: "Infografías y comparativos listos para publicar, en formato de historia.",
+  },
+  {
     slot: "material-campana",
     label: "Campaña temporal",
     emoji: "⭐",
