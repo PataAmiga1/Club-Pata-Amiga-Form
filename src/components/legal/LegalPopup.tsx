@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { LEGAL_DOCS } from "@/lib/site";
+import { LEGAL_DOCS } from "@/lib/legal-docs";
 import { LEGAL_TEXTS } from "@/data/legal-texts";
 import { limpiarMarcasLegales } from "@/lib/legal-format";
 

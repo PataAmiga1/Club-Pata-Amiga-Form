@@ -102,18 +102,8 @@ export async function fetchSiteSettings(): Promise<Record<string, string>> {
 export const COMPANY_LINE =
   "GIRBAZ, S.A. de C.V. y PATA AMIGA, A.C. Todos los derechos reservados. Hecho con ♡ en México.";
 
-/**
- * Documentos legales del footer. "Reglamento del fondo solidario" del sitio
- * anterior se renombra a reintegros (terminología vinculante 2026).
- */
-export const LEGAL_DOCS = [
-  { slug: "terminos-y-condiciones", title: "Términos y Condiciones" },
-  { slug: "reglamento-de-integridad", title: "Reglamento de Integridad" },
-  { slug: "convenio-asociado", title: "Convenio asociado" },
-  { slug: "aviso-de-privacidad", title: "Aviso de privacidad Integral" },
-  { slug: "politica-de-cookies", title: "Política de Cookies" },
-  { slug: "reglamento-de-reintegros", title: "Reglamento de reintegros" },
-] as const;
+/** Documentos legales del footer — viven en `@/lib/legal-docs` (cliente-seguro). */
+export { LEGAL_DOCS } from "@/lib/legal-docs";
 
 /** Slots de imagen del sitio editables desde el panel (tabla site_assets). */
 export const SITE_ASSET_SLOTS = [

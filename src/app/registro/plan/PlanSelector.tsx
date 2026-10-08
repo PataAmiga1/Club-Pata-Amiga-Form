@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Stepper } from "@/components/registro/Stepper";
 import { useValorLocal } from "@/lib/hooks";
+import { AceptoLegales } from "@/components/legal/AceptoLegales";
 
 type Plan = "monthly" | "annual";
 
@@ -22,6 +23,7 @@ export function PlanSelector({
   const [selected, setSelected] = useState<Plan>("annual");
   const [loading, setLoading] = useState<Plan | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [acepto, setAcepto] = useState(false);
 
   // El código de embajador puede llegar por el enlace (?codigo=) o quedar
   // guardado en /registro. Se lee DURANTE el render con `useValorLocal`, no
@@ -68,6 +70,11 @@ export function PlanSelector({
 
   async function checkout(plan: Plan) {
     setError(null);
+    if (!acepto) {
+      setError("Para continuar, marca la casilla de los Términos y condiciones.");
+      document.getElementById("acepto-legales")?.focus();
+      return;
+    }
     setLoading(plan);
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
@@ -75,10 +82,12 @@ export function PlanSelector({
       body: JSON.stringify({
         plan,
         ambassadorCode: codeStatus === "valid" ? code.trim() : undefined,
+        aceptaTerminos: acepto,
       }),
     });
     if (!res.ok) {
-      setError("No pudimos iniciar el pago. Intenta de nuevo.");
+      const cuerpo = await res.json().catch(() => ({}));
+      setError(cuerpo.error ?? "No pudimos iniciar el pago. Intenta de nuevo.");
       setLoading(null);
       return;
     }
@@ -99,6 +108,18 @@ export function PlanSelector({
         <p className="mt-2 text-[15px] text-ink-secondary">
           Mismos beneficios en ambos planes. Cancela cuando quieras.
         </p>
+      </div>
+
+      {/* Legales: antes de cualquier botón de pago (8-oct-2026) */}
+      <div className="rounded-[16px] bg-white px-4 py-3.5 shadow-[var(--shadow-card)]">
+        <AceptoLegales
+          id="acepto-legales"
+          checked={acepto}
+          onChange={(v) => {
+            setAcepto(v);
+            if (v) setError(null);
+          }}
+        />
       </div>
 
       {/* Plan cards */}

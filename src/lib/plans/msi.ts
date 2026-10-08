@@ -4,6 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { versionVigente } from "@/lib/plans/versiones";
 import { PLAN_599 } from "@/lib/plans/planes";
 import type { NivelDePrecio } from "@/lib/plans/suscripciones";
+import { crearSesionConTerminos } from "@/lib/legal/aceptacion";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -87,7 +88,9 @@ export async function sesionDePagoAnual(input: {
 }): Promise<string | null> {
   const stripe = getStripe();
   const precio = await precioDeUnaExhibicion(input.anual);
-  const sesion = await stripe.checkout.sessions.create({
+  // Con la casilla de términos de Stripe: es la única aceptación que deja la
+  // renovación adelantada desde Mi cuenta, que no pasa por nuestra casilla.
+  const sesion = await crearSesionConTerminos(stripe, {
     mode: "payment",
     line_items: [{ quantity: 1, price: precio }],
     ...(input.clienteStripe
