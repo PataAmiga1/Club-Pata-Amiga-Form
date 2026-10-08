@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateMemberByAdmin, updatePetByAdmin } from "@/app/admin/actions";
+import { registerPetByAdmin, updateMemberByAdmin, updatePetByAdmin } from "@/app/admin/actions";
+import { CAT_BREED_NAMES, DOG_BREED_NAMES, PET_COLORS } from "@/data/pet-catalogs";
+import { comprimir } from "@/components/ui/FotoDocumento";
+import { formatDateEs } from "@/lib/dates";
 
 /**
  * Edición de miembro y mascotas por el SUPER ADMIN (equipo, 5-ago): para
@@ -247,6 +250,252 @@ export function EditPetButton({
       >
         {pending ? "Guardando…" : "Guardar cambios"}
       </button>
+    </Overlay>
+  );
+}
+
+/**
+ * Registrar un peludo a nombre del socio — SOLO super admin (8-oct-2026).
+ * En el $159 queda aprobado al guardar y se elige desde cuándo cuenta la
+ * espera; en el $599 queda en revisión hasta que el socio active su membresía.
+ */
+export function RegisterPetButton({
+  userId,
+  memberSince,
+  modelo599,
+  cupoLleno,
+}: {
+  userId: string;
+  /** yyyy-mm-dd (día en México) de su inscripción, o null si no hay. */
+  memberSince: string | null;
+  modelo599: boolean;
+  cupoLleno: boolean;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [species, setSpecies] = useState<"dog" | "cat">("dog");
+  const [espera, setEspera] = useState<"hoy" | "inscripcion" | "fecha">("hoy");
+  const [foto, setFoto] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [listo, setListo] = useState<string | null>(null);
+
+  if (cupoLleno && !modelo599) return null;
+
+  const label = "flex flex-col gap-1 text-[11.5px] font-bold text-ink-secondary";
+  const razas = species === "dog" ? ["Mestizo", ...DOG_BREED_NAMES] : ["Doméstico", ...CAT_BREED_NAMES];
+  const lista = (id: string, opciones: readonly string[]) => (
+    <datalist id={id}>
+      {opciones.map((o) => (
+        <option key={o} value={o} />
+      ))}
+    </datalist>
+  );
+
+  const cerrar = () => {
+    setOpen(false);
+    setError(null);
+    setListo(null);
+    setFoto(null);
+    setEspera("hoy");
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-full border-[1.5px] border-teal px-3 py-1 text-[11.5px] font-bold text-teal-deep transition-colors hover:bg-info-bg"
+      >
+        + Registrar peludo
+      </button>
+    );
+  }
+
+  if (listo) {
+    return (
+      <Overlay title="Peludo registrado" onClose={cerrar}>
+        <p className="text-[13.5px] leading-relaxed text-ink-body">{listo}</p>
+        <button
+          type="button"
+          onClick={cerrar}
+          className="mt-4 grid h-11 w-full place-items-center rounded-full bg-teal text-[13.5px] font-bold text-white hover:bg-teal-deep"
+        >
+          Listo
+        </button>
+      </Overlay>
+    );
+  }
+
+  return (
+    <Overlay title="Registrar peludo" onClose={cerrar}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          if (foto) fd.set("photo", foto);
+          startTransition(async () => {
+            setError(null);
+            const res = await registerPetByAdmin(userId, fd);
+            if ("error" in res) {
+              setError(res.error);
+              return;
+            }
+            const nombre = String(fd.get("name") ?? "").trim();
+            setListo(
+              res.aprobado
+                ? `${nombre} quedó aprobado.${res.esperaHasta ? ` Su tiempo de espera termina el ${formatDateEs(res.esperaHasta)}.` : ""}`
+                : `${nombre} quedó registrado y en revisión. El socio tiene que activarle su membresía desde su panel; después lo apruebas en Peludos.`,
+            );
+            router.refresh();
+          });
+        }}
+        className="flex flex-col gap-3"
+      >
+        <p
+          className={`rounded-[12px] px-3 py-2 text-[12.5px] leading-snug ${modelo599 ? "bg-warning-bg text-warning-text" : "bg-info-bg text-info-text"}`}
+        >
+          {modelo599
+            ? "Socio de la membresía $599: cada peludo paga la suya. Queda en revisión y el socio la activa desde su panel."
+            : "Queda aprobado al guardar: capturarlo tú ya cuenta como decisión del comité."}
+        </p>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <label className={label}>
+            Nombre *
+            <input name="name" required className={field} />
+          </label>
+          <label className={label}>
+            Especie
+            <select
+              name="species"
+              value={species}
+              onChange={(e) => setSpecies(e.target.value === "cat" ? "cat" : "dog")}
+              className={field}
+            >
+              <option value="dog">Perro</option>
+              <option value="cat">Gato</option>
+            </select>
+          </label>
+          <label className={label}>
+            Raza
+            <input name="breed" list="registro-razas" className={field} />
+            {lista("registro-razas", razas)}
+          </label>
+          <label className={label}>
+            Sexo
+            <select name="sex" defaultValue="" className={field}>
+              <option value="">—</option>
+              <option value="female">Hembra</option>
+              <option value="male">Macho</option>
+            </select>
+          </label>
+          <label className={label}>
+            Fecha de nacimiento
+            <input name="birth_date" type="date" className={field} />
+          </label>
+          <div className="grid grid-cols-2 gap-1.5">
+            <label className={label}>
+              o edad: años
+              <input name="age_years" type="number" min={0} className={field} />
+            </label>
+            <label className={label}>
+              meses
+              <input name="age_months" type="number" min={0} max={11} className={field} />
+            </label>
+          </div>
+          <label className={label}>
+            Color de pelaje
+            <input name="coat_color" list="registro-pelaje" className={field} />
+            {lista("registro-pelaje", PET_COLORS.coat[species])}
+          </label>
+          <label className={label}>
+            Color de ojos
+            <input name="eye_color" list="registro-ojos" className={field} />
+            {lista("registro-ojos", PET_COLORS.eye[species])}
+          </label>
+          <label className={label}>
+            Color de nariz
+            <input name="nose_color" list="registro-nariz" className={field} />
+            {lista("registro-nariz", PET_COLORS.nose[species])}
+          </label>
+          <label className="flex items-center gap-2 self-end pb-2 text-[12.5px] font-semibold text-ink-body">
+            <input type="checkbox" name="is_adopted" className="size-4 accent-teal" />
+            Es adoptado
+          </label>
+        </div>
+
+        <label className={label}>
+          Foto
+          <input
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              setFoto(null);
+              if (!f) return;
+              try {
+                setFoto(await comprimir(f));
+              } catch {
+                setError("No pudimos leer esa foto. Prueba con otra.");
+              }
+            }}
+            className="text-[12px] font-normal text-ink-body"
+          />
+        </label>
+        {foto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={foto} alt="" className="h-24 w-24 rounded-[12px] object-cover" />
+        )}
+
+        {!modelo599 && (
+          <fieldset className="flex flex-col gap-1.5 rounded-[14px] border-[1.5px] border-border-input p-3">
+            <legend className="px-1 text-[11.5px] font-bold text-ink-secondary">
+              ¿Desde cuándo cuenta su tiempo de espera?
+            </legend>
+            <label className="flex items-center gap-2 text-[13px] text-ink-body">
+              <input type="radio" name="espera" value="hoy" checked={espera === "hoy"} onChange={() => setEspera("hoy")} className="accent-teal" />
+              Desde hoy, como cualquier aprobación
+            </label>
+            <label className={`flex items-center gap-2 text-[13px] ${memberSince ? "text-ink-body" : "text-ink-tertiary"}`}>
+              <input
+                type="radio"
+                name="espera"
+                value="inscripcion"
+                disabled={!memberSince}
+                checked={espera === "inscripcion"}
+                onChange={() => setEspera("inscripcion")}
+                className="accent-teal"
+              />
+              Desde su inscripción{memberSince ? ` (${formatDateEs(memberSince)})` : " (sin fecha registrada)"}
+            </label>
+            <label className="flex flex-wrap items-center gap-2 text-[13px] text-ink-body">
+              <input type="radio" name="espera" value="fecha" checked={espera === "fecha"} onChange={() => setEspera("fecha")} className="accent-teal" />
+              Desde otra fecha
+              {espera === "fecha" && <input name="espera_desde" type="date" required className={`${field} h-9`} />}
+            </label>
+            <p className="text-[11.5px] leading-snug text-ink-tertiary">
+              Los días salen de sus reglas de siempre (adoptado, raza, código de embajador). Aquí solo eliges desde cuándo cuentan.
+            </p>
+          </fieldset>
+        )}
+
+        {!modelo599 && (
+          <label className="flex items-center gap-2 text-[12.5px] text-ink-body">
+            <input type="checkbox" name="avisar" defaultChecked className="size-4 accent-teal" />
+            Avisarle al socio por correo que su peludo quedó aprobado
+          </label>
+        )}
+
+        {error && <p className="text-xs font-semibold text-error-text">{error}</p>}
+        <button
+          type="submit"
+          disabled={pending}
+          className="grid h-11 w-full place-items-center rounded-full bg-teal text-[13.5px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
+        >
+          {pending ? "Registrando…" : "Registrar peludo"}
+        </button>
+      </form>
     </Overlay>
   );
 }

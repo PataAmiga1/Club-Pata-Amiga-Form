@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { valorDeUnMesCentavos } from "@/lib/garantia";
 import { corteDeComisiones } from "@/lib/comisiones";
 import { formatDateEs } from "@/lib/dates";
-import { estadoDePeludo599, esRubro599 } from "@/lib/reintegros-599";
+import { estadoDePeludo599, esRubro599, esMiembro599 } from "@/lib/reintegros-599";
+import { MAX_ACTIVE_PETS, SENIOR_PET_AGE_YEARS } from "@/lib/constants";
 import type { Rubro599 } from "@/lib/plans/montos";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -63,6 +64,46 @@ async function requireAdmin(superOnly = false) {
   if (role !== "admin" && role !== "super_admin") throw new Error("Sin permisos");
   if (superOnly && role !== "super_admin") throw new Error("Solo super admin");
   return { adminId: user.id, admin: createAdminClient() };
+}
+
+/**
+ * CRM tras aprobar un peludo: con la suscripción activa, la tarjeta llega a
+ * "Miembro activo" — la etapa que en LynSales está en cero. Va sin actorId
+ * (es la plataforma), así que respeta cualquier tarjeta que ventas haya
+ * fijado a mano. Lo comparten `resolvePet` y `registerPetByAdmin`.
+ */
+async function crmTrasAprobarPeludo(
+  admin: ReturnType<typeof createAdminClient>,
+  pet: { id: string; name: string; user_id: string },
+) {
+  // `.limit(1)`: con una suscripción por peludo ($599) `maybeSingle()` daba
+  // error con dos o más, y la tarjeta del CRM nunca llegaba a «Miembro activo».
+  const { data: subs } = await admin
+    .from("subscriptions")
+    .select("id, plan")
+    .eq("user_id", pet.user_id)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  const sub = subs?.[0] ?? null;
+  if (sub) {
+    await crmEventoDeUsuario(admin, {
+      userId: pet.user_id,
+      kind: "membresia_activa",
+      summary: `${pet.name} aprobado por el comité — membresía completa`,
+      stageKey: "miembro_activo",
+      interval: sub.plan === "annual" ? "year" : "month",
+      payload: { petId: pet.id },
+    });
+    await marcarComoMiembro(admin, pet.user_id);
+  } else {
+    await crmEventoDeUsuario(admin, {
+      userId: pet.user_id,
+      kind: "mascota_aprobada",
+      summary: `${pet.name} aprobado por el comité`,
+      payload: { petId: pet.id },
+    });
+  }
 }
 
 async function notifyMember(
@@ -239,40 +280,7 @@ export async function resolvePet(
   // reales; la pantalla ya no adivina el inicio con created_at.
   if (decision.approve) await iniciarEsperaDeMascota(admin, petId);
 
-  // CRM: con la mascota aprobada y la suscripción activa, la tarjeta llega a
-  // "Miembro activo" — la etapa que en LynSales está en cero. Va sin actorId
-  // (es la plataforma), así que respeta cualquier tarjeta que ventas haya
-  // fijado a mano.
-  if (decision.approve) {
-    // `.limit(1)`: con una suscripción por peludo ($599) `maybeSingle()` daba
-    // error con dos o más, y la tarjeta del CRM nunca llegaba a «Miembro activo».
-    const { data: subs } = await admin
-      .from("subscriptions")
-      .select("id, plan")
-      .eq("user_id", pet.user_id)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(1);
-    const sub = subs?.[0] ?? null;
-    if (sub) {
-      await crmEventoDeUsuario(admin, {
-        userId: pet.user_id,
-        kind: "membresia_activa",
-        summary: `${pet.name} aprobado por el comité — membresía completa`,
-        stageKey: "miembro_activo",
-        interval: sub.plan === "annual" ? "year" : "month",
-        payload: { petId: pet.id },
-      });
-      await marcarComoMiembro(admin, pet.user_id);
-    } else {
-      await crmEventoDeUsuario(admin, {
-        userId: pet.user_id,
-        kind: "mascota_aprobada",
-        summary: `${pet.name} aprobado por el comité`,
-        payload: { petId: pet.id },
-      });
-    }
-  }
+  if (decision.approve) await crmTrasAprobarPeludo(admin, pet);
 
   const notes = decision.approve ? "" : decision.notes;
   await notifyMember(
@@ -733,6 +741,167 @@ export async function updatePetByAdmin(
   revalidatePath(`/admin/miembros/${pet.user_id}`);
   revalidatePath("/admin/mascotas");
   return { ok: true as const };
+}
+
+/** Meses cumplidos entre dos días yyyy-mm-dd (sin contar el mes en curso). */
+function mesesCumplidos(desde: string, hasta: string): number {
+  const [ay, am, ad] = desde.split("-").map(Number);
+  const [by, bm, bd] = hasta.split("-").map(Number);
+  return (by - ay) * 12 + (bm - am) - (bd < ad ? 1 : 0);
+}
+
+const DIA = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Registrar un peludo A NOMBRE de un socio — SOLO super admin (Pablo,
+ * 8-oct-2026). Mismo espíritu que `updatePetByAdmin`: para cuando el socio no
+ * puede o no supo hacerlo y el comité captura por él.
+ *
+ * Nació con un socio migrado que pagó en mayo y nunca terminó el registro del
+ * sitio anterior: pagaba sin peludo dado de alta. Por eso el formulario deja
+ * elegir DESDE CUÁNDO cuenta la espera —hoy, su fecha de inscripción u otra—
+ * en lugar de dejarlo a la memoria de quien lo captura.
+ *
+ * - Plan $159 (peludos incluidos en la membresía, hasta 3): queda APROBADO —
+ *   capturarlo el super admin ya es la decisión del comité— y la espera se
+ *   fija con las reglas de siempre (`iniciarEsperaDeMascota`).
+ * - Plan $599: cada peludo paga su propia membresía, así que queda EN REVISIÓN
+ *   y el socio la activa desde su panel; el comité lo aprueba después.
+ */
+export async function registerPetByAdmin(
+  userId: string,
+  fd: FormData,
+): Promise<{ error: string } | { ok: true; aprobado: boolean; esperaHasta: string | null }> {
+  const { adminId, admin } = await requireAdmin(true);
+  const t = (k: string) => {
+    const v = fd.get(k);
+    return typeof v === "string" && v.trim() ? v.trim() : null;
+  };
+
+  const name = t("name");
+  if (!name) return { error: "El peludo necesita nombre." };
+  const species = t("species");
+  if (species !== "dog" && species !== "cat") return { error: "Elige si es perro o gato." };
+  const sexo = t("sex");
+  const sex = sexo === "male" || sexo === "female" ? sexo : null;
+
+  // Edad: de la fecha de nacimiento si la hay; si no, de años y meses.
+  const hoy = hoyEnMexico();
+  const nacimiento = t("birth_date");
+  let meses: number;
+  if (nacimiento) {
+    if (!DIA.test(nacimiento) || nacimiento > hoy)
+      return { error: "La fecha de nacimiento no es válida." };
+    meses = mesesCumplidos(nacimiento, hoy);
+  } else {
+    const a = Number(t("age_years") ?? "0");
+    const m = Number(t("age_months") ?? "0");
+    if (!Number.isFinite(a) || !Number.isFinite(m) || a < 0 || m < 0 || (!t("age_years") && !t("age_months")))
+      return { error: "Falta la fecha de nacimiento o la edad." };
+    meses = Math.floor(a) * 12 + Math.floor(m);
+  }
+  if (meses < 4) return { error: "El peludo tiene que tener al menos 4 meses." };
+  const ageYears = Math.floor(meses / 12);
+  const ageMonths = meses % 12;
+
+  const { data: socio } = await admin
+    .from("profiles")
+    .select("id, member_since, created_at")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!socio) return { error: "No encontramos al socio." };
+
+  const modelo599 = await esMiembro599(admin, userId);
+  if (!modelo599) {
+    const { count } = await admin
+      .from("pets")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_active", true);
+    if ((count ?? 0) >= MAX_ACTIVE_PETS)
+      return { error: `Este socio ya tiene ${MAX_ACTIVE_PETS} peludos activos, el máximo de su membresía.` };
+  }
+
+  // Desde cuándo cuenta la espera (solo cuando queda aprobado aquí mismo).
+  let desde: string | undefined;
+  if (!modelo599) {
+    const espera = t("espera") ?? "hoy";
+    if (espera === "inscripcion") {
+      const base = socio.member_since ?? socio.created_at;
+      if (!base) return { error: "Este socio no tiene fecha de inscripción registrada." };
+      desde = diaEnMexico(new Date(base));
+    } else if (espera === "fecha") {
+      const f = t("espera_desde");
+      if (!f || !DIA.test(f) || f > hoy)
+        return { error: "Elige una fecha de inicio de la espera válida (hoy o antes)." };
+      desde = f;
+    }
+  }
+
+  // Foto: llega comprimida desde el navegador como data URL (tope de Vercel).
+  let photoUrl: string | null = null;
+  const foto = t("photo");
+  if (foto) {
+    const partes = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(foto);
+    if (!partes) return { error: "La foto tiene que ser una imagen." };
+    const bytes = Buffer.from(partes[2], "base64");
+    const slug = name.normalize("NFD").replace(/[^\w]+/g, "-").toLowerCase().slice(0, 40) || "peludo";
+    const path = `${userId}/${Date.now()}-${slug}.jpg`;
+    const { error: subida } = await admin.storage
+      .from("pet-photos")
+      .upload(path, bytes, { contentType: partes[1] });
+    if (subida) return { error: "No pudimos subir la foto. Intenta de nuevo o regístralo sin foto." };
+    photoUrl = admin.storage.from("pet-photos").getPublicUrl(path).data.publicUrl;
+  }
+
+  const aprobar = !modelo599;
+  const { data: nuevo, error } = await admin
+    .from("pets")
+    .insert({
+      user_id: userId,
+      name,
+      species,
+      breed: t("breed"),
+      sex,
+      birth_date: nacimiento,
+      age_years: ageYears,
+      age_months: ageMonths,
+      is_senior: ageYears >= SENIOR_PET_AGE_YEARS,
+      coat_color: t("coat_color"),
+      eye_color: t("eye_color"),
+      nose_color: t("nose_color"),
+      is_adopted: fd.get("is_adopted") === "on",
+      photo_url: photoUrl,
+      ...(aprobar
+        ? { approval_status: "approved", approved_at: new Date().toISOString(), approved_by: adminId }
+        : {}),
+    })
+    .select("id")
+    .single();
+  if (error || !nuevo) return { error: "No pudimos registrar al peludo." };
+
+  let esperaHasta: string | null = null;
+  if (aprobar) {
+    const espera = await iniciarEsperaDeMascota(admin, nuevo.id, desde);
+    esperaHasta = espera?.endDate ?? null;
+    await crmTrasAprobarPeludo(admin, { id: nuevo.id, name, user_id: userId });
+    if (fd.get("avisar") === "on")
+      await notifyMember(
+        admin,
+        userId,
+        {
+          type: "pet_approved",
+          title: `¡${name} fue aprobado por el comité! 🐾`,
+          message: `El perfil de ${name} quedó aprobado. Su tiempo de espera sigue corriendo con normalidad.`,
+        },
+        { template: "pet_approved", vars: { petName: name } },
+      );
+  }
+
+  revalidatePath(`/admin/miembros/${userId}`);
+  revalidatePath("/admin/mascotas");
+  revalidatePath("/admin");
+  return { ok: true, aprobado: aprobar, esperaHasta };
 }
 
 /**
