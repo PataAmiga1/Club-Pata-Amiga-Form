@@ -9,6 +9,7 @@ import { ESTADOS_VIVOS, type NivelDePrecio } from "@/lib/plans/suscripciones";
 import { registroAbierto } from "@/lib/registro";
 import { anualParaMSI, sesionDePagoAnual } from "@/lib/plans/msi";
 import { buscarPromocion, esCodigoDeEmbajador, limpiarCodigo } from "@/lib/plans/codigos";
+import { crearSesionConTerminos, registrarAceptacion } from "@/lib/legal/aceptacion";
 
 const PRICE_BY_PLAN: Record<string, string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
@@ -48,7 +49,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const { plan: planPedido, ambassadorCode, promotionCode, petId } = await request.json();
+  const { plan: planPedido, ambassadorCode, promotionCode, petId, aceptaTerminos } =
+    await request.json();
   // «annual_msi» es el MISMO plan anual, pagado de una vez y a meses sin
   // intereses (17-sep-2026). Stripe no admite MSI dentro de una suscripción,
   // así que cambia CÓMO se cobra, no qué se contrata: de ahí `plan` para todo
@@ -61,6 +63,21 @@ export async function POST(request: Request) {
   if (esMSI && !ALTAS_SON_599) {
     return NextResponse.json({ error: "Plan inválido" }, { status: 400 });
   }
+
+  // Los legales se aceptan con una casilla antes de pagar (8-oct-2026): sin
+  // ella no se abre ningún cobro, y con ella queda el registro en nuestra base.
+  // Ver src/lib/legal/aceptacion.ts.
+  if (aceptaTerminos !== true) {
+    return NextResponse.json(
+      {
+        error:
+          "Para continuar, acepta los Términos y condiciones, el Reglamento de reintegros y el Aviso de privacidad.",
+        motivo: "terminos",
+      },
+      { status: 400 },
+    );
+  }
+  await registrarAceptacion(createAdminClient(), user.id);
 
   // Quien se registra contrata el plan de altas (PLAN_DE_ALTAS). La versión
   // publicada manda sobre la variable de entorno; si todavía no hay versión con
@@ -310,7 +327,7 @@ export async function POST(request: Request) {
   }
   let session;
   try {
-    session = await stripe.checkout.sessions.create({
+    session = await crearSesionConTerminos(stripe, {
       mode: "subscription",
       line_items: [{ price, quantity: 1 }],
       ...(peludo?.customerId

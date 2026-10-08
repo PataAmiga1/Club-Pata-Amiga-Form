@@ -6,6 +6,7 @@ import { useValorLocal } from "@/lib/hooks";
 import type { GrupoCatalogo } from "@/lib/catalogo-cuidados";
 import type { Oferta599 } from "@/lib/plans/oferta";
 import { describirPromocion, type Promocion } from "@/lib/plans/promocion-texto";
+import { AceptoLegales } from "@/components/legal/AceptoLegales";
 
 /**
  * Selector de plan de la membresía $599 (sección 2, 17-sep-2026).
@@ -44,6 +45,7 @@ export function PlanSelector599({
   const [selected, setSelected] = useState<Plan>("annual");
   const [loading, setLoading] = useState<Cobro | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [acepto, setAcepto] = useState(false);
   const [catalogoAbierto, setCatalogoAbierto] = useState(false);
 
   // «¿Tienes un código?» (19-sep-2026): una casilla para los dos tipos. Se
@@ -112,6 +114,11 @@ export function PlanSelector599({
 
   async function checkout(plan: Cobro) {
     setError(null);
+    if (!acepto) {
+      setError("Para continuar, marca la casilla de los Términos y condiciones.");
+      document.getElementById("acepto-legales")?.focus();
+      return;
+    }
     setLoading(plan);
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
@@ -120,6 +127,7 @@ export function PlanSelector599({
         plan,
         ambassadorCode: embajadorVigente ?? undefined,
         promotionCode: promo?.codigo,
+        aceptaTerminos: acepto,
       }),
     });
     const cuerpo = await res.json().catch(() => ({}));
@@ -158,6 +166,18 @@ export function PlanSelector599({
             Por ser un peludo adicional, pagas 15% menos
           </p>
         )}
+      </div>
+
+      {/* Legales: antes de cualquier botón de pago (8-oct-2026) */}
+      <div className="rounded-[16px] bg-white px-4 py-3.5 shadow-[var(--shadow-card)]">
+        <AceptoLegales
+          id="acepto-legales"
+          checked={acepto}
+          onChange={(v) => {
+            setAcepto(v);
+            if (v) setError(null);
+          }}
+        />
       </div>
 
       {/* Planes */}
