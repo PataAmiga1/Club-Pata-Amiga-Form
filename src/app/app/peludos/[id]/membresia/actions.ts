@@ -14,6 +14,7 @@ import {
   controlarAltaDePeludo,
 } from "@/lib/plans/peludos-599";
 import { notifyTeam } from "@/lib/alerts";
+import { registrarAceptacion } from "@/lib/legal/aceptacion";
 
 /**
  * Activa la membresía $599 de un peludo con la TARJETA GUARDADA (sección 4).
@@ -28,6 +29,7 @@ import { notifyTeam } from "@/lib/alerts";
 export async function activarMembresiaDePeludo(
   petId: string,
   plan: "monthly" | "annual",
+  aceptaTerminos: boolean,
 ): Promise<{ ok: true } | { error?: string; checkout?: true }> {
   const supabase = await createClient();
   const {
@@ -35,7 +37,12 @@ export async function activarMembresiaDePeludo(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Tu sesión terminó. Vuelve a iniciar sesión." };
   if (plan !== "monthly" && plan !== "annual") return { error: "Elige tu plan." };
+  // Este cobro no pasa por Stripe Checkout: nuestra casilla es la única
+  // aceptación de los legales que queda (8-oct-2026).
+  if (aceptaTerminos !== true)
+    return { error: "Para continuar, marca la casilla de los Términos y condiciones." };
   const admin = createAdminClient();
+  await registrarAceptacion(admin, user.id);
 
   const [{ data: pet }, { data: suyas }] = await Promise.all([
     admin.from("pets").select("id, name, user_id, is_active").eq("id", petId).maybeSingle(),

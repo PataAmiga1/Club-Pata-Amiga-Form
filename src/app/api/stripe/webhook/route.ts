@@ -30,11 +30,18 @@ import {
 import { acumularComisionDelPeriodo } from "@/lib/comisiones";
 import { anualParaMSI, mesesDelPago, siguienteAniversario } from "@/lib/plans/msi";
 import { diaEnMexico } from "@/lib/zona-horaria";
+import { registrarAceptacion } from "@/lib/legal/aceptacion";
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
   if (!userId) return;
   const supabase = createAdminClient();
+
+  // Aceptó los términos en la casilla de Stripe (8-oct-2026): queda también en
+  // nuestra base. Cubre la renovación adelantada, que no pasa por nuestra
+  // casilla; en el alta ya estaba registrada y no se duplica.
+  if (session.consent?.terms_of_service === "accepted")
+    await registrarAceptacion(supabase, userId);
 
   // Anual pagado de una sola vez, a meses sin intereses (17-sep-2026). Es otro
   // camino: no hay suscripción que Stripe haya cobrado, la creamos nosotros con

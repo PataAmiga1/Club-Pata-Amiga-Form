@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { Oferta599 } from "@/lib/plans/oferta";
 import { activarMembresiaDePeludo } from "./actions";
+import { AceptoLegales } from "@/components/legal/AceptoLegales";
 
 const mxn = (n: number) =>
   `$${n.toLocaleString("es-MX", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
@@ -24,14 +25,24 @@ export function ActivarMembresia({
   const [pendiente, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState(false);
+  const [acepto, setAcepto] = useState(false);
   const precio = plan === "annual" ? oferta.anualPesos : oferta.mensualPesos;
+
+  /** Sin la casilla no se cobra por ningún camino (8-oct-2026). */
+  function faltaAceptar() {
+    if (acepto) return false;
+    setError("Para continuar, marca la casilla de los Términos y condiciones.");
+    document.getElementById("acepto-legales")?.focus();
+    return true;
+  }
 
   async function conOtraTarjeta(cobro: "monthly" | "annual" | "annual_msi" = plan) {
     setError(null);
+    if (faltaAceptar()) return;
     const res = await fetch("/api/stripe/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan: cobro, petId }),
+      body: JSON.stringify({ plan: cobro, petId, aceptaTerminos: acepto }),
     });
     const cuerpo = await res.json().catch(() => ({}));
     if (!res.ok) return setError(cuerpo.error ?? "No pudimos abrir el pago. Intenta de nuevo.");
@@ -102,6 +113,17 @@ export function ActivarMembresia({
         ))}
       </div>
 
+      <div className="rounded-[16px] bg-white px-4 py-3.5 shadow-[var(--shadow-card)]">
+        <AceptoLegales
+          id="acepto-legales"
+          checked={acepto}
+          onChange={(v) => {
+            setAcepto(v);
+            if (v) setError(null);
+          }}
+        />
+      </div>
+
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">{error}</div>
       )}
@@ -111,15 +133,16 @@ export function ActivarMembresia({
           <button
             type="button"
             disabled={pendiente}
-            onClick={() =>
+            onClick={() => {
+              if (faltaAceptar()) return;
               startTransition(async () => {
                 setError(null);
-                const r = await activarMembresiaDePeludo(petId, plan);
+                const r = await activarMembresiaDePeludo(petId, plan, acepto);
                 if ("ok" in r) return setHecho(true);
                 if (r.error) setError(r.error);
                 else if (r.checkout) await conOtraTarjeta();
-              })
-            }
+              });
+            }}
             className="grid h-[52px] place-items-center rounded-full bg-teal text-[15px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-60"
           >
             {pendiente ? "Activando…" : `Pagar ${mxn(precio)} con ${tarjeta}`}
