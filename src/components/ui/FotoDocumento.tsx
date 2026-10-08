@@ -41,8 +41,12 @@ function leerTalCual(file: File): Promise<string> {
   });
 }
 
-/** Reescala y recomprime en el navegador. Devuelve un data URL JPEG. */
-async function comprimir(file: File): Promise<string> {
+/**
+ * Reescala y recomprime en el navegador. Devuelve un data URL JPEG.
+ * Exportada: el registro de peludos por el super admin (8-oct-2026) manda la
+ * foto dentro de la Server Action por la misma razón — el tope de 4.5 MB de Vercel.
+ */
+export async function comprimir(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const escala = Math.min(1, LADO_MAX / Math.max(bitmap.width, bitmap.height));
   const ancho = Math.round(bitmap.width * escala);

@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { petWaitingPeriodDays } from "@/lib/waiting-period";
 import { esperasDe, beneficiosDeUsuario } from "@/lib/plans/resolve";
 import { hoyEnMexico, diaEnMexicoMasDias } from "@/lib/zona-horaria";
+import { sumarDias } from "@/lib/plans/montos";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -20,10 +21,17 @@ type Admin = ReturnType<typeof createAdminClient>;
  * código de embajador se lee de `profiles.ambassador_code_used`: es un
  * beneficio de la MEMBRESÍA, no de la mascota — la tercera mascota registrada
  * meses después lo conserva (PM, 11-ago).
+ *
+ * `desde` (yyyy-mm-dd) adelanta el inicio a una fecha pasada: lo usa el super
+ * admin cuando registra un peludo que el socio nunca dio de alta y decide
+ * respetarle su fecha de inscripción (caso del 8-oct-2026: socio migrado que
+ * pagó en mayo y no terminó el registro del sitio anterior). Los días son los
+ * mismos; solo cambia desde cuándo se cuentan.
  */
 export async function iniciarEsperaDeMascota(
   admin: Admin,
   petId: string,
+  desde?: string,
 ): Promise<{ days: number; endDate: string } | null> {
   const { data: pet } = await admin
     .from("pets")
@@ -60,11 +68,11 @@ export async function iniciarEsperaDeMascota(
     esperasDe(beneficios),
   );
 
-  const endDate = diaEnMexicoMasDias(days);
+  const endDate = desde ? sumarDias(desde, days) : diaEnMexicoMasDias(days);
   await admin
     .from("pets")
     .update({
-      waiting_period_start_date: hoyEnMexico(),
+      waiting_period_start_date: desde ?? hoyEnMexico(),
       waiting_period_end_date: endDate,
     })
     .eq("id", petId);

@@ -8,12 +8,14 @@ import { formatMxn } from "@/lib/format";
 import { curpCoincide } from "@/lib/curp";
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { cuentaPorOmision, cuentasDelMiembro } from "@/lib/cuentas-bancarias";
-import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
+import { MAX_ACTIVE_PETS, REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
+import { esMiembro599 } from "@/lib/reintegros-599";
+import { diaEnMexico } from "@/lib/zona-horaria";
 import { PetThreadPanel } from "./PetThreadPanel";
 import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 import { PetResolveButtons } from "../../mascotas/PetResolveButtons";
 import { NOTA_HEREDADO_ADMIN } from "@/lib/membresia";
-import { EditMemberButton, EditPetButton } from "./EditPanels";
+import { EditMemberButton, EditPetButton, RegisterPetButton } from "./EditPanels";
 import { DetailItem, DetailModal } from "@/components/panel/DetailModal";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
@@ -96,6 +98,12 @@ export default async function AdminMiembroDetailPage({
     .order("created_at", { ascending: false });
 
   if (!m) notFound();
+
+  // Registro de peludos por el super admin (8-oct-2026): el formulario
+  // necesita saber su modelo, su cupo y su fecha de inscripción.
+  const modelo599 = isSuper ? await esMiembro599(admin, id) : false;
+  const peludosActivos = (pets ?? []).filter((p) => p.is_active).length;
+  const inscripcion = m.member_since ? diaEnMexico(new Date(m.member_since)) : null;
 
   // Sus cuentas para reintegro (hasta 3 desde el 2-sep). Se muestra la que
   // eligió por omisión, y cuántas tiene, para que el comité sepa que hay más
@@ -394,9 +402,24 @@ export default async function AdminMiembroDetailPage({
 
       {/* Mascotas */}
       <div className="flex flex-col gap-2.5 rounded-[18px] bg-white p-5 shadow-[0_2px_10px_rgba(30,83,80,.05)]">
-        <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
-          MASCOTAS ({(pets ?? []).length})
-        </span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-[11px] font-extrabold tracking-[.06em] text-teal-deep">
+            MASCOTAS ({(pets ?? []).length})
+          </span>
+          {isSuper && (
+            <RegisterPetButton
+              userId={id}
+              memberSince={inscripcion}
+              modelo599={modelo599}
+              cupoLleno={peludosActivos >= MAX_ACTIVE_PETS}
+            />
+          )}
+        </div>
+        {(pets ?? []).length === 0 && (
+          <span className="text-[13px] text-warning-text">
+            Este socio no tiene ningún peludo registrado.
+          </span>
+        )}
         {(pets ?? []).map((p) => {
           const pchip = PET_CHIP[p.approval_status] ?? PET_CHIP.pending;
           const thread = [...(p.pet_messages ?? [])].sort(
