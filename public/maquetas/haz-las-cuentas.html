@@ -2,8 +2,8 @@
 <html lang="es-MX">
 <head>
 <meta charset="utf-8">
-<meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
 <title>Haz las Cuentas · Pata Amiga</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -260,7 +260,7 @@ footer img { height: 34px; width: auto; }
 </head>
 <body>
 
-<div class="ribbon gutter">Maqueta para revisión · precios de referencia pendientes de validar con veterinarios · no publicada</div>
+<div class="ribbon gutter">Maqueta para revisión · no publicada</div>
 
 <header class="top gutter">
   <div class="shell">
@@ -273,9 +273,9 @@ footer img { height: 34px; width: auto; }
 <section class="hero gutter" aria-labelledby="titulo">
   <div class="shell">
     <div class="hero-text">
-      <span class="eyebrow">La salud de tu mascota también se administra</span>
+      <span class="eyebrow">La salud de tu mascota también se planifica</span>
       <h1 id="titulo">¿Cuánto te puede costar una emergencia?</h1>
-      <p class="sub">Escribe cuánto entra a tu casa al mes y elige qué le pasó a tu peludo. Te enseñamos cómo quedaría tu cuenta, con precios promedio de veterinarias en México.</p>
+      <p class="sub">Escribe cuánto entra a tu casa al mes y elige qué le pasó a tu mascota. Te enseñamos cómo quedaría tu cuenta, con precios promedio de veterinarias en México.</p>
     </div>
 
     <div class="sim" id="sim" data-current="1">
@@ -287,7 +287,7 @@ footer img { height: 34px; width: auto; }
       <div class="controls">
         <!-- Paso 1 -->
         <section class="panel step is-current" data-step="1" aria-labelledby="p1">
-          <div class="panel-head"><span class="n" aria-hidden="true">1</span><h2 id="p1">¿Cuánto entra a tu casa al mes?</h2></div>
+          <div class="panel-head"><span class="n" aria-hidden="true">1</span><h2 id="p1">¿Cuál es tu ingreso mensual aproximado?</h2></div>
           <label class="money" for="ingreso">
             <span aria-hidden="true">$</span>
             <input id="ingreso" inputmode="numeric" autocomplete="off" value="15,000" aria-describedby="ingresoHint">
@@ -301,16 +301,16 @@ footer img { height: 34px; width: auto; }
           <p class="hint" id="ingresoHint">El monto escrito es un ejemplo. Pon el tuyo, aproximado basta.</p>
           <div class="private">
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H4a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 4 15h8a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12 6h-.5V4.5A3.5 3.5 0 0 0 8 1Zm-2 3.5a2 2 0 1 1 4 0V6H6V4.5Z"/></svg>
-            <span>Este número se queda en tu teléfono. No lo guardamos ni lo enviamos a ningún lado.</span>
+            <span>Tus datos están seguros: esta información solo se procesa en tu dispositivo y no la guardamos.</span>
           </div>
         </section>
 
         <!-- Paso 2 -->
         <section class="panel step" data-step="2" aria-labelledby="p2">
-          <div class="panel-head"><span class="n" aria-hidden="true">2</span><h2 id="p2">¿Qué le pasó a tu peludo?</h2></div>
-          <p class="hint">Activa lo que quieras sumar y mueve el precio. Cada clínica cobra distinto, así que te damos el rango.</p>
+          <div class="panel-head"><span class="n" aria-hidden="true">2</span><h2 id="p2">¿Qué le pasó a tu mascota?</h2></div>
+          <p class="hint">Selecciona los servicios veterinarios y ajusta los montos según tu zona. Los precios son una referencia de los rangos promedio.</p>
           <div class="events" id="events"></div>
-          <p class="src">Precios de referencia publicados en 2026, sobre todo de CDMX. <span class="pend">Pendiente: reemplazarlos por promedios de veterinarios con los que trabajamos antes de publicar</span></p>
+          <p class="src">Precios de referencia calculados con promedios de clínicas y centros veterinarios (valores estimados para CDMX y Zona Metropolitana).</p>
         </section>
 
         <div class="stepnav">
@@ -334,7 +334,7 @@ footer img { height: 34px; width: auto; }
                 <button type="button" id="segCon" aria-pressed="false">Con Pata Amiga</button>
               </div>
               <div>
-                <p class="bal-label" id="balLabel">Lo que queda de tu ingreso</p>
+                <p class="bal-label" id="balLabel">Saldo restante estimado de tu mes</p>
                 <p class="bal num" id="bal">$0</p>
               </div>
               <div class="meter" aria-hidden="true"><i class="back" id="mBack" style="width:0%"></i><i id="mGasto" style="width:0%"></i></div>
@@ -357,34 +357,34 @@ footer img { height: 34px; width: auto; }
 <section class="band gutter" aria-labelledby="crece">
   <div class="shell">
     <div class="band-head">
-      <span class="eyebrow" style="color:var(--teal-deep)">Por peludo, al año</span>
-      <h2 id="crece">Lo que tienes disponible crece cada mes que pagas</h2>
-      <p>No todo está disponible el primer día. Así se va abriendo, contado desde que el comité aprueba el perfil de tu peludo.</p>
+      <span class="eyebrow" style="color:var(--teal-deep)">Por mascota, al año</span>
+      <h2 id="crece">Tus montos de reintegro crecen mes a mes con tu membresía</h2>
+      <p>Los beneficios se activan progresivamente. Así se van sumando tus montos a partir de que el comité aprueba el registro de tu mascota.</p>
     </div>
     <ol class="ladder">
-      <li><span class="when">Día 1</span><span class="what">Orientación veterinaria 24/7</span><p>Dudas y guía a cualquier hora, desde que entras.</p></li>
-      <li><span class="when">Día 31</span><span class="what">Cuidados cotidianos</span><span class="amt num">$500</span><p>Vacunas, consultas y lo demás del catálogo. Sube $125 por mes pagado.</p></li>
-      <li><span class="when">Día 31</span><span class="what">Despedida</span><span class="amt num">$2,000</span><p>Para acompañarte en uno de los momentos más difíciles.</p></li>
-      <li><span class="when">Mes 7</span><span class="what">Emergencia veterinaria</span><span class="amt num">$30,000</span><p>Urgencias, estudios, cirugía u hospitalización. Sube $833.33 por mes pagado.</p></li>
-      <li><span class="when">Mes 13 y mes 44</span><span class="what">Llegan a su tope</span><span class="amt num">$2,000 · $60,000</span><p>Cuidados en el mes 13; emergencia en el mes 44.</p></li>
+      <li><span class="when">Día 1</span><span class="what">Orientación veterinaria 24/7</span><p>Orientación médica inicial para resolver dudas y evaluar de inmediato si los síntomas de tu mascota requieren atención veterinaria urgente.</p></li>
+      <li><span class="when">Día 31</span><span class="what">Cuidados cotidianos</span><span class="amt num">$500</span><p>Reintegros para vacunas, consultas y prevención. El monto disponible aumenta $125 por cada mes activo.</p></li>
+      <li><span class="when">Día 31</span><span class="what">Despedida</span><span class="amt num">$2,000</span><p>Un reintegro pensado para acompañarte con empatía, amor y tranquilidad en la partida de tu mascota.</p></li>
+      <li><span class="when">Mes 7</span><span class="what">Emergencia grave</span><span class="amt num">$30,000</span><p>Reintegros para urgencias, estudios, cirugías u hospitalización. Tu monto disponible sube mes a mes ($833.33 por mes pagado).</p></li>
+      <li><span class="when">Mes 13 y mes 44</span><span class="what">Llegan a su tope</span><span class="amt num">$2,000 · $60,000</span><p>Alcanzas el tope máximo anual de reintegro ($2,000 en cuidados cotidianos al mes 13 y $60,000 en emergencias al mes 44).</p></li>
     </ol>
-    <p class="ladder-note">Son montos anuales por peludo: se renuevan cada año desde el día que entró y lo que no se usa no se acumula. Solo cuentan los meses pagados. Peludos de 8 años o más entran con certificado veterinario.</p>
+    <p class="ladder-note">Los montos son de reintegro anual por mascota y se renuevan al cumplir cada año de membresía (el saldo no utilizado no se acumula). Aplica únicamente con la membresía activa. En mascotas de 8 años o más, requerimos su certificado de salud veterinario para completar el registro.</p>
   </div>
 </section>
 
 <section class="band also gutter" aria-labelledby="incluye">
   <div class="shell">
     <div class="band-head">
-      <h2 id="incluye">Lo que también trae tu membresía</h2>
+      <h2 id="incluye">Más beneficios para la tranquilidad de tu mascota</h2>
     </div>
     <div class="facts">
-      <article class="fact"><span class="big num">5 días</span><h3>Reintegro en máximo 5 días hábiles</h3><p>Si nos tardamos más, ese mes de ese peludo es gratis.</p></article>
-      <article class="fact"><span class="big num">90 días</span><h3>Garantía de satisfacción</h3><p>En los primeros 90 días te devolvemos lo pagado por ese peludo, menos lo que ya se le reintegró.</p></article>
-      <article class="fact"><span class="big">Tu vet</span><h3>Mantienes a tu veterinario</h3><p>Vas con quien ya conoce a tu peludo, en cualquier parte de México. Sin copago y sin plazo forzoso.</p></article>
+      <article class="fact"><span class="big num">5 días</span><h3>Reintegro ágil en 5 días hábiles</h3><p>Procesamos tu reintegro en un máximo de 5 días hábiles. Si demoramos más tiempo, la mensualidad de ese mes va por nuestra cuenta.</p></article>
+      <article class="fact"><span class="big num">90 días</span><h3>Garantía de satisfacción por 90 días</h3><p>Si durante los primeros 90 días decides cancelar, te reembolsamos tus mensualidades pagadas (restando los reintegros que ya hayas recibido).</p></article>
+      <article class="fact"><span class="big">Libertad de elección</span><h3>Mantienes a tu veterinario</h3><p>Puedes llevar a tu mascota con el veterinario o clínica que ya conoce su historial en cualquier parte de México, sin complicaciones ni plazos forzosos.</p></article>
     </div>
     <div class="price-row">
-      <span class="p num">$599 al mes</span><span>por peludo, o $6,612 al año (hasta 6 meses sin intereses)</span>
-      <span>Segunda mascota con 15% de descuento: $509 al mes</span>
+      <span class="p num">$599 MXN / mes</span><span>por mascota · $6,612 MXN / año (hasta 6 MSI)</span>
+      <span>15% de descuento a partir de tu segunda mascota ($509 MXN / mes)</span>
     </div>
   </div>
 </section>
@@ -393,19 +393,19 @@ footer img { height: 34px; width: auto; }
   <div class="shell">
     <div>
       <h2 id="cierre">Tranquilidad también es estar preparado</h2>
-      <p class="lead">Déjanos tus datos y te mandamos tus cuentas junto con cómo funciona la membresía. Sin compromiso.</p>
-      <a class="alt" href="/registro" target="_blank" rel="noopener">O contrátala ahora →</a>
+      <p class="lead">Ingresa tus datos y te enviamos por correo el desglose estimado de tus gastos y la guía completa de cómo funciona la membresía, sin compromiso.</p>
+      <a class="alt" href="/registro" target="_blank" rel="noopener">O activa tu membresía de una vez →</a>
     </div>
     <form class="form" id="leadForm" novalidate>
-      <h3>Recibe tus cuentas</h3>
+      <h3>Recibe tu cálculo personalizado</h3>
       <div class="row2">
         <input class="field" id="fNombre" placeholder="Nombre" aria-label="Nombre" autocomplete="given-name">
-        <input class="field" id="fEdad" placeholder="Edad" aria-label="Edad" inputmode="numeric">
+        <input class="field" id="fEdad" placeholder="Tu edad" aria-label="Tu edad (titular de la membresía)" inputmode="numeric">
       </div>
       <input class="field" id="fCorreo" type="email" placeholder="Correo electrónico" aria-label="Correo electrónico" autocomplete="email">
       <div class="phone-field"><span>MX +52</span><input id="fTel" inputmode="tel" placeholder="123 123 1234" aria-label="Teléfono"></div>
-      <label class="check"><input type="checkbox" id="fAcepto"><span>Acepto recibir información de Club Pata Amiga conforme al <a href="/legales/aviso-de-privacidad" target="_blank" rel="noopener">Aviso de privacidad</a>. Tu ingreso no se envía con este formulario.</span></label>
-      <button class="cta" type="submit">Quiero mis cuentas</button>
+      <label class="check"><input type="checkbox" id="fAcepto"><span>Acepto recibir información de Club Pata Amiga de acuerdo con el <a href="/legales/aviso-de-privacidad" target="_blank" rel="noopener">Aviso de Privacidad</a>. (Tu información financiera es confidencial y no se comparte).</span></label>
+      <button class="cta" type="submit">Recibir mi cálculo</button>
       <p class="note" id="formNote" hidden>Maqueta: en el sitio esto se guarda en el CRM de landings, con su UTM y el código de embajador si llegó con uno.</p>
     </form>
   </div>
@@ -415,26 +415,20 @@ footer img { height: 34px; width: auto; }
 <footer class="gutter">
   <div class="shell">
     <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+DQoNCg0KPHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJzdmcxIiB2aWV3Qm94PSIzNy4yNCAzNjEuMjQgMTI0OC4wNiA2MTIuMjgiIHhtbG5zOmlua3NjYXBlPSJodHRwOi8vd3d3Lmlua3NjYXBlLm9yZy9uYW1lc3BhY2VzL2lua3NjYXBlIiB4bWxuczpzb2RpcG9kaT0iaHR0cDovL3NvZGlwb2RpLnNvdXJjZWZvcmdlLm5ldC9EVEQvc29kaXBvZGktMC5kdGQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6c3ZnPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+DQogIDxkZWZzIGlkPSJkZWZzMSI+DQogICAgPGNsaXBQYXRoIGNsaXBQYXRoVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBpZD0iY2xpcFBhdGgyIj4NCiAgICAgIDxwYXRoIGQ9Ik0gMCwxMDAwIEggMTAwMCBWIDAgSCAwIFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0zMzkuNzI2MzEsLTcxNC4wODQ1MikiIGlkPSJwYXRoMiI+PC9wYXRoPg0KICAgIDwvY2xpcFBhdGg+DQogICAgPGNsaXBQYXRoIGNsaXBQYXRoVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBpZD0iY2xpcFBhdGg0Ij4NCiAgICAgIDxwYXRoIGQ9Ik0gMCwxMDAwIEggMTAwMCBWIDAgSCAwIFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC01NTMuMDIxNjEsLTQ4NS4wNjU4MSkiIGlkPSJwYXRoNCI+PC9wYXRoPg0KICAgIDwvY2xpcFBhdGg+DQogICAgPGNsaXBQYXRoIGNsaXBQYXRoVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBpZD0iY2xpcFBhdGg2Ij4NCiAgICAgIDxwYXRoIGQ9Ik0gMCwxMDAwIEggMTAwMCBWIDAgSCAwIFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC05MDMuNjgwOCwtNDc0Ljc5ODYxKSIgaWQ9InBhdGg2Ij48L3BhdGg+DQogICAgPC9jbGlwUGF0aD4NCiAgICA8Y2xpcFBhdGggY2xpcFBhdGhVbml0cz0idXNlclNwYWNlT25Vc2UiIGlkPSJjbGlwUGF0aDgiPg0KICAgICAgPHBhdGggZD0iTSAwLDEwMDAgSCAxMDAwIFYgMCBIIDAgWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE2MS45MzE4MSwtNDYyLjc4MTYxKSIgaWQ9InBhdGg4Ij48L3BhdGg+DQogICAgPC9jbGlwUGF0aD4NCiAgICA8Y2xpcFBhdGggY2xpcFBhdGhVbml0cz0idXNlclNwYWNlT25Vc2UiIGlkPSJjbGlwUGF0aDEwIj4NCiAgICAgIDxwYXRoIGQ9Ik0gMCwxMDAwIEggMTAwMCBWIDAgSCAwIFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0zMjAuNjEzMzEsLTMwNC4zODkxMSkiIGlkPSJwYXRoMTAiPjwvcGF0aD4NCiAgICA8L2NsaXBQYXRoPg0KICAgIDxjbGlwUGF0aCBjbGlwUGF0aFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgaWQ9ImNsaXBQYXRoMTIiPg0KICAgICAgPHBhdGggZD0iTSAwLDEwMDAgSCAxMDAwIFYgMCBIIDAgWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTM4MC43MDg1MSwtMzE3LjY2MTgxKSIgaWQ9InBhdGgxMiI+PC9wYXRoPg0KICAgIDwvY2xpcFBhdGg+DQogICAgPGNsaXBQYXRoIGNsaXBQYXRoVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBpZD0iY2xpcFBhdGgxNCI+DQogICAgICA8cGF0aCBkPSJNIDAsMTAwMCBIIDEwMDAgViAwIEggMCBaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNTE0LjU1NDMxLC0zMzcuNzM3MTEpIiBpZD0icGF0aDE0Ij48L3BhdGg+DQogICAgPC9jbGlwUGF0aD4NCiAgICA8Y2xpcFBhdGggY2xpcFBhdGhVbml0cz0idXNlclNwYWNlT25Vc2UiIGlkPSJjbGlwUGF0aDE2Ij4NCiAgICAgIDxwYXRoIGQ9Ik0gMCwxMDAwIEggMTAwMCBWIDAgSCAwIFoiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC01MTQuNTU0MzEsLTM3MS4xNjA2MSkiIGlkPSJwYXRoMTYiPjwvcGF0aD4NCiAgICA8L2NsaXBQYXRoPg0KICAgIDxjbGlwUGF0aCBjbGlwUGF0aFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgaWQ9ImNsaXBQYXRoMTgiPg0KICAgICAgPHBhdGggZD0iTSAwLDEwMDAgSCAxMDAwIFYgMCBIIDAgWiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTU0My40NjIxMSwtMzE3LjM3OTIxKSIgaWQ9InBhdGgxOCI+PC9wYXRoPg0KICAgIDwvY2xpcFBhdGg+DQogICAgPGNsaXBQYXRoIGNsaXBQYXRoVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBpZD0iY2xpcFBhdGgyMCI+DQogICAgICA8cGF0aCBkPSJNIDAsMTAwMCBIIDEwMDAgViAwIEggMCBaIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNjY3LjE1OTcyLC0zMDQuMzg5MTEpIiBpZD0icGF0aDIwIj48L3BhdGg+DQogICAgPC9jbGlwUGF0aD4NCiAgPC9kZWZzPg0KICANCiAgPGcgaWQ9ImxheWVyLU1DMCI+DQogICAgPHBhdGggaWQ9InBhdGgxIiBkPSJtIDAsMCBjIC02NS40NzEsLTE5LjQ4MyAtODYuMDE0LC0xNDUuMTE5IC02MS45NSwtMjI5LjE0MiAyNC4wNTksLTg0LjAxOSA2NC4xMSwtNzEuNjMyIDg0LjMwOSwtNTcuNTggMjAuMTk4LDE0LjA1MiAzNC4zNSw1NC44NjQgMjUuMDA5LDcwLjU2NyAtOS4zNDIsMTUuNzAyIC0zNS43MjEsNi4zMTEgLTQ2LjAzMywyNS40MDkgLTEwLjMxNywxOS4wOTggMTkuMzA4LDMxLjI2IDQyLjQzNywzNy44ODEgMjMuMTM0LDYuNjI2IDUxLjY0OSwwLjA5IDU1Ljc4NCwtMTQuMzQ3IDQuMTM2LC0xNC40MzcgLTM0LjQ0LC0yOS4xNiAtMzAuMzA1LC00My41OTcgNC4xMzEsLTE0LjQzOCAzMi4wOTEsLTU4LjQ5IDczLjQzMiwtNDQuOTczIDQxLjM0MiwxMy41MTcgNDQuODM4LDU3LjcwNSAyOS42OTUsOTkuMzE2IEMgMTU3LjIzMSwtMTE0Ljg1OSA4MS44MzgsMjQuMzU0IDAsMCIgc3R5bGU9ImZpbGw6I2ZmZmZmZjtmaWxsLW9wYWNpdHk6MTtmaWxsLXJ1bGU6bm9uemVybztzdHJva2U6bm9uZSIgdHJhbnNmb3JtPSJtYXRyaXgoMS4zMzMzMzMzLDAsMCwtMS4zMzMzMzMzLDQ1Mi45Njg0LDM4MS4yMjA2NykiIGNsaXAtcGF0aD0idXJsKCNjbGlwUGF0aDIpIj48L3BhdGg+DQogICAgPHBhdGggaWQ9InBhdGgzIiBkPSJtIDAsMCBjIDEwLjI1NywzOC41NDYgMjguNjY1LDg2LjA1OSA0MS43MDIsMTM1LjA3NyAxLjM0LDUuMDMxIDEuNTY1LDUuODY2IC0xNC4zNzgsOS42NjIgLTM5LjYzMSw5LjQzMSAtNDQuOTA3LDM2Ljc1NiAtMzYuMzIsNjkuMDE2IDkuOTIxLDM3LjI5MSA0NS44NTcsMzcuNjQ2IDEyMC4xMDksMTkuOTc4IDY2LjA1MSwtMTUuNzE3IDExMS44NzMsLTM0LjkzNiAxMDIuMTc3LC03MS4zOTEgLTguODEyLC0zMy4wOTYgLTI5Ljk2LC01My44MzkgLTczLjY4NywtNDMuNDMzIC0xNS4wMzMsMy41NzYgLTE2LjA2Myw1LjE2MSAtMTcuOTU4LC0xLjk2NSBDIDEwOC4zNzgsNjcuMDg2IDEwMC40NDYsMTcuMDgzIDkwLjE5LC0yMS40NjMgODQuMzk0LC00My4yNTIgNzAuOTA3LC01Mi4wNjggMzcuMjAxLC00NC4wNDcgMi41OCwtMzUuODExIC01Ljc5NiwtMjEuNzg5IDAsMCIgc3R5bGU9ImZpbGw6I2ZmZmZmZjtmaWxsLW9wYWNpdHk6MTtmaWxsLXJ1bGU6bm9uemVybztzdHJva2U6bm9uZSIgdHJhbnNmb3JtPSJtYXRyaXgoMS4zMzMzMzMzLDAsMCwtMS4zMzMzMzMzLDczNy4zNjIxMyw2ODYuNTc4OTMpIiBjbGlwLXBhdGg9InVybCgjY2xpcFBhdGg0KSI+PC9wYXRoPg0KICAgIDxwYXRoIGlkPSJwYXRoNSIgZD0ibSAwLDAgYyAtNC4xMDYsLTkuMDIyIC0xMy42MDcsLTE0LjkwOCAtMjMuMTQ5LC0xNC4zNDcgLTEwLjI0NywwLjYwNSAtMTYuNjk3LDkuNDg2IC0xNC4wNzIsMTkuMzczIDIuNTYsOS42NDYgMTEuNTY3LDE3LjE5NyAyMS41MTgsMTguMDQ4IEMgLTIuMzA1LDI0LjIxOSA1LjY4MSwxMi40NzcgMCwwIG0gLTcuNDk2LC0zNi4wMzYgYyAtNC41MjYsLTYuMjg2IC05Ljc4NywtOS4wNDEgLTE4LjAzOCwtNS4zNDEgLTguNTUyLDMuODM2IC0xMC45OTcsMTIuMDE3IC01LjM5NiwxOC4wMjggNS44MzYsNi4yNTYgMTMuNDE3LDcuNDMxIDIwLjYyOCwxLjYzNiA0Ljg4MSwtMy45MjYgNi4wNDEsLTkuODM3IDIuODA2LC0xNC4zMjMgbSAtMzEuMzksMi45MTYgYyAtMS42MTEsLTcuNDUyIC00LjIyNiwtMTQuNjg4IC02LjM5MSwtMjIuMDU5IC0xLjcyNiwtMi40NjUgLTMuMTE2LC01LjEyMSAtNS4xMjEsLTcuMTc2IC01LjA5NiwtNS4yMjYgLTExLjI0MiwtNy44NTEgLTE4LjUyMywtNS4zMDEgLTguNjMyLDMuMDI1IC0xNC4zMjMsOC44ODEgLTE1Ljk4MywxOC4xNTMgLTAuMjI1LDEuMjM1IC0wLjI4NSwyLjQ5NSAtMC40MTUsMy43NDUgLTAuMzk1LDMuNzMxIC0yLjM2NSw2LjA1NiAtNS45NDEsNy4zMjIgLTMuOTM2LDEuMzk1IC03Ljg3NiwyLjg5NSAtMTEuNjEyLDQuNzUgLTcuNjgxLDMuODExIC0xMC45MTcsMTAuNTkyIC0xMC45MzcsMTguNzc0IC0wLjAyLDcuNjY2IDQuNTE2LDEyLjczMiAxMS4yMjcsMTUuNjcyIDkuMTA3LDMuOTk2IDE4LjE5OCw4LjA0MSAyOC40OTUsOC4yNTYgMjMuODY0LDAuNDk1IDQwLjIzNiwtMTguODAyIDM1LjIwMSwtNDIuMTM2IG0gLTQ1LjM4OCw3NS44NTcgYyA3LjM2MSw0LjI3MSAxNS40NDMsMC44MzUgMTcuNDczLC03LjQzMSAwLjk5NSwtNC4wNDYgMC4zNywtNy45MjEgLTEuMjM1LC0xMS44MTIgLTEuODQsLTMuNjMxIC00LjM0MSwtNi43NzYgLTguMjMyLC04LjU5NyAtNy4wMzEsLTMuMjk1IC0xNC4zMDIsMC4wODUgLTE2LjMzNyw3LjU4NyAtMi4wMjUsNy40NTEgMS42NSwxNi4zNzcgOC4zMzEsMjAuMjUzIE0gLTYzLjMsMjguMzM1IGMgMC4yOTUsMS41NSAwLjkzLDMuMDM1IDEuMzI1LDQuMjk1IDMuNTAxLDYuNTk2IDguMjQxLDExLjI5MiAxNS41NjcsMTIuNTcyIDguOTIyLDEuNTU2IDE1Ljk1MywtNC4zNTUgMTYuMjAzLC0xMy40MTcgMC4yNSwtOC44OTYgLTYuMjYxLC0xOC4xMzggLTE0Ljc1NywtMjAuODQ4IC01LjI1NiwtMS42OCAtMTAuMjQ3LC0xLjI2IC0xNC40MzgsMi42MyAtNC4zNTUsNC4wNDYgLTQuOTQ2LDkuMjQ3IC0zLjksMTQuNzY4IE0gMzYuOTIxLDk4Ljg3MSBjIC00OS42MzgsNDMuMzY3IC0xNjUuMTkyLC03LjM0MSAtMjIzLjIzMSwtNzIuMzQ3IC01OC4wMzUsLTY1LjAxIC0yNy4yOCwtOTEuMjg1IC01LjIzNiwtMTAwLjMzNiAyMi4wMzgsLTkuMDUyIDU4LjgyOSw0LjYyMSA3MS43NjEsMTcuNDAzIDEzLjU1OCwxMy4zOTIgMjQuOTU5LC0yLjU1MSAxNS42MTgsLTE1LjEyMyAtOC45MzEsLTEyLjAyMiAtMzIuNTksLTU3Ljg3NCAtMC4yMywtODQuNjAzIDMyLjM2LC0yNi43MzUgNzEuMTAyLC01LjgzMSA5OC4xOTYsMjkuMDE5IEMgMjAuODkzLC05Mi4yNyA5OC45NjYsNDQuNjU3IDM2LjkyMSw5OC44NzEiIHN0eWxlPSJmaWxsOiNmZmZmZmY7ZmlsbC1vcGFjaXR5OjE7ZmlsbC1ydWxlOm5vbnplcm87c3Ryb2tlOm5vbmUiIHRyYW5zZm9ybT0ibWF0cml4KDEuMzMzMzMzMywwLDAsLTEuMzMzMzMzMywxMjA0LjkwNzcsNzAwLjI2ODUzKSIgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoNikiPjwvcGF0aD4NCiAgICA8cGF0aCBpZD0icGF0aDciIGQ9Ik0gMCwwIEMgLTUuNTc2LC00LjU1NiAtMTEuMTMyLDAuMzUgLTMwLjg3LDI0LjUwOSAtNDEuOTcyLDM4LjEwMSAtNDQuNzM3LDQ3LjE3MyAtMzkuNDcxLDUxLjQ3NCAtMjguMzI1LDYwLjU4NSAtMTIuODU3LDY0LjQwNiAxLjMzLDQ3LjA0MyAyMS4wNzMsMjIuODc5IDEyLjY5NywxMC4zNzIgMCwwIE0gNDAuMjQyLC00NS44OTcgQyA5My41LC0yLjEwNSA5OC44NTEsNTMuNDQ0IDYwLjA0NSwxMDAuNjMxIDEyLjkyMiwxNTcuOTM2IC00NC42MzcsMTM5Ljk4MyAtOTkuNTgxLDk0LjgwNSBjIC00Ni44NTMsLTM4LjUzMSAtNTQuMzU0LC01OC4yNjQgMzEuNTcsLTE2Mi43NTYgNTguMjA5LC03MC43ODcgOTUuODUxLC0xMDcuNjMzIDEyNy4yMDEsLTgxLjg1MyAxOS41NDgsMTYuMDc3IDIyLjU5OCwzNy43OTYgOC40NjEsNTQuOTg0IC0xOC41NzMsMjIuNTgzIC0zNi4xNzEsNDEuNzE2IC0yNy40MDksNDguOTIzIiBzdHlsZT0iZmlsbDojZmZmZmZmO2ZpbGwtb3BhY2l0eToxO2ZpbGwtcnVsZTpub256ZXJvO3N0cm9rZTpub25lIiB0cmFuc2Zvcm09Im1hdHJpeCgxLjMzMzMzMzMsMCwwLC0xLjMzMzMzMzMsMjE1LjkwOTA3LDcxNi4yOTEyKSIgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoOCkiPjwvcGF0aD4NCiAgICA8cGF0aCBpZD0icGF0aDkiIGQ9Im0gMCwwIGMgMCwtMy4yNDUgMS41OTUsLTMuMjQ1IDYuODU2LC0zLjI0NSA1LjEwMSwwIDYuODUxLDAgNi44NTEsMy4yNDUgMCw2LjkxNiAtNC40NjEsMjIuMDI5IC02Ljg1MSwyMi4wMjkgQyA0LjMwNiwyMi4wMjkgMCw2LjkxNiAwLDAgbSA2Ljg1Niw2MS4xMzUgYyAyNC44NjQsMCAzOS42OTIsLTYyLjU0NSAzOS42OTIsLTgxLjMyMyAwLC04Ljc1NyAtMy42NzEsLTEzLjI3MyAtMTIuNTk3LC0xMy4yNzMgLTguMTI3LDAgLTEyLjU5MywzLjk1MSAtMTQuODIzLDExLjE1MiAtMS40MzUsNS4wODEgLTIuNTUsNS4yMjYgLTEyLjI3Miw1LjIyNiAtOS40MDYsMCAtMTEuMDAyLDAgLTEyLjU5NywtNS4wODYgLTIuMjMsLTguMDQ2IC02Ljg1MSwtMTEuMjkyIC0xNS4zMDIsLTExLjI5MiAtNy40OTIsMCAtMTEuOTUyLDQuNTE2IC0xMS45NTIsMTMuMjczIDAsMTMuNjkyIDE2LjI1Nyw4MS4zMjMgMzkuODUxLDgxLjMyMyIgc3R5bGU9ImZpbGw6I2E2Y2UzOTtmaWxsLW9wYWNpdHk6MTtmaWxsLXJ1bGU6bm9uemVybztzdHJva2U6bm9uZSIgdHJhbnNmb3JtPSJtYXRyaXgoMS4zMzMzMzMzLDAsMCwtMS4zMzMzMzMzLDQyNy40ODQ0LDkyNy40ODEyKSIgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoMTApIj48L3BhdGg+DQogICAgPHBhdGggaWQ9InBhdGgxMSIgZD0ibSAwLDAgYyAwLDIzLjg1OSAtMC4xNiw0Ny44NjMgMTUuNDYyLDQ3Ljg2MyAxMC41MjIsMCAyMi40NzQsLTE0LjY4MyAzMy43OTYsLTQyLjQ5NyAwLjYzNSwtMS4yNyAxLjU5LC0xLjI3IDIuMDcsMCAxMS4xNTcsMjcuNjY5IDIwLjQwNCw0Mi4zNTcgMzIuMzYxLDQyLjM1NyAxNS43NzcsMCAxNi43MzIsLTIyLjE2OSAxNi43MzIsLTQ2LjAyOCAwLC0zNy40MTYgLTAuNzk1LC00Ny41ODIgLTE3LjUzMywtNDcuNTgyIC03LjE3MSwwIC0xMi4yNzEsNC4zNzUgLTEyLjI3MSwxMi4yODIgMCw2LjM1NiAyLjU1LDE3LjIyNyAyLjU1LDIzLjI5OCAwLDMuOTUxIC0wLjQ4LDYuOTE3IC0yLjM5LDYuOTE3IC00LjYyNiwwIC0xMC41MjIsLTQxLjA4NyAtMjAuNTY0LC00MS4wODcgLTkuNTY2LDAgLTE1Ljc4Miw0MC45NDYgLTE5LjkyOCw0MC45NDYgLTEuNzUsMCAtMi4zOSwtMi44MjUgLTIuMzksLTYuNzc2IDAsLTYuMDcxIDEuNTk1LC0xNi45NDIgMS41OTUsLTIzLjI5OCAwLC03LjkwNyAtMi41NTEsLTEyLjI4MiAtMTIuNzUyLC0xMi4yODIgQyAzLjM0NiwtNDUuODg3IDAsLTM2LjI4NiAwLDAiIHN0eWxlPSJmaWxsOiNhNmNlMzk7ZmlsbC1vcGFjaXR5OjE7ZmlsbC1ydWxlOm5vbnplcm87c3Ryb2tlOm5vbmUiIHRyYW5zZm9ybT0ibWF0cml4KDEuMzMzMzMzMywwLDAsLTEuMzMzMzMzMyw1MDcuNjExMzMsOTA5Ljc4NDI3KSIgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoMTIpIj48L3BhdGg+DQogICAgPHBhdGggaWQ9InBhdGgxMyIgZD0ibSAwLDAgYyAxMi45MTIsMCAxNS43ODMsLTYuMjk2IDE1Ljc4MywtMzIuOTggMCwtMjYuNzg1IC0xLjU5NiwtMzIuOTgxIC0xNC41MDgsLTMyLjk4MSAtMTIuOTEyLDAgLTE3LjIxOCw2LjE5NiAtMTcuMjE4LDMyLjk4MSBDIC0xNS45NDMsLTYuMjk2IC0xMi45MTIsMCAwLDAiIHN0eWxlPSJmaWxsOiNhNmNlMzk7ZmlsbC1vcGFjaXR5OjE7ZmlsbC1ydWxlOm5vbnplcm87c3Ryb2tlOm5vbmUiIHRyYW5zZm9ybT0ibWF0cml4KDEuMzMzMzMzMywwLDAsLTEuMzMzMzMzMyw2ODYuMDcyNCw4ODMuMDE3MikiIGNsaXAtcGF0aD0idXJsKCNjbGlwUGF0aDE0KSI+PC9wYXRoPg0KICAgIDxwYXRoIGlkPSJwYXRoMTUiIGQ9Im0gMCwwIGMgMTAuOTM3LDAgMTUuNzgzLC03Ljg2NiAxNS43ODMsLTE0LjM2MiAwLC02LjE3NiAtNC44NDYsLTE0LjM2OCAtMTQuNTA4LC0xNC4zNjggLTEyLjkxMiwwIC0xNy4yMTgsNy41MzcgLTE3LjIxOCwxNC4zNjggQyAtMTUuOTQzLC05LjE3NyAtMTIuOTEyLDAgMCwwIiBzdHlsZT0iZmlsbDojYTZjZTM5O2ZpbGwtb3BhY2l0eToxO2ZpbGwtcnVsZTpub256ZXJvO3N0cm9rZTpub25lIiB0cmFuc2Zvcm09Im1hdHJpeCgxLjMzMzMzMzMsMCwwLC0xLjMzMzMzMzMsNjg2LjA3MjQsODM4LjQ1MjUzKSIgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoMTYpIj48L3BhdGg+DQogICAgPHBhdGggaWQ9InBhdGgxNyIgZD0ibSAwLDAgYyAwLDMyLjE5IDE1LjQ2Miw0OC41NjggNDQuNjMyLDQ4LjU2OCAxOC40OTMsMCAyOC4wNTUsLTguMDQ2IDI4LjA1NSwtMTcuNjQ4IDAsLTcuMjAxIC0zLjUwNiwtMTQuMjYyIC0xMC41MjIsLTE0LjI2MiAtNS43MzYsMCAtOS44ODEsNS4zNjYgLTE2LjU3OCw1LjM2NiAtMTAuMjAxLDAgLTE0LjM0MiwtNy4wNTcgLTE0LjM0MiwtMjEuNTk5IDAsLTEzLjgzNyA2LjM3NiwtMjAuMTkzIDE0LjM0MiwtMjAuMTkzIDYuMzc3LDAgNy4wMTcsNC4wOTYgNy4wMTcsNy4wNjEgMCw0LjUxNiAtMi41NTEsOC4xODYgLTIuNTUxLDExLjg1NyAwLDMuNTMxIDIuNTUxLDQuODAxIDEwLjk5Nyw0LjgwMSAxNS43ODIsMCAxNy4zNzgsLTUuMDgxIDE3LjM3OCwtMjMuMjk0IDAsLTIxLjg4NCAtMC45NiwtMjYuMjU5IC04LjQ1MiwtMjYuMjU5IC00LjE0LDAgLTcuMTcxLDIuODIgLTkuNTYxLDIuODIgLTIuNzExLDAgLTYuNTM2LC0zLjY3MSAtMTYuNzM4LC0zLjY3MSBDIDI0LjIyOSwtNDYuNDUzIDAsLTM2LjI4NiAwLDAiIHN0eWxlPSJmaWxsOiNhNmNlMzk7ZmlsbC1vcGFjaXR5OjE7ZmlsbC1ydWxlOm5vbnplcm87c3Ryb2tlOm5vbmUiIHRyYW5zZm9ybT0ibWF0cml4KDEuMzMzMzMzMywwLDAsLTEuMzMzMzMzMyw3MjQuNjE2MTMsOTEwLjE2MTA3KSIgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoMTgpIj48L3BhdGg+DQogICAgPHBhdGggaWQ9InBhdGgxOSIgZD0ibSAwLDAgYyAwLC0zLjI0NSAxLjU5NSwtMy4yNDUgNi44NTYsLTMuMjQ1IDUuMTAxLDAgNi44NTEsMCA2Ljg1MSwzLjI0NSAwLDYuOTE2IC00LjQ2LDIyLjAyOSAtNi44NTEsMjIuMDI5IEMgNC4zMDYsMjIuMDI5IDAsNi45MTYgMCwwIG0gNi44NTYsNjEuMTM1IGMgMjQuODY0LDAgMzkuNjkyLC02Mi41NDUgMzkuNjkyLC04MS4zMjMgMCwtOC43NTcgLTMuNjcxLC0xMy4yNzMgLTEyLjU5MiwtMTMuMjczIC04LjEzMiwwIC0xMi41OTgsMy45NTEgLTE0LjgyOCwxMS4xNTIgLTEuNDM1LDUuMDgxIC0yLjU1LDUuMjI2IC0xMi4yNzIsNS4yMjYgLTkuNDA2LDAgLTExLjAwMiwwIC0xMi41OTIsLTUuMDg2IC0yLjIzNSwtOC4wNDYgLTYuODU2LC0xMS4yOTIgLTE1LjMwMiwtMTEuMjkyIC03LjQ5NywwIC0xMS45NTcsNC41MTYgLTExLjk1NywxMy4yNzMgMCwxMy42OTIgMTYuMjU3LDgxLjMyMyAzOS44NTEsODEuMzIzIiBzdHlsZT0iZmlsbDojYTZjZTM5O2ZpbGwtb3BhY2l0eToxO2ZpbGwtcnVsZTpub256ZXJvO3N0cm9rZTpub25lIiB0cmFuc2Zvcm09Im1hdHJpeCgxLjMzMzMzMzMsMCwwLC0xLjMzMzMzMzMsODg5LjU0NjI3LDkyNy40ODEyKSIgY2xpcC1wYXRoPSJ1cmwoI2NsaXBQYXRoMjApIj48L3BhdGg+DQogIDwvZz4NCjwvc3ZnPg==" alt="Pata Amiga" width="70" height="34">
-    <span>Membresía de salud para tu peludo, orgullosamente 100% mexicana. No es un seguro.</span>
+    <span>Membresía de salud para tu mascota, orgullosamente 100% mexicana. No es un seguro.</span>
   </div>
 </footer>
 
 <script>
 (() => {
   // ---- Datos ---------------------------------------------------------------
-  // Precios: referencias públicas (pendientes de validar). Beneficios: plan
+  // Precios: rangos promedio que mandó la PM (observaciones, 9-oct-2026). Beneficios: plan
   // $599 publicado en producción (plan_versions.benefits, 6-oct-2026).
   const EVENTOS = [
-    { id: "lavado", nombre: "Se comió algo y necesita lavado gástrico", rubro: "em", min: 2900, max: 8500, paso: 100, def: 5700, on: true,
-      src: 'Suma de consulta de urgencia, suero y un día de hospital · <a href="https://animall.com.mx/blogs/noticias/veterinaria-24-horas-cdmx-guia-precios" target="_blank" rel="noopener">AniMALL 2026</a>',
-      pend: "Estimado: ninguna fuente publica el lavado gástrico solo" },
-    { id: "fractura", nombre: "Pata fracturada con cirugía", rubro: "em", min: 8000, max: 45000, paso: 500, def: 15000, on: false,
-      src: '<a href="https://www.bbva.mx/educacion-financiera/seguros/seguro-mascota-cuanto-cuesta-cirugia-perro.html" target="_blank" rel="noopener">BBVA México</a> $15k–$45k · <a href="https://cuantomecuesta.com/mx/veterinario/" target="_blank" rel="noopener">cuantomecuesta</a> $8k–$15k+',
-      pend: "Las dos fuentes no coinciden" },
-    { id: "consulta", nombre: "Consulta rápida", rubro: "cu", min: 200, max: 500, paso: 10, def: 350, on: true,
-      src: 'Clínica privada media $200–$350 · <a href="https://cuantomecuesta.com/mx/veterinario/" target="_blank" rel="noopener">cuantomecuesta, abr-2026</a>' },
-    { id: "vacuna", nombre: "Vacuna múltiple", rubro: "cu", min: 200, max: 700, paso: 10, def: 450, on: false,
-      src: '<a href="https://cuantomecuesta.com/mx/veterinario/" target="_blank" rel="noopener">cuantomecuesta</a> $300–$700 · <a href="https://petsapp.uno/blog/cuanto-cuesta-vacuna-perro-mexico" target="_blank" rel="noopener">PetsApp</a> $200–$600' },
+    { id: "lavado", nombre: "Ingesta de sustancia extraña (requiere atención urgente)", rubro: "em", min: 2800, max: 9500, paso: 100, def: 5700, on: true },
+    { id: "fractura", nombre: "Fractura que requiere intervención quirúrgica", rubro: "em", min: 9000, max: 40500, paso: 500, def: 15000, on: false },
+    { id: "consulta", nombre: "Consulta general", rubro: "cu", min: 250, max: 800, paso: 10, def: 400, on: true },
+    { id: "vacuna", nombre: "Vacuna anual / Múltiple", rubro: "cu", min: 250, max: 700, paso: 10, def: 450, on: false },
   ];
   const PLAN = { precio: 599,
     cuidados: { abreMes: 2, inicial: 500, tope: 2000, meses: 12 },    // día 31 = segundo mes
@@ -471,7 +465,7 @@ footer img { height: 34px; width: auto; }
       </div>
       <div class="cost"><b class="num" id="v-${e.id}">${$(e.def)}</b><small class="num">${$(e.min)} – ${$(e.max)}</small></div>
       <input type="range" id="r-${e.id}" min="${e.min}" max="${e.max}" step="${e.paso}" value="${e.def}" aria-label="Precio de ${e.nombre}">
-      <p class="src">${e.src}</p>
+      ${e.src ? `<p class="src">${e.src}</p>` : ""}
       ${e.pend ? `<span class="pend">${e.pend}</span>` : ""}`;
     cont.appendChild(card);
     const sw = card.querySelector(`#on-${e.id}`);
@@ -543,8 +537,8 @@ footer img { height: 34px; width: auto; }
     let reint = 0;
     const m = st.meses;
     if (st.con) {
-      rows.push(["Membresía Pata Amiga", "1 peludo", -PLAN.precio, "minus"]);
-      [["cu", PLAN.cuidados, "Cuidados cotidianos"], ["em", PLAN.emergencia, "Emergencia veterinaria"]].forEach(([rb, r, label]) => {
+      rows.push(["Membresía Pata Amiga", "1 mascota", -PLAN.precio, "minus"]);
+      [["cu", PLAN.cuidados, "Cuidados cotidianos"], ["em", PLAN.emergencia, "Emergencia grave"]].forEach(([rb, r, label]) => {
         const sum = activos.filter((e) => e.rubro === rb).reduce((s, e) => s + st.ev[e.id].precio, 0);
         if (!sum) return;
         if (m < r.abreMes) {
@@ -574,12 +568,12 @@ footer img { height: 34px; width: auto; }
     if (!activos.length) v = "Activa un evento para ver cómo queda tu mes.";
     else if (ing <= 0) v = "Escribe tu ingreso para comparar.";
     else if (saldo < 0) v = `Te faltarían <b>${$(-saldo)}</b>. Es más de lo que entra en un mes.`;
-    else v = `Se lleva <b>${Math.round((neto / ing) * 100)}%</b> de tu mes: como trabajar <b>${dias} ${dias === 1 ? "día" : "días"}</b> solo para pagarlo.`;
+    else v = `Este gasto representa el <b>${Math.round((neto / ing) * 100)}%</b> de tu presupuesto mensual (equivalente a <b>${dias} ${dias === 1 ? "día" : "días"}</b> de trabajo).`;
     el("verdict").innerHTML = v;
 
     el("mesPill").textContent = st.con ? `Mes ${m}` : "Tu mes";
     el("mesesOut").textContent = `Mes ${m}`;
-    el("balLabel").textContent = st.con ? "Lo que queda, ya con tu reintegro" : "Lo que queda de tu ingreso";
+    el("balLabel").textContent = st.con ? "Saldo restante estimado, ya con tu reintegro" : "Saldo restante estimado de tu mes";
 
     const sv = el("saving");
     if (st.con && activos.length) {
@@ -595,7 +589,7 @@ footer img { height: 34px; width: auto; }
     } else sv.hidden = true;
 
     el("fine").textContent = st.con
-      ? "Reintegro sin copago hasta el monto disponible del año. Los meses cuentan desde que el comité aprueba a tu peludo y solo suman los pagados."
+      ? "Reintegro sin copago hasta el monto disponible del año. Los meses cuentan desde que el comité aprueba a tu mascota y solo suman los pagados."
       : "Precios promedio de referencia. Tu veterinario puede cobrar distinto.";
 
     const tx = el("tx");
