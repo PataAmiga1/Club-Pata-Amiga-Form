@@ -1438,10 +1438,11 @@ export async function sendReimbursementMessage(
   const { admin, adminId } = await requireAdmin();
   const { data: req } = await admin
     .from("reimbursements")
-    .select("id, folio, user_id")
+    .select("id, folio, user_id, pets(name)")
     .eq("id", reimbursementId)
     .single();
   if (!req) throw new Error("Reintegro no encontrado");
+  const pet = (Array.isArray(req.pets) ? req.pets[0] : req.pets) as { name?: string } | null;
   const text = message?.trim() ?? "";
   const adjuntos = sanearAdjuntos(documents);
   if (!text && !adjuntos.length)
@@ -1454,11 +1455,31 @@ export async function sendReimbursementMessage(
     message: text || "(el comité envió archivos)",
     documents: adjuntos,
   });
-  await notifyMember(admin, req.user_id, {
-    type: "reimbursement_message",
-    title: `Mensaje del comité sobre tu reintegro ${req.folio}`,
-    message: text || "El comité te envió archivos.",
-  });
+  // La campanita solo se ve al entrar; el correo es lo que hace que el miembro
+  // se entere (Lucero, 9-oct: una despedida esperaba datos bancarios).
+  const mensajeHtml = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+  await notifyMember(
+    admin,
+    req.user_id,
+    {
+      type: "reimbursement_message",
+      title: `Mensaje del comité sobre tu reintegro ${req.folio}`,
+      message: text || "El comité te envió archivos.",
+    },
+    {
+      template: "reimbursement_message",
+      vars: {
+        folio: req.folio,
+        petName: pet?.name ?? "tu peludo",
+        message: mensajeHtml || "El comité te envió archivos: entra a tu solicitud para verlos.",
+        reintegroUrl: `${SITE_URL}/app/reintegros/${reimbursementId}`,
+      },
+    },
+  );
 
   revalidatePath(`/admin/reintegros/${reimbursementId}`);
   return { ok: true as const };
