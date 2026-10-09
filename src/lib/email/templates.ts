@@ -246,6 +246,30 @@ ${BOTON("{{reintegroUrl}}", "Ver mi reintegro")}`),
 ${BOTON("{{reintegroUrl}}", "Ver el detalle")}`),
   },
   {
+    key: "reimbursement_message",
+    name: "Mensaje del comité sobre un reintegro",
+    description:
+      "Cuando el comité escribe en la conversación de una solicitud de reintegro (además del aviso en la campanita).",
+    variables: {
+      firstName: "Nombre del miembro",
+      folio: "Folio de la solicitud",
+      petName: "Nombre del peludo",
+      message: "Mensaje del comité, tal como lo escribió",
+      reintegroUrl: "URL del reintegro, donde puede contestar",
+    },
+    sample: {
+      firstName: "Verónica", folio: "R-0001", petName: "Max",
+      message: "Para procesar tu reintegro, compártenos por favor la CLABE de una cuenta a tu nombre.",
+      reintegroUrl: "https://pataamiga.mx/app/reintegros/xxx",
+    },
+    subject: "Tienes un mensaje del comité sobre tu reintegro {{folio}}",
+    html: WRAP(`<h2 style="color:#1E5350">Tienes un mensaje sobre tu reintegro {{folio}}</h2>
+<p>Hola {{firstName}}, el comité te escribió sobre la solicitud de <strong>{{petName}}</strong>:</p>
+<p style="background:#FAF7F1;border-radius:12px;padding:12px">{{message}}</p>
+<p>Para contestar o mandar documentos, entra a tu solicitud.</p>
+${BOTON("{{reintegroUrl}}", "Ver y contestar")}`),
+  },
+  {
     key: "pet_approved",
     name: "Peludo aprobado",
     description: "Cuando el comité aprueba el perfil de un peludo.",
@@ -821,6 +845,7 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   plan_migrado: "membresia",
   reimbursement_approved: "reintegros",
   reimbursement_rejected: "reintegros",
+  reimbursement_message: "reintegros",
   pet_approved: "mascotas",
   pet_rejected: "mascotas",
   pet_info_request: "mascotas",
