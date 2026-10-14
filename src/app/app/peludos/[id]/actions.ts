@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cancelarAlCorte } from "@/lib/plans/peludos-599";
-import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
+import { darDeBajaPeludo } from "@/lib/pets/dar-de-baja";
 import { formatDateEs } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -119,17 +118,11 @@ export async function replyPetThread(
   return { ok: true as const };
 }
 
-/** Motivos válidos para dar de baja una mascota (nota del cliente 15-jul-2026). */
-const DEACTIVATION_REASONS: Record<string, string> = {
-  fallecio: "Falleció",
-  ya_no_esta: "Ya no vive conmigo",
-  otro: "Otro motivo",
-};
-
 /**
  * Dar de baja: la mascota deja de contar en el límite de activas, pero su
- * tarjeta queda (gris) como recuerdo. El miembro puede registrar otra en su
- * lugar — la nueva entra como reemplazo (tiempo de espera de 180 días).
+ * tarjeta queda (gris) como recuerdo. Toda la lógica (incluida la cancelación
+ * al corte de su membresía $599 y los avisos al equipo) vive en
+ * `darDeBajaPeludo`, que comparte con la baja que registra el comité.
  */
 export async function deactivatePet(
   petId: string,
@@ -139,60 +132,21 @@ export async function deactivatePet(
   const ctx = await ownPet(petId);
   if (!ctx) return { error: "No encontramos a tu peludo." };
 
-  const label = DEACTIVATION_REASONS[reasonKey];
-  if (!label) return { error: "Elige el motivo de la baja." };
-  const reason = details?.trim() ? `${label}: ${details.trim()}` : label;
-
-  const { error } = await ctx.admin
-    .from("pets")
-    .update({
-      is_active: false,
-      deactivation_reason: reason,
-      deactivated_at: new Date().toISOString(),
-    })
-    .eq("id", petId);
-  if (error) return { error: "No pudimos dar de baja a tu peludo. Intenta de nuevo." };
-
-  // Membresía $599 (sección 4): el peludo tiene SU suscripción. Se cancela al
-  // final del período ya pagado (no se cobra otra vez ni se reembolsa lo que
-  // corre). Si era el principal, al terminar sube el siguiente peludo (webhook).
-  let membresiaHasta: string | null = null;
-  const { data: suyaDelPeludo } = await ctx.admin
-    .from("subscriptions")
-    .select("id, status, cancel_at_period_end, current_period_end")
-    .eq("pet_id", petId)
-    .order("created_at", { ascending: false });
-  const viva = (suyaDelPeludo ?? []).find((s) => ESTADOS_VIVOS.includes(s.status ?? ""));
-  if (viva) {
-    if (viva.cancel_at_period_end) membresiaHasta = viva.current_period_end;
-    else {
-      try {
-        membresiaHasta = (await cancelarAlCorte(ctx.admin, viva.id))?.hasta ?? null;
-      } catch {
-        await notifyTeam(
-          "notify_memberships",
-          `⚠️ No se pudo cancelar la membresía de ${ctx.pet.name}`,
-          `<p>El miembro dio de baja a <strong>${ctx.pet.name}</strong>, pero Stripe no aceptó cancelar su suscripción. Hay que cancelarla a mano para que no se le vuelva a cobrar.</p>`,
-        );
-      }
-    }
-  }
-
-  await notifyTeam(
-    "notify_pets",
-    `Baja de peludo: ${ctx.pet.name} 🕊️`,
-    `<h2 style="color:#1E5350">Un miembro dio de baja a ${ctx.pet.name}</h2>
-     <p>Motivo: ${reason}</p>
-     <p>El miembro conserva su lugar y puede registrar otro peludo (entrará como reemplazo, 180 días de tiempo de espera).</p>`,
-  );
+  const res = await darDeBajaPeludo(ctx.admin, {
+    petId,
+    petName: ctx.pet.name,
+    reasonKey,
+    details,
+  });
+  if ("error" in res) return { error: res.error };
 
   revalidatePath("/app/peludos");
   revalidatePath(`/app/peludos/${petId}`);
   revalidatePath("/app/cuenta");
   return {
     ok: true as const,
-    ...(membresiaHasta
-      ? { mensaje: `Su membresía termina el ${formatDateEs(membresiaHasta)}; no se te vuelve a cobrar por ${ctx.pet.name}.` }
+    ...(res.membresiaHasta
+      ? { mensaje: `Su membresía termina el ${formatDateEs(res.membresiaHasta)}; no se te vuelve a cobrar por ${ctx.pet.name}.` }
       : {}),
   };
 }
