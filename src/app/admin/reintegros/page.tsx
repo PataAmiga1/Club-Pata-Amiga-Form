@@ -4,6 +4,9 @@ import { REIMBURSEMENT_CATEGORY_LABELS } from "@/lib/constants";
 import { formatMxn, hoursSince } from "@/lib/format";
 import { FilterChips } from "@/components/panel/FilterChips";
 import { formatDateEs } from "@/lib/dates";
+import { reintegrosPorDispersar } from "@/lib/reintegros-pago";
+import { hoyEnMexico } from "@/lib/zona-horaria";
+import { LotePagadoPanel, type FilaDelLayout } from "./LotePagadoPanel";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pendiente",
@@ -34,9 +37,6 @@ export default async function AdminReintegrosPage({
     .limit(100);
   if (estado) rowsQuery = rowsQuery.eq("status", estado);
   if (tipo) rowsQuery = rowsQuery.eq("category", tipo);
-  const { data: rowsRaw } = await rowsQuery;
-  const rows = rowsRaw ?? [];
-
   const memberName = (p: unknown) => {
     const prof = (Array.isArray(p) ? p[0] : p) as {
       first_name?: string;
@@ -47,6 +47,21 @@ export default async function AdminReintegrosPage({
       ? `${prof.first_name} ${prof.last_name ?? ""}`.trim()
       : (prof?.email ?? "Miembro");
   };
+  const [{ data: rowsRaw }, porDispersar] = await Promise.all([
+    rowsQuery,
+    reintegrosPorDispersar(admin),
+  ]);
+  const rows = rowsRaw ?? [];
+  // Lo mismo que trae el layout bancario, para «Marcar lote como pagado».
+  const filasDelLayout: FilaDelLayout[] = porDispersar.map((r) => ({
+    id: r.id,
+    folio: r.folio,
+    miembro: memberName(r.profiles),
+    monto: Number(r.amount_approved ?? 0),
+    sinClabe: !r.clabe,
+  }));
+
+
 
   return (
     <div className="flex flex-col gap-5 px-5 py-6 md:px-[30px] md:py-[26px]">
@@ -69,13 +84,16 @@ export default async function AdminReintegrosPage({
           </Link>
           <a
             href="/api/admin/layouts/reintegros"
-            title="CSV con CLABE, beneficiario y monto de los reintegros aprobados del mes — para dispersión masiva (SPEI) en el portal del banco"
+            title="CSV con CLABE, beneficiario y monto de los reintegros aprobados del mes que aún no se marcan como pagados — para dispersión masiva (SPEI) en el portal del banco"
             className="grid h-9 place-items-center rounded-full border-[1.5px] border-teal px-4 text-xs font-bold text-teal-deep transition-colors hover:bg-teal hover:text-white"
           >
             ⬇ Layout bancario del mes (CSV)
           </a>
         </div>
       </div>
+      {filasDelLayout.length > 0 && (
+        <LotePagadoPanel filas={filasDelLayout} hoy={hoyEnMexico()} />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterChips
           basePath="/admin/reintegros"
