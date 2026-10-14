@@ -152,6 +152,8 @@ async function marcarDndCorreo(
   valor: boolean,
   resumen: string,
   actorId: string | null,
+  actorLabel: string = "Plataforma",
+  extra: Record<string, unknown> = {},
 ) {
   const { data: actual } = await admin
     .from("contacts")
@@ -171,9 +173,9 @@ async function marcarDndCorreo(
     contactId,
     kind: "nota",
     summary: resumen,
-    payload: { dnd },
+    payload: { dnd, ...extra },
     actorId,
-    actorLabel: actorId ? null : "Plataforma",
+    actorLabel: actorId ? null : actorLabel,
   });
 }
 
@@ -243,30 +245,77 @@ export async function darDeBajaCorreo(
 }
 
 /**
+ * Quién deshace una baja.
+ *   · `equipo`: alguien del panel, a petición de la persona (WhatsApp, correo…).
+ *   · `persona`: la propia persona, sin intervención del equipo — se volvió a
+ *     suscribir desde el formulario del sitio (`formulario_sitio`) o pulsó
+ *     «Volver a suscribirme» en la página de su liga de baja (`pagina_baja`).
+ *
+ * RASTRO sin columnas nuevas: `revertida_por` es una FK a `profiles`, así que
+ * para la persona queda en null. Lectura: `revertida_at` con `revertida_por`
+ * = la persona lo hizo sola; con id = lo hizo ese miembro del equipo. Por
+ * dónde lo hizo queda en la nota del CRM (`payload.revertida_via`). `origen`
+ * NO se borra: sigue diciendo cómo había llegado a la lista, por si vuelve a
+ * hacer falta saberlo.
+ */
+export type QuienRevierte =
+  | { tipo: "equipo"; actorId: string }
+  | { tipo: "persona"; via: "formulario_sitio" | "pagina_baja" };
+
+const NOTA_REVERSION: Record<"equipo" | "formulario_sitio" | "pagina_baja", string> = {
+  equipo: "El equipo deshizo su baja del correo (la persona lo pidió)",
+  formulario_sitio: "Volvió a suscribirse desde el sitio",
+  pagina_baja: "Deshizo su baja desde la liga del correo («Volver a suscribirme»)",
+};
+
+/**
  * Deshace una baja cuando la persona lo pide. Vuelve a activar su suscripción
  * al boletín si se había dado de baja (un rebote duro no se toca: ese buzón no
  * existe) y le quita el «no contactar por correo» del CRM.
+ *
+ * QUEJA DE SPAM: solo el equipo la puede deshacer. Una queja la registra el
+ * proveedor del buzón (Gmail, Outlook…) y le cuenta en contra a nuestro
+ * dominio; si cualquiera pudiera revertirla escribiendo ese correo en el
+ * formulario público —que no pide comprobar que el buzón es suyo—, le
+ * volveríamos a escribir a quien ya nos reportó, que es justo lo que más daña
+ * la entrega de todos los demás correos. Quien de verdad quiera volver, le
+ * escribe al equipo y el equipo lo hace desde /ventas/newsletter/audiencia.
  */
 export async function revertirBajaCorreo(
   admin: Admin,
   emailCrudo: string,
-  actorId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  quien: QuienRevierte,
+): Promise<
+  | { ok: true }
+  | { ok: false; motivo: "invalido" | "no_estaba" | "queja_spam" | "error"; error: string }
+> {
   const email = normalizeEmail(emailCrudo);
-  if (!email) return { ok: false, error: "Ese correo no es válido." };
+  if (!email) return { ok: false, motivo: "invalido", error: "Ese correo no es válido." };
 
   const { data: fila } = await admin
     .from("correo_bajas")
-    .select("baja_at, contact_id")
+    .select("baja_at, origen, contact_id")
     .eq("email", email)
     .maybeSingle();
-  if (!fila?.baja_at) return { ok: false, error: "Ese correo no está dado de baja." };
+  if (!fila?.baja_at)
+    return { ok: false, motivo: "no_estaba", error: "Ese correo no está dado de baja." };
+  if (fila.origen === "queja_spam" && quien.tipo !== "equipo")
+    return {
+      ok: false,
+      motivo: "queja_spam",
+      error:
+        "Para volver a recibir nuestros correos en esa dirección, escríbenos a contacto@pataamiga.mx.",
+    };
+
+  const actorId = quien.tipo === "equipo" ? quien.actorId : null;
+  const via = quien.tipo === "equipo" ? "equipo" : quien.via;
 
   const ahora = new Date().toISOString();
-  await admin
+  const { error } = await admin
     .from("correo_bajas")
     .update({ baja_at: null, revertida_at: ahora, revertida_por: actorId, updated_at: ahora })
     .eq("email", email);
+  if (error) return { ok: false, motivo: "error", error: "No pudimos hacerlo. Intenta de nuevo." };
 
   await admin
     .from("newsletter_subscribers")
@@ -276,13 +325,10 @@ export async function revertirBajaCorreo(
 
   const contactId = (fila.contact_id as string | null) ?? (await contactoDelCorreo(admin, email));
   if (contactId)
-    await marcarDndCorreo(
-      admin,
-      contactId,
-      false,
-      "El equipo deshizo su baja del correo (la persona lo pidió)",
-      actorId,
-    );
+    await marcarDndCorreo(admin, contactId, false, NOTA_REVERSION[via], actorId, "La persona", {
+      revertida_via: via,
+      origen_de_la_baja: fila.origen,
+    });
 
   return { ok: true };
 }
@@ -291,6 +337,13 @@ export async function revertirBajaCorreo(
  * Al activarse una membresía, el miembro entra al boletín — salvo que la regla
  * única de exclusión (`correo_fuera_del_boletin`, en la base) diga que no:
  * lista negra, «no contactar», equipo, prueba o baja previa.
+ *
+ * PAGAR NO DESHACE UNA BAJA (PM, 14-oct-2026): quien se dio de baja a
+ * propósito y luego se hace miembro sigue fuera del boletín — pagar no es
+ * pedir correos de mercadotecnia. Para volver, lo pide explícitamente (el
+ * formulario del sitio o «Volver a suscribirme» en su liga de baja). Los
+ * correos de servicio (bienvenida, cobros, reintegros) NO pasan por aquí ni
+ * por `correo_bajas`: salen por `sendTemplatedEmail` y le llegan igual.
  *
  * Nunca lanza: un webhook de pago no se cae por esto.
  */

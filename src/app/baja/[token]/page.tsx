@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buscarPorToken } from "@/lib/correo/bajas";
-import { confirmarBaja } from "./actions";
+import { confirmarBaja, volverASuscribirme } from "./actions";
 
 export const metadata: Metadata = {
   title: "Dejar de recibir correos · Club Pata Amiga",
@@ -23,10 +23,10 @@ export default async function BajaCorreoPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ listo?: string }>;
+  searchParams: Promise<{ listo?: string; vuelta?: string }>;
 }) {
   const { token } = await params;
-  const { listo } = await searchParams;
+  const { listo, vuelta } = await searchParams;
   const fila = await buscarPorToken(createAdminClient(), token);
   const dadoDeBaja = !!fila?.baja_at;
 
@@ -65,17 +65,48 @@ export default async function BajaCorreoPage({
               llegando los correos de tu cuenta: tus cobros, tus reintegros y los
               avisos legales.
             </p>
-            <p className="text-[12px] leading-relaxed text-ink-tertiary">
-              ¿Fue un error? Escríbenos a{" "}
-              <a href="mailto:contacto@pataamiga.mx" className="font-semibold underline">
-                contacto@pataamiga.mx
-              </a>{" "}
-              y te volvemos a dar de alta.
-            </p>
+            {fila.origen === "queja_spam" ? (
+              <p className="text-[12px] leading-relaxed text-ink-tertiary">
+                ¿Fue un error? Escríbenos a{" "}
+                <a href="mailto:contacto@pataamiga.mx" className="font-semibold underline">
+                  contacto@pataamiga.mx
+                </a>{" "}
+                y te volvemos a dar de alta.
+              </p>
+            ) : (
+              <form
+                action={volverASuscribirme}
+                className="text-[12px] leading-relaxed text-ink-tertiary"
+              >
+                <input type="hidden" name="token" value={token} />
+                ¿Te diste de baja por error?{" "}
+                <button type="submit" className="font-semibold text-teal underline">
+                  Volver a suscribirme
+                </button>
+              </form>
+            )}
           </>
         )}
 
-        {fila && !dadoDeBaja && (
+        {fila && !dadoDeBaja && vuelta && (
+          <>
+            <h1 className="font-display text-[22px] text-ink-title">
+              ¡Qué gusto tenerte de vuelta!
+            </h1>
+            <p className="break-words text-[13.5px] leading-relaxed text-ink-secondary">
+              Te volverán a llegar el boletín y nuestras novedades en{" "}
+              <strong>{fila.email}</strong>.
+            </p>
+            <a
+              href="https://www.pataamiga.mx"
+              className="w-full rounded-full bg-teal px-6 py-3 text-[14px] font-bold text-white hover:bg-teal-deep"
+            >
+              Ir al sitio
+            </a>
+          </>
+        )}
+
+        {fila && !dadoDeBaja && !vuelta && (
           <>
             <h1 className="font-display text-[22px] text-ink-title">
               ¿Dejamos de escribirte?

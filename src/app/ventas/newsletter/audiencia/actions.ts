@@ -73,7 +73,10 @@ export async function agregarBajaManual(email: string) {
 /** Deshacer una baja, solo si la persona lo pidió. */
 export async function deshacerBaja(email: string) {
   const { userId } = await requireCapability("bajas.administrar");
-  const r = await revertirBajaCorreo(createAdminClient(), email, userId);
+  const r = await revertirBajaCorreo(createAdminClient(), email, {
+    tipo: "equipo",
+    actorId: userId,
+  });
   if (!r.ok) return { error: r.error };
   revalidar();
   return { ok: true as const };

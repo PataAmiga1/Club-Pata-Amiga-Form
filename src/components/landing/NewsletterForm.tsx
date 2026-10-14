@@ -8,10 +8,12 @@ export function NewsletterForm() {
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">(
     "idle",
   );
+  const [mensaje, setMensaje] = useState("");
 
   const submit = async () => {
     setState("busy");
     const result = await subscribeNewsletter(email);
+    setMensaje(result.error ?? "");
     setState(result.error ? "error" : "done");
   };
 
@@ -50,7 +52,7 @@ export function NewsletterForm() {
       </div>
       {state === "error" && (
         <span className="text-xs font-semibold text-[#FFB3C4]">
-          Revisa tu correo e intenta de nuevo.
+          {mensaje || "Revisa tu correo e intenta de nuevo."}
         </span>
       )}
       <span className="text-xs leading-relaxed text-white/60">
