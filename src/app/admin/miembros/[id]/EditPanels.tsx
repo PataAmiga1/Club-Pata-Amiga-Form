@@ -2,7 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { registerPetByAdmin, updateMemberByAdmin, updatePetByAdmin } from "@/app/admin/actions";
+import {
+  deactivatePetByAdmin,
+  registerPetByAdmin,
+  updateMemberByAdmin,
+  updatePetByAdmin,
+  updatePetPhotoByAdmin,
+} from "@/app/admin/actions";
 import { CAT_BREED_NAMES, DOG_BREED_NAMES, PET_COLORS } from "@/data/pet-catalogs";
 import { comprimir } from "@/components/ui/FotoDocumento";
 import { formatDateEs } from "@/lib/dates";
@@ -496,6 +502,280 @@ export function RegisterPetButton({
           {pending ? "Registrando…" : "Registrar peludo"}
         </button>
       </form>
+    </Overlay>
+  );
+}
+
+/**
+ * Cambiar la foto principal de un peludo (comité, 13-oct-2026). Se comprime
+ * en el navegador con el mismo `comprimir` del registro y solo reemplaza la
+ * foto principal: la galería del miembro se queda igual.
+ */
+export function PetPhotoButton({
+  petId,
+  petName,
+  currentUrl,
+}: {
+  petId: string;
+  petName: string;
+  currentUrl: string | null;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [foto, setFoto] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const cerrar = () => {
+    setOpen(false);
+    setFoto(null);
+    setError(null);
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[11px] font-bold text-teal-deep hover:underline"
+      >
+        📷 Cambiar foto
+      </button>
+    );
+  }
+
+  const vista = foto ?? currentUrl;
+
+  return (
+    <Overlay title={`Cambiar la foto de ${petName}`} onClose={cerrar}>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          {vista ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={vista}
+              alt={petName}
+              className="size-24 flex-none rounded-[12px] bg-cream object-cover"
+            />
+          ) : (
+            <span className="grid size-24 flex-none place-items-center rounded-[12px] bg-info-bg text-[12px] text-ink-tertiary">
+              Sin foto
+            </span>
+          )}
+          <p className="text-[12.5px] leading-snug text-ink-secondary">
+            {foto
+              ? "Así se verá la nueva foto principal."
+              : "Reemplaza la foto principal de su perfil. Las fotos de su galería no se tocan."}
+          </p>
+        </div>
+        <label className="flex flex-col gap-1 text-[11.5px] font-bold text-ink-secondary">
+          Nueva foto
+          <input
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              setFoto(null);
+              setError(null);
+              if (!f) return;
+              if (!f.type.startsWith("image/")) {
+                setError("Elige una imagen (JPG, PNG o WEBP).");
+                return;
+              }
+              try {
+                setFoto(await comprimir(f));
+              } catch {
+                setError("No pudimos leer esa foto. Prueba con otra.");
+              }
+            }}
+            className="text-[12px] font-normal text-ink-body"
+          />
+        </label>
+        {error && <p className="text-xs font-semibold text-error-text">{error}</p>}
+        <button
+          type="button"
+          disabled={pending || !foto}
+          onClick={() =>
+            startTransition(async () => {
+              if (!foto) return;
+              setError(null);
+              const res = await updatePetPhotoByAdmin(petId, foto);
+              if ("error" in res && res.error) setError(res.error);
+              else {
+                cerrar();
+                router.refresh();
+              }
+            })
+          }
+          className="grid h-11 w-full place-items-center rounded-full bg-teal text-[13.5px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
+        >
+          {pending ? "Guardando…" : "Guardar foto"}
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
+/**
+ * Dar de baja a un peludo a petición del miembro (comité, 13-oct-2026). Misma
+ * lógica que la baja del miembro (`darDeBajaPeludo`); aquí hay un paso de
+ * confirmación y un aviso de lo que va a pasar.
+ */
+export function DeactivatePetButton({
+  petId,
+  petName,
+  activo,
+  tieneMembresiaPropia,
+}: {
+  petId: string;
+  petName: string;
+  /**
+   * Se monta también con el peludo ya dado de baja (sin pintar nada) para que
+   * el aviso de «Baja registrada» sobreviva al refresco que trae la acción.
+   */
+  activo: boolean;
+  /** Membresía $599: el peludo tiene su propia suscripción activa. */
+  tieneMembresiaPropia: boolean;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [motivo, setMotivo] = useState("");
+  const [detalle, setDetalle] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [listo, setListo] = useState<string | null>(null);
+
+  const cerrar = () => {
+    const habiaBaja = listo !== null;
+    setOpen(false);
+    setMotivo("");
+    setDetalle("");
+    setConfirmando(false);
+    setError(null);
+    setListo(null);
+    if (habiaBaja) router.refresh();
+  };
+
+  if (!open) {
+    if (!activo) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[11px] font-bold text-ink-secondary hover:text-error-text hover:underline"
+      >
+        🕊️ Dar de baja
+      </button>
+    );
+  }
+
+  if (listo) {
+    return (
+      <Overlay title="Baja registrada" onClose={cerrar}>
+        <p className="text-[13.5px] leading-relaxed text-ink-body">{listo}</p>
+        <button
+          type="button"
+          onClick={cerrar}
+          className="mt-4 grid h-11 w-full place-items-center rounded-full bg-teal text-[13.5px] font-bold text-white hover:bg-teal-deep"
+        >
+          Listo
+        </button>
+      </Overlay>
+    );
+  }
+
+  const motivoTexto =
+    motivo === "fallecio"
+      ? "Falleció"
+      : motivo === "ya_no_esta"
+        ? "Ya no vive con el miembro"
+        : "Otro motivo";
+
+  return (
+    <Overlay title={`Dar de baja a ${petName}`} onClose={cerrar}>
+      <div className="flex flex-col gap-3">
+        <p className="rounded-[12px] bg-info-bg px-3 py-2 text-[12.5px] leading-snug text-info-text">
+          {tieneMembresiaPropia
+            ? `Su tarjeta queda en la cuenta del miembro como recuerdo. Su membresía se cancela al final del período ya pagado: no se le vuelve a cobrar por ${petName}.`
+            : "Su tarjeta queda en la cuenta del miembro como recuerdo y su lugar se libera (el siguiente peludo entra como reemplazo, con 180 días de tiempo de espera)."}{" "}
+          Al miembro le llega un aviso en su panel.
+        </p>
+        {!confirmando ? (
+          <>
+            <label className="flex flex-col gap-1 text-[11.5px] font-bold text-ink-secondary">
+              Motivo
+              <select value={motivo} onChange={(e) => setMotivo(e.target.value)} className={field}>
+                <option value="">Elige un motivo</option>
+                <option value="fallecio">Falleció 🕊️</option>
+                <option value="ya_no_esta">Ya no vive con el miembro</option>
+                <option value="otro">Otro motivo</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-[11.5px] font-bold text-ink-secondary">
+              Detalles (opcional)
+              <textarea
+                value={detalle}
+                onChange={(e) => setDetalle(e.target.value)}
+                rows={2}
+                placeholder="Por ejemplo: lo pidió por teléfono"
+                className="rounded-[10px] border-[1.5px] border-border-input p-3 text-[13px] font-normal text-ink-body outline-none focus:border-teal"
+              />
+            </label>
+            {error && <p className="text-xs font-semibold text-error-text">{error}</p>}
+            <button
+              type="button"
+              disabled={!motivo}
+              onClick={() => setConfirmando(true)}
+              className="grid h-11 w-full place-items-center rounded-full bg-teal text-[13.5px] font-bold text-white transition-colors hover:bg-teal-deep disabled:opacity-50"
+            >
+              Continuar
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-[13.5px] leading-relaxed text-ink-body">
+              ¿Confirmas la baja de <strong>{petName}</strong>?
+              <span className="mt-1 block text-[12.5px] text-ink-secondary">
+                Motivo: {motivoTexto}
+                {detalle.trim() ? ` — ${detalle.trim()}` : ""}. No se puede deshacer desde el panel.
+              </span>
+            </p>
+            {error && <p className="text-xs font-semibold text-error-text">{error}</p>}
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setConfirmando(false)}
+                className="h-11 flex-1 rounded-full border-[1.5px] border-border-input text-[13px] font-bold text-ink-secondary"
+              >
+                Volver
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    setError(null);
+                    const res = await deactivatePetByAdmin(petId, motivo, detalle);
+                    if (!res.ok) {
+                      setError(res.error ?? "No pudimos registrar la baja.");
+                      return;
+                    }
+                    const hasta = res.membresiaHasta;
+                    setListo(
+                      `Registramos la baja de ${petName}.${hasta ? ` Su membresía termina el ${formatDateEs(hasta)} y no se vuelve a cobrar.` : ""}${res.cancelacionPendiente ? " Ojo: Stripe no aceptó cancelar su membresía; le avisamos al equipo para cancelarla a mano." : ""} El miembro ya tiene el aviso en su panel.`,
+                    );
+                  })
+                }
+                className="h-11 flex-1 rounded-full bg-error-bg text-[13px] font-bold text-error-text transition-opacity hover:opacity-80 disabled:opacity-50"
+              >
+                {pending ? "Registrando…" : "Confirmar baja"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </Overlay>
   );
 }

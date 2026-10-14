@@ -15,7 +15,13 @@ import { PetThreadPanel } from "./PetThreadPanel";
 import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 import { PetResolveButtons } from "../../mascotas/PetResolveButtons";
 import { NOTA_HEREDADO_ADMIN } from "@/lib/membresia";
-import { EditMemberButton, EditPetButton, RegisterPetButton } from "./EditPanels";
+import {
+  DeactivatePetButton,
+  EditMemberButton,
+  EditPetButton,
+  PetPhotoButton,
+  RegisterPetButton,
+} from "./EditPanels";
 import { DetailItem, DetailModal } from "@/components/panel/DetailModal";
 
 const STATUS_CHIP: Record<string, { text: string; cls: string }> = {
@@ -63,7 +69,7 @@ export default async function AdminMiembroDetailPage({
       admin
         .from("pets")
         .select(
-          "id, name, species, breed, sex, age_years, age_months, coat_color, eye_color, nose_color, is_adopted, adoption_story, is_senior, photo_url, gallery_photos, vet_certificate_url, approval_status, is_active, deactivation_reason, waiting_period_end_date, info_requested, pet_messages(id, sender, message, requested_items, documents, created_at)",
+          "id, name, species, breed, sex, age_years, age_months, coat_color, eye_color, nose_color, is_adopted, adoption_story, is_senior, photo_url, gallery_photos, vet_certificate_url, approval_status, is_active, deactivation_reason, deactivated_at, waiting_period_end_date, info_requested, pet_messages(id, sender, message, requested_items, documents, created_at)",
         )
         .eq("user_id", id)
         .order("created_at", { ascending: true }),
@@ -464,7 +470,7 @@ export default async function AdminMiembroDetailPage({
                               : ""}
                           {p.sex ? ` · ${p.sex === "male" ? "macho" : "hembra"}` : ""}
                           {!p.is_active
-                            ? ` · 🕊️ dada de baja${p.deactivation_reason ? ` (${p.deactivation_reason})` : ""}`
+                            ? ` · 🕊️ dada de baja${p.deactivated_at ? ` el ${formatDateEs(p.deactivated_at)}` : ""}${p.deactivation_reason ? ` (${p.deactivation_reason})` : ""}`
                             : ""}
                           <span className="block text-[11.5px] text-ink-tertiary">
                             {[
@@ -546,6 +552,14 @@ export default async function AdminMiembroDetailPage({
                           }
                         />
                         <DetailItem
+                          label="FECHA DE LA BAJA"
+                          value={
+                            !p.is_active && p.deactivated_at
+                              ? formatDateEs(p.deactivated_at)
+                              : null
+                          }
+                        />
+                        <DetailItem
                           label="MOTIVO DE LA BAJA"
                           value={!p.is_active ? p.deactivation_reason : null}
                         />
@@ -612,6 +626,16 @@ export default async function AdminMiembroDetailPage({
                       }}
                     />
                   )}
+                  {/* Foto y baja a petición del miembro (comité, 13-oct-2026).
+                      La foto se puede cambiar también ya dada de baja: es la
+                      de su tarjeta de recuerdo. */}
+                  <PetPhotoButton petId={p.id} petName={p.name} currentUrl={p.photo_url} />
+                  <DeactivatePetButton
+                    petId={p.id}
+                    petName={p.name}
+                    activo={p.is_active}
+                    tieneMembresiaPropia={porPeludo.some((x) => x.pet_id === p.id)}
+                  />
                 </span>
               </div>
               <PetThreadPanel

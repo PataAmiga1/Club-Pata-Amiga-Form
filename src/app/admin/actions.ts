@@ -48,6 +48,7 @@ import { getStripe } from "@/lib/stripe";
 import { getTemplateDef } from "@/lib/email/templates";
 import { crmEventoDeUsuario, marcarComoMiembro } from "@/lib/crm/sync";
 import { iniciarEsperaDeMascota } from "@/lib/pets/iniciar-espera";
+import { darDeBajaPeludo } from "@/lib/pets/dar-de-baja";
 
 async function requireAdmin(superOnly = false) {
   const supabase = await createClient();
@@ -741,6 +742,112 @@ export async function updatePetByAdmin(
   revalidatePath(`/admin/miembros/${pet.user_id}`);
   revalidatePath("/admin/mascotas");
   return { ok: true as const };
+}
+
+/** Tope de la foto ya comprimida (llega como data URL dentro de la Server Action). */
+const FOTO_PELUDO_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Cambiar la foto principal de un peludo desde el expediente (comité,
+ * 13-oct-2026): para cuando el miembro la pide por teléfono o correo — el caso
+ * que lo originó fue una socia cuyo perro falleció. Llega comprimida desde el
+ * navegador (`comprimir`), se sube al mismo bucket y con el mismo patrón de
+ * ruta que `registerPetByAdmin`, y solo reemplaza `photo_url`: la galería se
+ * queda como está.
+ */
+export async function updatePetPhotoByAdmin(petId: string, foto: string) {
+  const { admin } = await requireAdmin();
+  const partes = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(foto ?? "");
+  if (!partes) return { error: "La foto tiene que ser una imagen (JPG, PNG o WEBP)." };
+  const bytes = Buffer.from(partes[2], "base64");
+  if (!bytes.length) return { error: "La foto llegó vacía. Prueba con otra." };
+  if (bytes.length > FOTO_PELUDO_MAX_BYTES)
+    return { error: "La foto es demasiado pesada. Prueba con otra." };
+
+  const { data: pet } = await admin
+    .from("pets")
+    .select("id, name, user_id")
+    .eq("id", petId)
+    .maybeSingle();
+  if (!pet) return { error: "No encontramos al peludo." };
+
+  const ext = partes[1] === "image/png" ? "png" : partes[1] === "image/webp" ? "webp" : "jpg";
+  const slug =
+    pet.name.normalize("NFD").replace(/[^\w]+/g, "-").toLowerCase().slice(0, 40) || "peludo";
+  const path = `${pet.user_id}/${Date.now()}-${slug}.${ext}`;
+  const { error: subida } = await admin.storage
+    .from("pet-photos")
+    .upload(path, bytes, { contentType: partes[1] });
+  if (subida) return { error: "No pudimos subir la foto. Intenta de nuevo." };
+  const photoUrl = admin.storage.from("pet-photos").getPublicUrl(path).data.publicUrl;
+
+  const { error } = await admin.from("pets").update({ photo_url: photoUrl }).eq("id", petId);
+  if (error) return { error: "Subimos la foto, pero no pudimos guardarla en su perfil." };
+
+  revalidatePath(`/admin/miembros/${pet.user_id}`);
+  revalidatePath("/admin/mascotas");
+  revalidatePath(`/app/peludos/${petId}`);
+  revalidatePath("/app/peludos");
+  return { ok: true as const, photoUrl };
+}
+
+/**
+ * Dar de baja a un peludo desde el expediente (comité, 13-oct-2026). Hace
+ * EXACTAMENTE lo mismo que la baja del miembro —tarjeta de recuerdo, cancelar
+ * al corte su membresía $599, avisos al equipo— porque las dos usan
+ * `darDeBajaPeludo`. El motivo queda marcado como registrado por el comité, y
+ * al miembro le llega un aviso en su campana (sin correo: no hay plantilla
+ * para esto y no queremos uno frío en un momento así).
+ */
+export async function deactivatePetByAdmin(
+  petId: string,
+  reasonKey: string,
+  details?: string,
+) {
+  const { admin } = await requireAdmin();
+  const { data: pet } = await admin
+    .from("pets")
+    .select("id, name, user_id, is_active")
+    .eq("id", petId)
+    .maybeSingle();
+  if (!pet) return { error: "No encontramos al peludo." };
+  if (!pet.is_active) return { error: `${pet.name} ya tiene registrada su baja.` };
+
+  const res = await darDeBajaPeludo(admin, {
+    petId,
+    petName: pet.name,
+    reasonKey,
+    details,
+    porComite: true,
+  });
+  if ("error" in res) return { error: res.error };
+
+  const cobro = res.membresiaHasta
+    ? ` Su membresía termina el ${formatDateEs(res.membresiaHasta)} y no se te vuelve a cobrar por ${pet.name}.`
+    : "";
+  await admin.from("notifications").insert({
+    user_id: pet.user_id,
+    type: "pet_deactivated",
+    title:
+      reasonKey === "fallecio"
+        ? `Lamentamos mucho la partida de ${pet.name} 🕊️`
+        : `Registramos la baja de ${pet.name}`,
+    message:
+      reasonKey === "fallecio"
+        ? `Te acompañamos en este momento. Como nos pediste, registramos la baja de ${pet.name}; su tarjeta se queda en tu cuenta como recuerdo.${cobro}`
+        : `Como nos pediste, registramos la baja de ${pet.name}. Su tarjeta se queda en tu cuenta como recuerdo y su lugar queda libre.${cobro}`,
+  });
+
+  revalidatePath(`/admin/miembros/${pet.user_id}`);
+  revalidatePath("/admin/mascotas");
+  revalidatePath("/app/peludos");
+  revalidatePath(`/app/peludos/${petId}`);
+  revalidatePath("/app/cuenta");
+  return {
+    ok: true as const,
+    membresiaHasta: res.membresiaHasta,
+    cancelacionPendiente: res.cancelacionPendiente,
+  };
 }
 
 /** Meses cumplidos entre dos días yyyy-mm-dd (sin contar el mes en curso). */
