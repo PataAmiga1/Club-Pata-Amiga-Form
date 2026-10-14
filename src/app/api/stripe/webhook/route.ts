@@ -8,6 +8,7 @@ import { formatMxn } from "@/lib/format";
 import { AMBASSADOR_COMMISSION_MXN } from "@/lib/constants";
 import { petWaitingPeriodDays } from "@/lib/waiting-period";
 import { crmEventoDeUsuario, marcarComoMiembro } from "@/lib/crm/sync";
+import { sumarMiembroAlBoletin } from "@/lib/correo/bajas";
 import {
   beneficiosDeVersion,
   esperasDe,
@@ -275,6 +276,9 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     payload: { sessionId: session.id, amount: session.amount_total },
   });
   await marcarComoMiembro(supabase, userId);
+  // Miembro activo = entra al boletín (aprobado por la PM, con liga de baja),
+  // salvo lista negra / «no contactar» / baja previa. Nunca lanza.
+  await sumarMiembroAlBoletin(supabase, userId);
 
   // 6. Welcome email (sendTemplatedEmail never throws)
   if (profile?.email && !esAdicional) {
@@ -742,6 +746,9 @@ async function handleAnualPrepagado(
     payload: { sessionId: session.id, amount: pagado, msi: meses },
   });
   await marcarComoMiembro(supabase, userId);
+  // Miembro activo = entra al boletín (aprobado por la PM, con liga de baja),
+  // salvo lista negra / «no contactar» / baja previa. Nunca lanza.
+  await sumarMiembroAlBoletin(supabase, userId);
 
   if (perfil?.email && !esAdicional) {
     const { data: pet } = await supabase.from("pets").select("name").eq("id", petId).maybeSingle();
