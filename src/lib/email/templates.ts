@@ -970,6 +970,16 @@ export function getTemplateDef(key: string): EmailTemplateDef | undefined {
   return EMAIL_TEMPLATES.find((t) => t.key === key);
 }
 
+/** Convierte texto en HTML inerte: `<b>` se lee tal cual, no como etiqueta. */
+export function escapeHtml(texto: string): string {
+  return texto
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** Sustituye {{variables}}; las no provistas quedan vacías. */
 export function renderTemplate(
   text: string,
