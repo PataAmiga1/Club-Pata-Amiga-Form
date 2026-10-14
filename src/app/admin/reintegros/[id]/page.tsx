@@ -12,10 +12,13 @@ import { formatMxn, hoursSince } from "@/lib/format";
 import { formatDateEs, waitingProgress } from "@/lib/dates";
 import { ResolutionPanel } from "./ResolutionPanel";
 import { ThreadPanel } from "./ThreadPanel";
+import { PagoPanel } from "./PagoPanel";
+import { TestimonioPanel } from "./TestimonioPanel";
+import { estadoDeTestimonio, type EstadoDeTestimonio } from "@/lib/testimonios";
 import { firmarAdjuntosDeHilo } from "@/lib/documentos-conversacion";
 import { estadoDePeludo599, esRubro599 } from "@/lib/reintegros-599";
 import { diasHabilesRestantes } from "@/lib/dias-habiles";
-import { hoyEnMexico } from "@/lib/zona-horaria";
+import { diaEnMexico, hoyEnMexico } from "@/lib/zona-horaria";
 import type { Rubro599 } from "@/lib/plans/montos";
 
 export default async function ReviewPage({
@@ -29,7 +32,7 @@ export default async function ReviewPage({
   const { data: req } = await admin
     .from("reimbursements")
     .select(
-      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, care_concepts, plan_balance, due_business_date, sla_breached_at, high_amount_alert_at, free_month_applied_at, free_month_cents, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
+      "id, folio, category, amount_requested, amount_approved, total_paid_amount, status, rejection_reason, service_date, clabe, bank_holder, clinic_name, vet_name, vet_license, invoice_urls, documents, created_at, user_id, pet_id, care_concepts, plan_balance, due_business_date, sla_breached_at, high_amount_alert_at, free_month_applied_at, free_month_cents, paid_at, payment_reference, payment_note, pets(name, species, breed, age_years, approval_status, waiting_period_end_date, waiting_period_start_date, waiting_period_bypassed, created_at), profiles!user_id(first_name, last_name, email, member_since)",
     )
     .eq("id", id)
     .single();
@@ -118,6 +121,14 @@ export default async function ReviewPage({
   const habilesRestantes = req.due_business_date
     ? diasHabilesRestantes(hoy, req.due_business_date)
     : null;
+
+  const testimonio = await estadoDeTestimonio(admin, {
+    user_id: req.user_id,
+    category: req.category,
+    status: req.status,
+    paid_at: req.paid_at,
+  });
+  const textoTestimonio = textoDeTestimonio(testimonio);
 
   const hrs = hoursSince(req.created_at);
   const open = req.status === "pending" || req.status === "in_review";
@@ -339,7 +350,8 @@ export default async function ReviewPage({
           </div>
         </div>
 
-        {/* Resolution */}
+        {/* Resolución + pago + testimonio en la misma columna */}
+        <div className="flex flex-col gap-4">
         <ResolutionPanel
           reimbursementId={req.id}
           petId={req.pet_id}
@@ -353,6 +365,24 @@ export default async function ReviewPage({
           isSuperAdmin={isSuperAdmin}
           waitingDone={es599 ? Boolean(rubro599?.abierto) : wait.done}
         />
+        <PagoPanel
+          reimbursementId={req.id}
+          status={req.status}
+          monto={Number(req.amount_approved ?? req.amount_requested)}
+          hoy={hoy}
+          pagadoEl={req.paid_at ? formatDateEs(diaEnMexico(new Date(req.paid_at))) : null}
+          referencia={req.payment_reference}
+          nota={req.payment_note}
+        />
+        {testimonio.tipo !== "no_aplica" && (
+          <TestimonioPanel
+            reimbursementId={req.id}
+            boton={testimonio.tipo === "boton"}
+            texto={textoTestimonio.texto}
+            tono={textoTestimonio.tono}
+          />
+        )}
+        </div>
 
         {/* Conversación separada por área: este hilo pertenece SOLO a esta solicitud */}
         <ThreadPanel
@@ -368,4 +398,34 @@ export default async function ReviewPage({
       </div>
     </div>
   );
+}
+
+/** Cómo se lee el estado del testimonio en la solicitud. */
+function textoDeTestimonio(e: EstadoDeTestimonio): {
+  texto: string | null;
+  tono: "ok" | "info" | "aviso";
+} {
+  switch (e.tipo) {
+    case "pedido": {
+      const cuando = formatDateEs(diaEnMexico(new Date(e.sentAt)));
+      const como = e.auto ? "automático" : "manual";
+      const cual = e.template === "testimonial_request_despedida" ? " · despedida" : "";
+      return e.emailOk === false
+        ? { texto: `Se intentó pedir el ${cuando} (${como}${cual}), pero el correo no salió.`, tono: "aviso" }
+        : { texto: `Ya se pidió el ${cuando} (${como}${cual}).`, tono: "ok" };
+    }
+    case "programado":
+      return { texto: `Se pedirá automáticamente el ${formatDateEs(e.fecha)} (o en la siguiente corrida diaria).`, tono: "info" };
+    case "apagado":
+      return { texto: "El testimonio automático está apagado (Sitio web → Ajustes).", tono: "aviso" };
+    case "dnd":
+      return { texto: "No se pedirá: este contacto pidió no recibir correos (CRM).", tono: "aviso" };
+    case "fuera_de_ventana":
+      return { texto: "No se pedirá: el pago tiene más de 30 días.", tono: "aviso" };
+    case "despedida_en_cuenta":
+      return { texto: "No se pide en automático: este miembro tiene un reintegro de despedida. Si procede, pídelo desde esa solicitud.", tono: "aviso" };
+    case "boton":
+    case "no_aplica":
+      return { texto: null, tono: "info" };
+  }
 }

@@ -75,6 +75,20 @@ export const SITE_SETTINGS = [
     label: "Registro de nuevos miembros abierto («si» o «no»)",
     default: "no",
   },
+  {
+    // Casos de éxito (13-oct-2026): cuando un reintegro queda pagado, la tarea
+    // diaria le pide testimonio al miembro, UNA vez por miembro. Despedida
+    // nunca va en automático: esa se pide a mano desde la solicitud.
+    // Ver src/lib/testimonios.ts.
+    key: "testimonio_automatico",
+    label: "Pedir testimonio automático tras un reintegro pagado («si» o «no»)",
+    default: "si",
+  },
+  {
+    key: "testimonio_dias_tras_pago",
+    label: "Días después del pago para pedir el testimonio",
+    default: "3",
+  },
 ] as const;
 
 /**

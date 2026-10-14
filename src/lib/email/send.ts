@@ -20,6 +20,9 @@ export async function sendTemplatedEmail(
   key: string,
   to: string,
   vars: Record<string, string> = {},
+  // Opcional y al final: los ~40 llamados existentes no cambian. Lo usa el
+  // correo de testimonio, que se contesta a miembros@ y no a no-responder.
+  opciones: { replyTo?: string } = {},
 ): Promise<boolean> {
   const def = getTemplateDef(key);
   if (!def) {
@@ -48,6 +51,7 @@ export async function sendTemplatedEmail(
       to,
       subject,
       html,
+      ...(opciones.replyTo ? { replyTo: opciones.replyTo } : {}),
     });
     if (error) {
       console.error(`email "${key}" rejected`, error);

@@ -270,6 +270,100 @@ ${BOTON("{{reintegroUrl}}", "Ver el detalle")}`),
 ${BOTON("{{reintegroUrl}}", "Ver y contestar")}`),
   },
   {
+    key: "reimbursement_paid",
+    name: "Reintegro depositado",
+    description:
+      "Cuando el comité registra el depósito de un reintegro (Reintegros → la solicitud → «Registrar pago», o el lote del layout del banco).",
+    variables: {
+      firstName: "Nombre del miembro",
+      folio: "Folio de la solicitud",
+      amount: "Monto depositado con formato (ej. $1,250)",
+      petName: "Nombre de la mascota",
+      fecha: "Fecha del depósito (ej. 13 de octubre de 2026)",
+      referenciaLine: "Línea con la clave de rastreo SPEI (vacía si no se capturó)",
+      reintegroUrl: "URL del reintegro",
+    },
+    sample: {
+      firstName: "Verónica", folio: "R-0001", amount: "$1,250", petName: "Max",
+      fecha: "13 de octubre de 2026",
+      referenciaLine: "<p>Clave de rastreo SPEI: <strong>MBAN01002610130000123</strong></p>",
+      reintegroUrl: "https://pataamiga.mx/app/reintegros/xxx",
+    },
+    subject: "Ya depositamos tu reintegro {{folio}} 💚",
+    html: WRAP(`<h2 style="color:#1E5350">Ya depositamos tu reintegro {{folio}} 💚</h2>
+<p>Hola {{firstName}}, el <strong>{{fecha}}</strong> te transferimos <strong>{{amount}} MXN</strong> del reintegro de <strong>{{petName}}</strong> a la cuenta que nos compartiste.</p>
+{{referenciaLine}}
+<p>Según tu banco, el depósito puede tardar unas horas en reflejarse. Si no lo ves en 2 días hábiles, contéstanos y lo revisamos contigo.</p>
+${BOTON("{{reintegroUrl}}", "Ver mi reintegro")}`),
+  },
+  {
+    key: "testimonial_request",
+    name: "Testimonio tras un reintegro (general)",
+    description:
+      "Se manda solo, una vez por miembro, unos días después de que un reintegro queda pagado (días y encendido en Sitio web → Ajustes). Nunca en despedida. Las respuestas llegan a miembros@pataamiga.mx.",
+    variables: {
+      firstName: "Nombre del miembro",
+      petName: "Nombre de la mascota del reintegro",
+      folio: "Folio del reintegro pagado",
+    },
+    sample: { firstName: "Verónica", petName: "Max", folio: "R-0001" },
+    subject: "{{firstName}}, ¿nos cuentas cómo te fue con tu reintegro?",
+    html: WRAP(`<p style="margin:0 0 14px">Hola, {{firstName}}:</p>
+<p style="margin:0 0 14px">¡Esperamos que tú y {{petName}} estén muy bien!</p>
+<p style="margin:0 0 14px">Nos gustaría compartir tu experiencia con el reintegro de Pata Amiga en nuestras redes sociales para que más personas conozcan cómo funciona. Es solo si tú quieres.</p>
+<p style="margin:0 0 14px"><strong>Si te animas, puedes elegir una de estas dos opciones:</strong></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F2F9F8;border-radius:14px;margin:8px 0"><tr><td style="padding:15px 20px">
+<div style="font-size:15px;font-weight:bold;color:#0E8377;margin-bottom:4px">Opción A: un video cortito</div>
+<div style="font-size:14px;color:#3D524F;line-height:1.55">Grabado con tu celular, contándonos cómo fue tu experiencia al recibir el reintegro.</div>
+</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F2F9F8;border-radius:14px;margin:8px 0 16px"><tr><td style="padding:15px 20px">
+<div style="font-size:15px;font-weight:bold;color:#0E8377;margin-bottom:4px">Opción B: una nota de voz</div>
+<div style="font-size:14px;color:#3D524F;line-height:1.55">Un audio grabado con tu celular contándonos tu experiencia, con tu voz y como te salga.</div>
+</td></tr></table>
+<p style="margin:0 0 14px">No necesitas preparar nada especial ni decir algo en particular. ¡Cuéntanos con tus propias palabras y de manera natural!</p>
+<p style="margin:0 0 14px">Para enviarlo, solo responde a este correo con el archivo adjunto. Si el video pesa demasiado, también puedes compartirnos una liga de Google Drive.</p>
+<p style="margin:0 0 14px">Si nos compartes tu video o audio, te pediremos autorización para publicarlo en las redes sociales de Pata Amiga. Puedes consultar cómo cuidamos tus datos en nuestro <a href="{{siteUrl}}/legales/aviso-de-privacidad" style="color:#0E8377">Aviso de Privacidad</a>.</p>
+${BOTON("mailto:miembros@pataamiga.mx?subject=Mi%20experiencia%20con%20Pata%20Amiga%20({{folio}})", "Responder a este correo")}
+<p style="margin:14px 0">¡Muchas gracias por tu tiempo y por confiar en nosotros! 🐾</p>
+<p style="margin:0 0 4px">Con cariño,</p>
+<p style="margin:0">El equipo de Pata Amiga</p>
+<p style="margin:18px 0 0;color:#9AA8A5;font-size:11.5px">Escribimos este correo porque eres parte de Pata Amiga. Puedes contestarnos en <a href="mailto:miembros@pataamiga.mx" style="color:#9AA8A5">miembros@pataamiga.mx</a>.</p>`),
+  },
+  {
+    key: "testimonial_request_despedida",
+    name: "Testimonio tras un reintegro (despedida)",
+    description:
+      "Versión cuidadosa para reintegros de despedida/fallecimiento. NUNCA sale sola: el comité la manda a mano con «Pedir testimonio» desde la solicitud. Las respuestas llegan a miembros@pataamiga.mx.",
+    variables: {
+      firstName: "Nombre del miembro",
+      petName: "Nombre de la mascota que partió",
+      folio: "Folio del reintegro pagado",
+    },
+    sample: { firstName: "Verónica", petName: "Nymeria", folio: "R-0001" },
+    subject: "Pensando en ti y en {{petName}}",
+    html: WRAP(`<p style="margin:0 0 14px">Hola, {{firstName}}:</p>
+<p style="margin:0 0 14px">Antes que nada, queremos decirte que lamentamos muchísimo la partida de <strong>{{petName}}</strong>. Sabemos que no era solo una mascota, era parte de tu familia, y en el equipo de Pata Amiga la recordamos con cariño.</p>
+<p style="margin:0 0 14px">Nos gustaría compartir tu experiencia con el reintegro de Pata Amiga en nuestras redes sociales, para que más personas conozcan cómo funciona. Lo hacemos con todo el cuidado posible, y solo si tú quieres.</p>
+<p style="margin:0 0 14px"><strong>Si te animas, puedes elegir una de estas dos opciones:</strong></p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F2F9F8;border-radius:14px;margin:8px 0"><tr><td style="padding:15px 20px">
+<div style="font-size:15px;font-weight:bold;color:#0E8377;margin-bottom:4px">Opción A: un video cortito</div>
+<div style="font-size:14px;color:#3D524F;line-height:1.55">Grabado con tu celular, contándonos cómo fue tu experiencia al recibir el reintegro.</div>
+</td></tr></table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F2F9F8;border-radius:14px;margin:8px 0 16px"><tr><td style="padding:15px 20px">
+<div style="font-size:15px;font-weight:bold;color:#0E8377;margin-bottom:4px">Opción B: una nota de voz</div>
+<div style="font-size:14px;color:#3D524F;line-height:1.55">Un audio grabado con tu celular contándonos tu experiencia, con tu voz y como te salga.</div>
+</td></tr></table>
+<p style="margin:0 0 14px">No necesitas preparar nada especial ni decir algo en particular. Cuéntanos con tus propias palabras y de manera natural.</p>
+<p style="margin:0 0 14px">Para enviarlo, solo responde a este correo con el archivo adjunto. Si el video pesa demasiado, también puedes compartirnos una liga de Google Drive.</p>
+<p style="margin:0 0 14px"><strong>Tu permiso es lo primero.</strong> Si nos compartes tu video o audio, te pediremos autorización para publicarlo en las redes sociales de Pata Amiga. Tú decides cómo aparecer: con tu nombre completo, solo tu nombre de pila o de forma anónima. Si cambias de opinión, nos lo dices y lo retiramos. Puedes consultar cómo cuidamos tus datos en nuestro <a href="{{siteUrl}}/legales/aviso-de-privacidad" style="color:#0E8377">Aviso de Privacidad</a>.</p>
+<p style="margin:0 0 14px">Y si prefieres no hacerlo, responde simplemente «prefiero no» o no respondas. Es completamente válido y <strong>no cambia absolutamente nada</strong> con tu membresía ni con tus reintegros.</p>
+${BOTON("mailto:miembros@pataamiga.mx?subject=Testimonio%20de%20{{petName}}", "Responder a este correo")}
+<p style="margin:14px 0">Sin prisa, sin compromiso. Pase lo que pase, gracias por habernos dejado acompañarte a ti y a {{petName}}.</p>
+<p style="margin:0 0 4px">Con cariño,</p>
+<p style="margin:0">El equipo de Pata Amiga</p>
+<p style="margin:18px 0 0;color:#9AA8A5;font-size:11.5px">Escribimos este correo porque eres parte de Pata Amiga. Puedes contestarnos en <a href="mailto:miembros@pataamiga.mx" style="color:#9AA8A5">miembros@pataamiga.mx</a>.</p>`),
+  },
+  {
     key: "pet_approved",
     name: "Peludo aprobado",
     description: "Cuando el comité aprueba el perfil de un peludo.",
@@ -846,6 +940,9 @@ export const TEMPLATE_CATEGORY: Record<string, EmailCategoryId> = {
   reimbursement_approved: "reintegros",
   reimbursement_rejected: "reintegros",
   reimbursement_message: "reintegros",
+  reimbursement_paid: "reintegros",
+  testimonial_request: "reintegros",
+  testimonial_request_despedida: "reintegros",
   pet_approved: "mascotas",
   pet_rejected: "mascotas",
   pet_info_request: "mascotas",
