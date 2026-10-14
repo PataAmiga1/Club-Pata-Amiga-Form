@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePortal } from "@/lib/panel-guard";
 import { leerAjustesIA } from "@/lib/llm/gobierno";
@@ -126,7 +127,15 @@ export default async function NewsletterPage() {
 
   return (
     <div className="flex flex-col gap-4 px-5 py-6 md:px-[30px] md:py-[26px]">
-      <h1 className="font-display text-[24px] text-ink-title">Boletín</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-display text-[24px] text-ink-title">Boletín</h1>
+        <Link
+          href="/ventas/newsletter/audiencia"
+          className="rounded-full border border-teal px-4 py-1.5 text-[12.5px] font-bold text-teal"
+        >
+          Audiencia y bajas de correo →
+        </Link>
+      </div>
 
       <p className="text-[12.5px] leading-snug text-ink-secondary">
         Un tema <strong>sin brief no se puede investigar</strong>: tener a una

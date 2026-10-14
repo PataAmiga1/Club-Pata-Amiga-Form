@@ -1,6 +1,12 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { getResend, EMAIL_FROM } from "@/lib/resend";
 import { notifyTeam } from "@/lib/alerts";
+import {
+  darDeBajaCorreo,
+  encabezadosDeBaja,
+  tokensDeBaja,
+  urlDeBaja,
+} from "@/lib/correo/bajas";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -22,8 +28,6 @@ type Admin = ReturnType<typeof createAdminClient>;
  * cae a la mitad, la siguiente sigue donde iba sin repetir lo enviado.
  */
 
-const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-
 /** Resend acepta hasta 100 por lote. */
 const TAMANO_LOTE = 100;
 
@@ -44,7 +48,10 @@ export type ResumenEnvio = {
   terminada: boolean;
 };
 
-/** Los correos a los que NO se les escribe por DND del CRM. */
+/**
+ * Los correos a los que NO se les escribe: «no contactar» del CRM y la lista
+ * negra de `correo_bajas`.
+ */
 async function correosConDnd(admin: Admin): Promise<Set<string>> {
   const fuera = new Set<string>();
   try {
@@ -65,6 +72,19 @@ async function correosConDnd(admin: Admin): Promise<Set<string>> {
     console.error("[boletín] no se pudo leer el DND del CRM", err);
     throw new Error("No se pudo comprobar quién pidió no recibir correo.");
   }
+
+  // La lista negra de correo (bajas por liga, un clic, queja de spam o a mano).
+  // Misma regla: si no se puede leer, no se manda.
+  const { data: bajas, error } = await admin
+    .from("correo_bajas")
+    .select("email")
+    .not("baja_at", "is", null);
+  if (error) {
+    console.error("[boletín] no se pudo leer la lista negra", error.message);
+    throw new Error("No se pudo comprobar quién pidió no recibir correo.");
+  }
+  for (const b of bajas ?? []) fuera.add(String(b.email).trim().toLowerCase());
+
   return fuera;
 }
 
@@ -145,35 +165,68 @@ export async function enviarEdicion(
 
   // Solo lo que sigue pendiente: lo encolado y lo que falló pero todavía tiene
   // intentos. Lo ya enviado no se vuelve a tocar nunca.
-  const { data: pendientes } = await admin
+  const { data: pendientesTodos } = await admin
     .from("newsletter_sends")
-    .select(
-      "id, email, attempts, subscriber_id, newsletter_subscribers!subscriber_id(unsubscribe_token)",
-    )
+    .select("id, email, attempts")
     .eq("edition_id", editionId)
     .in("status", ["encolado", "fallido"])
     .lt("attempts", MAX_INTENTOS)
     .limit(TAMANO_LOTE);
 
+  // Entre que se armó la cola y esta pasada alguien pudo darse de baja: se
+  // vuelve a mirar la lista negra justo antes de mandar.
+  let fuera: Set<string>;
+  try {
+    fuera = await correosConDnd(admin);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "No se pudo leer la lista negra." };
+  }
+  const pendientes = (pendientesTodos ?? []).filter((p) => !fuera.has(p.email));
+  const recienDeBaja = (pendientesTodos ?? []).filter((p) => fuera.has(p.email));
+  if (recienDeBaja.length > 0) {
+    await admin
+      .from("newsletter_sends")
+      .update({ status: "baja", updated_at: new Date().toISOString() })
+      .in(
+        "id",
+        recienDeBaja.map((p) => p.id),
+      );
+    excluidos += recienDeBaja.length;
+  }
+
   let enviados = 0;
   let fallidos = 0;
 
-  if ((pendientes ?? []).length > 0) {
+  if (pendientes.length > 0) {
     const resend = getResend();
-    const lote = (pendientes ?? []).map((p) => {
-      const sus = Array.isArray(p.newsletter_subscribers)
-        ? p.newsletter_subscribers[0]
-        : p.newsletter_subscribers;
-      const token = sus?.unsubscribe_token ?? "";
-      return {
-        filaId: p.id,
-        email: p.email,
-        intentos: p.attempts ?? 0,
-        html: (edicion.html as string).replace(
-          /\{\{ENLACE_BAJA\}\}/g,
-          `${SITIO}/boletin/baja/${token}`,
-        ),
-      };
+    let tokens: Map<string, string>;
+    try {
+      tokens = await tokensDeBaja(
+        admin,
+        pendientes.map((p) => p.email),
+      );
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "No se pudieron armar las ligas de baja." };
+    }
+
+    const lote = pendientes.flatMap((p) => {
+      const token = tokens.get(p.email);
+      // Sin liga de baja no sale: es obligatoria en cada boletín.
+      if (!token) return [];
+      const liga = urlDeBaja(token);
+      const html = edicion.html as string;
+      const conLiga = html.includes("{{ENLACE_BAJA}}")
+        ? html.replace(/\{\{ENLACE_BAJA\}\}/g, liga)
+        : agregarPieDeBaja(html, liga);
+      return [
+        {
+          filaId: p.id,
+          email: p.email,
+          intentos: p.attempts ?? 0,
+          html: conLiga,
+          headers: encabezadosDeBaja(token),
+        },
+      ];
     });
 
     try {
@@ -183,6 +236,7 @@ export async function enviarEdicion(
           to: [l.email],
           subject: edicion.subject ?? "Boletín Club Pata Amiga",
           html: l.html,
+          headers: l.headers,
         })),
       );
 
@@ -285,7 +339,7 @@ export async function aplicarEventoResend(
 
   const { data: fila } = await admin
     .from("newsletter_sends")
-    .select("id, subscriber_id")
+    .select("id, subscriber_id, email")
     .eq("resend_id", resendId)
     .maybeSingle();
   // No es del boletín (puede ser un correo transaccional): se ignora sin ruido.
@@ -317,33 +371,21 @@ export async function aplicarEventoResend(
         .eq("id", fila.subscriber_id);
   }
 
-  // Una queja de spam es una baja en todo menos en el nombre.
-  if (evento.type === "email.complained" && fila.subscriber_id)
-    await admin
-      .from("newsletter_subscribers")
-      .update({ status: "baja", unsubscribed_at: new Date().toISOString() })
-      .eq("id", fila.subscriber_id);
+  // Una queja de spam es una baja en todo menos en el nombre: va a la lista
+  // negra de correo (que también da de baja del boletín y marca el CRM).
+  if (evento.type === "email.complained" && fila.email)
+    await darDeBajaCorreo(admin, fila.email, "queja_spam").catch((err) =>
+      console.error("[boletín] no se pudo registrar la queja como baja", err),
+    );
 
   return { aplicado: true, detalle: nuevo };
 }
 
-/** Da de baja por token. Sin sesión: el token ES la identificación. */
-export async function darDeBajaPorToken(
-  admin: Admin,
-  token: string,
-): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
-  const { data } = await admin
-    .from("newsletter_subscribers")
-    .select("id, email, status")
-    .eq("unsubscribe_token", token)
-    .maybeSingle();
-  if (!data) return { ok: false, error: "Ese enlace no corresponde a ninguna suscripción." };
-
-  if (data.status !== "baja")
-    await admin
-      .from("newsletter_subscribers")
-      .update({ status: "baja", unsubscribed_at: new Date().toISOString() })
-      .eq("id", data.id);
-
-  return { ok: true, email: data.email };
+/**
+ * Si la plantilla perdió el marcador {{ENLACE_BAJA}}, la liga se agrega igual al
+ * final: un boletín sin forma de darse de baja no sale.
+ */
+function agregarPieDeBaja(html: string, liga: string) {
+  const pie = `<p style="margin:24px 0 0;text-align:center;font:12px/1.5 Arial,sans-serif;color:#7A8A87">¿Ya no quieres recibir estos correos? <a href="${liga}" style="color:#7A8A87">Darme de baja</a></p>`;
+  return html.includes("</body>") ? html.replace("</body>", `${pie}</body>`) : html + pie;
 }

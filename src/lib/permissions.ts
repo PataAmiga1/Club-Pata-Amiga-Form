@@ -74,6 +74,20 @@ const CAPABILITIES = {
   "boletin.revision_vet": ["admin", "super_admin"],
   /** Editar las plantillas de marca del boletín. */
   "boletin.plantillas": ["gerente_ventas", "super_admin"],
+  /**
+   * Cargar la audiencia del boletín (sitio anterior + landings + miembros
+   * activos). Mete gente a una lista de envío masivo: solo administración.
+   */
+  "boletin.audiencia": ["admin", "super_admin"],
+
+  // --- Bajas de correo («lista negra») -------------------------------------
+  /** Ver quién pidió no recibir correos de mercadotecnia. */
+  "bajas.ver": ["ventas", "gerente_ventas", "admin", "super_admin"],
+  /**
+   * Dar de baja a alguien a mano o deshacer una baja (cuando la persona lo
+   * pide). Deshacer vuelve a escribirle a alguien que dijo que no: va al gerente.
+   */
+  "bajas.administrar": ["gerente_ventas", "admin", "super_admin"],
 
   // --- Calendario de contenido (sección 4) --------------------------------
   /** Redactar, editar borradores y enviar a revisión. */
