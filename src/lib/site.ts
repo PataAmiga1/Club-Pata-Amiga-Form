@@ -151,6 +151,15 @@ export type SiteAssetSlot = (typeof SITE_ASSET_SLOTS)[number]["slot"];
  */
 export const MATERIAL_SLOTS = [
   {
+    // 16-oct-2026: Efra aprobó la guía del programa y salió por correo a los
+    // embajadores; aquí queda para consultarla cuando quieran. Va primero
+    // porque es lo que explica cómo ganan.
+    slot: "material-guia-programa",
+    label: "Guía del programa de embajadores",
+    emoji: "🧭",
+    hint: "Cómo ganas tu comisión y tus meses de regalo, paso a paso.",
+  },
+  {
     // Las LLAVES no cambian: son las que apuntan al archivo ya subido en
     // site_assets. Solo cambian etiqueta y descripción, para que digan lo que
     // de verdad se descarga (30-sep-2026: se cargó el primer material real).
