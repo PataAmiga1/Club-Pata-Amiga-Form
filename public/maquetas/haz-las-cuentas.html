@@ -91,10 +91,7 @@ button, input { font: inherit; }
 .money:focus-within { border-color: var(--teal); }
 .money span { font-size: 1.5rem; font-weight: 700; color: var(--ink-title); }
 .money input { border: 0; outline: 0; width: 100%; font-size: 1.5rem; font-weight: 700; color: var(--ink-title); background: transparent; font-variant-numeric: tabular-nums; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { border: 1.5px solid var(--line-input); background: var(--white); color: var(--ink-body); border-radius: 99px; padding: 6px 14px; font-size: .9rem; font-weight: 500; cursor: pointer; }
-.chip:hover { border-color: var(--teal); }
-.chip[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: var(--white); }
+.scale { display: flex; justify-content: space-between; font-size: .78rem; color: var(--ink-3); margin-top: -4px; }
 .private { display: flex; gap: 10px; align-items: flex-start; background: var(--info-bg); color: var(--info-ink); border-radius: 12px; padding: 10px 12px; font-size: .88rem; }
 .private svg { flex: none; margin-top: 2px; }
 
@@ -296,13 +293,9 @@ footer img { height: 34px; width: auto; }
             <span aria-hidden="true">$</span>
             <input id="ingreso" inputmode="numeric" autocomplete="off" value="30,000" aria-describedby="ingresoHint">
           </label>
-          <div class="chips" role="group" aria-label="Montos rápidos">
-            <button type="button" class="chip" data-ingreso="18000" aria-pressed="false">$18,000</button>
-            <button type="button" class="chip" data-ingreso="30000" aria-pressed="true">$30,000</button>
-            <button type="button" class="chip" data-ingreso="50000" aria-pressed="false">$50,000</button>
-            <button type="button" class="chip" data-ingreso="80000" aria-pressed="false">$80,000</button>
-          </div>
-          <p class="hint" id="ingresoHint">El monto escrito es un ejemplo. Pon el tuyo (desde $18,000), aproximado basta.</p>
+          <input type="range" id="ingresoRango" min="16000" max="100000" step="1000" value="30000" aria-label="Ingreso mensual">
+          <div class="scale num" aria-hidden="true"><span>$16,000</span><span>$100,000 o más</span></div>
+          <p class="hint" id="ingresoHint">El monto es un ejemplo. Mueve la barra o escribe el tuyo (desde $16,000); aproximado basta.</p>
           <div class="private">
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H4a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 4 15h8a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12 6h-.5V4.5A3.5 3.5 0 0 0 8 1Zm-2 3.5a2 2 0 1 1 4 0V6H6V4.5Z"/></svg>
             <span>Tus datos están seguros: esta información solo se procesa en tu dispositivo y no la guardamos.</span>
@@ -428,7 +421,7 @@ footer img { height: 34px; width: auto; }
   // ---- Datos ---------------------------------------------------------------
   // Precios: rangos de la PM (9-oct-2026) y precios-investigacion-12-oct.md, subidos el
   // 17-oct-2026 (Pablo, tras la junta) a clínica privada urbana, nivel Petco: la consulta
-  // arranca en $500 y el ingreso en $18,000. Beneficios: plan $599 publicado en producción
+  // arranca en $500 y el ingreso en $16,000. Beneficios: plan $599 publicado en producción
   // (plan_versions.benefits, 6-oct-2026).
   // Orden: primero las emergencias (de la más común a la más cara), luego los cuidados cotidianos.
   const EVENTOS = [
@@ -441,7 +434,7 @@ footer img { height: 34px; width: auto; }
     { id: "vacuna", nombre: "Vacuna anual / Múltiple", rubro: "cu", min: 400, max: 1000, paso: 50, def: 650, on: false },
     { id: "estudios", nombre: "Estudios de laboratorio (sangre y orina)", rubro: "cu", min: 1200, max: 5000, paso: 100, def: 2500, on: false },
   ];
-  const MIN_INGRESO = 18000;
+  const MIN_INGRESO = 16000;
   const PLAN = { precio: 599,
     cuidados: { abreMes: 2, inicial: 500, tope: 2000, meses: 12 },    // día 31 = segundo mes
     emergencia: { abreMes: 7, inicial: 30000, tope: 60000, meses: 36 } };
@@ -495,11 +488,15 @@ footer img { height: 34px; width: auto; }
 
   // ---- Ingreso -------------------------------------------------------------
   const inp = el("ingreso");
-  const chips = document.querySelectorAll("[data-ingreso]");
-  function setIngreso(v, fromChip) {
+  // Barra de $16,000 a $100,000 (Pablo, 17-oct-2026). El campo acepta más de $100,000;
+  // la barra se queda al tope. Nada por debajo de $16,000.
+  const rango = el("ingresoRango");
+  const pintaRango = () => rango.style.setProperty("--p", ((rango.value - rango.min) / (rango.max - rango.min)) * 100 + "%");
+  function setIngreso(v, desdeBarra) {
     st.ingreso = Math.max(0, Math.min(10000000, v || 0));
-    if (fromChip) inp.value = st.ingreso.toLocaleString("es-MX");
-    chips.forEach((c) => c.setAttribute("aria-pressed", String(+c.dataset.ingreso === st.ingreso)));
+    if (desdeBarra) inp.value = st.ingreso.toLocaleString("es-MX");
+    else rango.value = Math.max(MIN_INGRESO, Math.min(+rango.max, st.ingreso));
+    pintaRango();
     render();
   }
   inp.addEventListener("input", () => {
@@ -507,11 +504,12 @@ footer img { height: 34px; width: auto; }
     inp.value = n ? n.toLocaleString("es-MX") : "";
     setIngreso(n);
   });
-  // Al salir del campo, nada por debajo del piso: la calculadora es para ingresos desde $18,000.
+  // Al salir del campo, nada por debajo del piso.
   inp.addEventListener("change", () => {
     if (st.ingreso < MIN_INGRESO) setIngreso(MIN_INGRESO, true);
   });
-  chips.forEach((c) => c.addEventListener("click", () => setIngreso(+c.dataset.ingreso, true)));
+  rango.addEventListener("input", () => setIngreso(+rango.value, true));
+  pintaRango();
 
   // ---- Con / sin membresía -------------------------------------------------
   function setCon(v) {
