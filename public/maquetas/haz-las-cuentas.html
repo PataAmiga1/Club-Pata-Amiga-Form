@@ -294,15 +294,15 @@ footer img { height: 34px; width: auto; }
           <div class="panel-head"><span class="n" aria-hidden="true">1</span><h2 id="p1">¿Cuál es tu ingreso mensual aproximado?</h2></div>
           <label class="money" for="ingreso">
             <span aria-hidden="true">$</span>
-            <input id="ingreso" inputmode="numeric" autocomplete="off" value="15,000" aria-describedby="ingresoHint">
+            <input id="ingreso" inputmode="numeric" autocomplete="off" value="30,000" aria-describedby="ingresoHint">
           </label>
           <div class="chips" role="group" aria-label="Montos rápidos">
-            <button type="button" class="chip" data-ingreso="8000" aria-pressed="false">$8,000</button>
-            <button type="button" class="chip" data-ingreso="15000" aria-pressed="true">$15,000</button>
-            <button type="button" class="chip" data-ingreso="25000" aria-pressed="false">$25,000</button>
-            <button type="button" class="chip" data-ingreso="40000" aria-pressed="false">$40,000</button>
+            <button type="button" class="chip" data-ingreso="18000" aria-pressed="false">$18,000</button>
+            <button type="button" class="chip" data-ingreso="30000" aria-pressed="true">$30,000</button>
+            <button type="button" class="chip" data-ingreso="50000" aria-pressed="false">$50,000</button>
+            <button type="button" class="chip" data-ingreso="80000" aria-pressed="false">$80,000</button>
           </div>
-          <p class="hint" id="ingresoHint">El monto escrito es un ejemplo. Pon el tuyo, aproximado basta.</p>
+          <p class="hint" id="ingresoHint">El monto escrito es un ejemplo. Pon el tuyo (desde $18,000), aproximado basta.</p>
           <div class="private">
             <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1a3.5 3.5 0 0 0-3.5 3.5V6H4a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 4 15h8a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 12 6h-.5V4.5A3.5 3.5 0 0 0 8 1Zm-2 3.5a2 2 0 1 1 4 0V6H6V4.5Z"/></svg>
             <span>Tus datos están seguros: esta información solo se procesa en tu dispositivo y no la guardamos.</span>
@@ -314,7 +314,7 @@ footer img { height: 34px; width: auto; }
           <div class="panel-head"><span class="n" aria-hidden="true">2</span><h2 id="p2">¿Qué le pasó a tu mascota?</h2></div>
           <p class="hint">Selecciona los servicios veterinarios y ajusta los montos según tu zona. Los precios son una referencia de los rangos promedio.</p>
           <div class="events" id="events"></div>
-          <p class="src">Precios de referencia calculados con promedios de clínicas y centros veterinarios (valores estimados para CDMX y Zona Metropolitana).</p>
+          <p class="src">Precios de referencia calculados con promedios de clínicas y hospitales veterinarios privados (valores estimados para CDMX y Zona Metropolitana).</p>
         </section>
 
         <div class="stepnav">
@@ -426,19 +426,22 @@ footer img { height: 34px; width: auto; }
 <script>
 (() => {
   // ---- Datos ---------------------------------------------------------------
-  // Precios: rangos promedio que mandó la PM (observaciones, 9-oct-2026). Beneficios: plan
-  // $599 publicado en producción (plan_versions.benefits, 6-oct-2026).
+  // Precios: rangos de la PM (9-oct-2026) y precios-investigacion-12-oct.md, subidos el
+  // 17-oct-2026 (Pablo, tras la junta) a clínica privada urbana, nivel Petco: la consulta
+  // arranca en $500 y el ingreso en $18,000. Beneficios: plan $599 publicado en producción
+  // (plan_versions.benefits, 6-oct-2026).
   // Orden: primero las emergencias (de la más común a la más cara), luego los cuidados cotidianos.
   const EVENTOS = [
-    { id: "emergencia", nombre: "Emergencia general (consulta, suero y medicamentos)", rubro: "em", min: 1500, max: 6000, paso: 100, def: 3000, on: false },
-    { id: "lavado", nombre: "Ingesta de sustancia extraña (requiere atención urgente)", rubro: "em", min: 2800, max: 9500, paso: 100, def: 5700, on: true },
-    { id: "fractura", nombre: "Fractura que requiere intervención quirúrgica", rubro: "em", min: 9000, max: 40500, paso: 500, def: 15000, on: false },
-    { id: "cirugia", nombre: "Cirugía de emergencia (abdomen, cesárea u obstrucción)", rubro: "em", min: 8000, max: 35000, paso: 500, def: 15000, on: false },
-    { id: "hospital", nombre: "Hospitalización (2 a 3 días)", rubro: "em", min: 2500, max: 15000, paso: 500, def: 6000, on: false },
-    { id: "consulta", nombre: "Consulta general", rubro: "cu", min: 250, max: 800, paso: 10, def: 400, on: true },
-    { id: "vacuna", nombre: "Vacuna anual / Múltiple", rubro: "cu", min: 250, max: 700, paso: 10, def: 450, on: false },
-    { id: "estudios", nombre: "Estudios de laboratorio (sangre y orina)", rubro: "cu", min: 800, max: 4500, paso: 100, def: 2000, on: false },
+    { id: "emergencia", nombre: "Emergencia general (consulta, suero y medicamentos)", rubro: "em", min: 2000, max: 8000, paso: 100, def: 3500, on: false },
+    { id: "lavado", nombre: "Ingesta de sustancia extraña (requiere atención urgente)", rubro: "em", min: 3500, max: 12000, paso: 100, def: 6500, on: true },
+    { id: "fractura", nombre: "Fractura que requiere intervención quirúrgica", rubro: "em", min: 15000, max: 45000, paso: 500, def: 22000, on: false },
+    { id: "cirugia", nombre: "Cirugía de emergencia (abdomen, cesárea u obstrucción)", rubro: "em", min: 10000, max: 40000, paso: 500, def: 18000, on: false },
+    { id: "hospital", nombre: "Hospitalización (2 a 3 días)", rubro: "em", min: 4500, max: 15000, paso: 500, def: 7500, on: false },
+    { id: "consulta", nombre: "Consulta general", rubro: "cu", min: 500, max: 1000, paso: 50, def: 600, on: true },
+    { id: "vacuna", nombre: "Vacuna anual / Múltiple", rubro: "cu", min: 400, max: 1000, paso: 50, def: 650, on: false },
+    { id: "estudios", nombre: "Estudios de laboratorio (sangre y orina)", rubro: "cu", min: 1200, max: 5000, paso: 100, def: 2500, on: false },
   ];
+  const MIN_INGRESO = 18000;
   const PLAN = { precio: 599,
     cuidados: { abreMes: 2, inicial: 500, tope: 2000, meses: 12 },    // día 31 = segundo mes
     emergencia: { abreMes: 7, inicial: 30000, tope: 60000, meses: 36 } };
@@ -456,7 +459,7 @@ footer img { height: 34px; width: auto; }
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ---- Estado --------------------------------------------------------------
-  const st = { ingreso: 15000, con: false, meses: 8, ev: {} };
+  const st = { ingreso: 30000, con: false, meses: 8, ev: {} };
   EVENTOS.forEach((e) => (st.ev[e.id] = { on: e.on, precio: e.def }));
 
   // ---- Tarjetas de eventos -------------------------------------------------
@@ -503,6 +506,10 @@ footer img { height: 34px; width: auto; }
     const n = +inp.value.replace(/[^\d]/g, "");
     inp.value = n ? n.toLocaleString("es-MX") : "";
     setIngreso(n);
+  });
+  // Al salir del campo, nada por debajo del piso: la calculadora es para ingresos desde $18,000.
+  inp.addEventListener("change", () => {
+    if (st.ingreso < MIN_INGRESO) setIngreso(MIN_INGRESO, true);
   });
   chips.forEach((c) => c.addEventListener("click", () => setIngreso(+c.dataset.ingreso, true)));
 
