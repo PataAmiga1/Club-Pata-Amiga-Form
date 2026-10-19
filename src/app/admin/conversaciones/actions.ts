@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendChannelMessage, type Channel } from "@/lib/channels/meta";
+import { comprobarVentana } from "@/lib/channels/ventana";
 
 /** Guard local (mismo criterio que requireAdmin de admin/actions.ts). */
 async function requireAdmin() {
@@ -72,6 +73,11 @@ export async function sendAdminMessage(conversationId: string, text: string) {
     .single();
   if (!conv) throw new Error("Conversación no encontrada");
 
+  // Ventana de 24 h de Meta: fuera de ella no se guarda ni se intenta enviar.
+  // La misma regla que la bandeja de ventas (src/lib/channels/ventana.ts).
+  const ventanaCerrada = await comprobarVentana(admin, conversationId, conv.channel);
+  if (ventanaCerrada) return { sent: false, error: ventanaCerrada };
+
   await admin.from("channel_messages").insert({
     conversation_id: conversationId,
     direction: "out",
@@ -91,7 +97,7 @@ export async function sendAdminMessage(conversationId: string, text: string) {
     clean,
   );
   revalidatePath("/admin/conversaciones");
-  return { sent };
+  return { sent, error: null as string | null };
 }
 
 // ===== Promociones y material rotativo de los agentes IA =====

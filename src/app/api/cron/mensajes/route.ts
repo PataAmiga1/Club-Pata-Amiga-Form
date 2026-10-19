@@ -4,6 +4,7 @@ import { sendChannelMessage } from "@/lib/channels/meta";
 import { enviarCorreo } from "@/lib/channels/email";
 import { emitEvent } from "@/lib/crm/events";
 import { uno } from "@/lib/crm/embed";
+import { comprobarVentana } from "@/lib/channels/ventana";
 
 /**
  * Despachador de los mensajes programados ("le escribo el lunes a las 9").
@@ -55,12 +56,18 @@ export async function GET(request: Request) {
           .eq("id", msg.id);
       else error = res.error;
     } else if (["facebook", "instagram", "whatsapp"].includes(hilo.channel)) {
-      const salio = await sendChannelMessage(
-        hilo.channel as "facebook" | "instagram" | "whatsapp",
-        hilo.external_user_id,
-        msg.content,
-      );
-      if (!salio) error = "El conector del canal no está configurado";
+      // La ventana de 24 h se vuelve a revisar al SALIR (no basta con que
+      // estuviera abierta al programar): si se cerró, el mensaje queda con su
+      // motivo; si la persona volvió a escribir entretanto, sí sale.
+      error = await comprobarVentana(admin, msg.conversation_id, hilo.channel);
+      if (!error) {
+        const salio = await sendChannelMessage(
+          hilo.channel as "facebook" | "instagram" | "whatsapp",
+          hilo.external_user_id,
+          msg.content,
+        );
+        if (!salio) error = "El conector del canal no está configurado";
+      }
     } else {
       error = `El canal ${hilo.channel} no admite envíos`;
     }

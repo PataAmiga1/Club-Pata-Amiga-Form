@@ -17,6 +17,8 @@ import {
   votarMensaje,
 } from "@/app/ventas/conversaciones/actions";
 import { CANAL_SELLO } from "./ListaConversaciones";
+// La regla de las 24 h vive en un solo lugar: la misma que aplica el servidor.
+import { ventanaAbierta } from "@/lib/channels/ventana";
 
 export type PlantillaResumen = {
   id: string;
@@ -90,13 +92,6 @@ function etiquetaDia(iso: string) {
   if (d === hoy.toISOString().slice(0, 10)) return "Hoy";
   if (d === ayer.toISOString().slice(0, 10)) return "Ayer";
   return FECHA_LARGA.format(new Date(iso));
-}
-
-/** ¿Se puede escribir texto libre? Meta cierra la ventana a las 24 h. */
-function ventanaAbierta(canal: string, ultimoEntrante: string | null) {
-  if (!["whatsapp", "instagram", "facebook"].includes(canal)) return true;
-  if (!ultimoEntrante) return false;
-  return Date.now() - new Date(ultimoEntrante).getTime() < 24 * 60 * 60 * 1000;
 }
 
 /**

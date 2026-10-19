@@ -6,6 +6,7 @@ import { requireCapability } from "@/lib/panel-guard";
 import { emitEvent } from "@/lib/crm/events";
 import { sendChannelMessage, sendWhatsAppTemplate } from "@/lib/channels/meta";
 import { enviarCorreo } from "@/lib/channels/email";
+import { comprobarVentana } from "@/lib/channels/ventana";
 import {
   renderizar,
   valoresDelContacto,
@@ -286,6 +287,13 @@ export async function enviarMensaje(
         error: `Este contacto pidió no ser contactado por ${dnd.todos ? "ningún canal" : canalDnd}.`,
       };
   }
+
+  // Ventana de 24 h de Meta: fuera de ella no hay texto libre (sí plantillas,
+  // que van por enviarPlantillaWhatsApp). Antes solo lo bloqueaba la interfaz.
+  // También aplica a los programados: el despachador lo vuelve a revisar al
+  // enviarlo, por si la persona escribió de nuevo entretanto.
+  const ventanaCerrada = await comprobarVentana(admin, conversationId, hilo.channel);
+  if (ventanaCerrada) return { error: ventanaCerrada };
 
   const { data: guardado, error: errorGuardar } = await admin
     .from("channel_messages")
