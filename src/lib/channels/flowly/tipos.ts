@@ -34,6 +34,8 @@ export type MensajeFlowly = {
   actor: string | null;
   attachment: AdjuntoFlowly | null;
   attachments: AdjuntoFlowly[];
+  /** Solo entrantes: el anuncio/enlace que Meta adjuntó a ESTE mensaje (§4.5). */
+  referral: ReferralFlowly | null;
 };
 
 export type ConversacionFlowly = {
@@ -48,6 +50,10 @@ export type ConversacionFlowly = {
   agent_enabled_override: boolean | null;
   taken_over_by: string | null;
   taken_over_at: string | null;
+  /** El primer anuncio/enlace que trajo a la persona. Nunca se reemplaza (§4.5). */
+  first_referral: ReferralFlowly | null;
+  /** El más reciente (por received_at). Igual al primero hasta que llegue otro. */
+  last_referral: ReferralFlowly | null;
 };
 
 export type Elegibilidad = {
@@ -87,20 +93,38 @@ export type PlantillaFlowly = {
 };
 
 /**
- * Atribución de anuncio ya normalizada (la nuestra, no la de Flowly). La forma
- * cruda de Flowly todavía es provisional: se traduce en UN solo lugar,
- * `mapearReferral` en mapeo.ts.
+ * Atribución de anuncio, publicación o enlace (contrato §4.5): el objeto
+ * `referral` que Flowly normaliza para los tres canales. Todas las llaves
+ * existen siempre; lo que Meta no mandó viene null. Se guarda con esta misma
+ * forma (snake_case) en first_referral / last_referral y en
+ * custom_fields.anuncio. Se lee en UN solo lugar: `mapearReferral`.
+ *
+ * Las URL de imagen/video/miniatura son del CDN de Meta, firmadas y de vida
+ * corta: sirven para mostrarse un rato, nunca como enlace permanente.
+ * `ctwa_clid` es para la API de Conversiones de Meta; no se le muestra al equipo.
  */
-export type AtribucionAnuncio = {
-  sourceType: string | null;
-  sourceId: string | null;
-  sourceUrl: string | null;
+export type ReferralFlowly = {
+  channel: CanalFlowly | null;
+  received_at: string | null;
+  message_id: string | null;
+  /** ad · post · link · otra palabra de Meta en minúsculas · unknown */
+  source_type: string;
+  meta_source: string | null;
+  source_id: string | null;
+  ad_id: string | null;
+  source_url: string | null;
   headline: string | null;
   body: string | null;
-  mediaType: string | null;
-  ctwaClid: string | null;
-  adId: string | null;
+  media_type: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  thumbnail_url: string | null;
+  ctwa_clid: string | null;
+  welcome_message: string | null;
   ref: string | null;
+  referral_type: string | null;
+  post_id: string | null;
+  product_id: string | null;
 };
 
 /** Sobre de cada entrega del webhook. */
@@ -117,5 +141,4 @@ export type DatosMensaje = {
   conversation_id: string;
   connection_id: string | null;
   message: MensajeFlowly;
-  referral: AtribucionAnuncio | null;
 };
