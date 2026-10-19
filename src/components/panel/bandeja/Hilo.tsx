@@ -69,6 +69,8 @@ export type CabezaHilo = {
   pospuestoHasta: string | null;
   /** Fecha del último mensaje entrante, para la ventana de 24 h de Meta. */
   ultimoEntrante: string | null;
+  /** Llegó por un anuncio (clic a WhatsApp/Messenger/Instagram). */
+  anuncio?: { titular: string | null } | null;
 };
 
 const HORA = new Intl.DateTimeFormat("es-MX", {
@@ -235,6 +237,15 @@ export function Hilo({
 
       {/* Estado de la IA / atención */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border-divider bg-cream/60 px-4 py-2">
+        {cabeza.anuncio && (
+          <span
+            title={cabeza.anuncio.titular ?? undefined}
+            className="max-w-full truncate rounded-full bg-teal/10 px-2.5 py-1 text-[11px] font-bold text-teal-deep"
+          >
+            📣 Llegó por anuncio
+            {cabeza.anuncio.titular ? ` · ${cabeza.anuncio.titular}` : ""}
+          </span>
+        )}
         {cabeza.necesitaAtencion && (
           <span className="rounded-full bg-pink/15 px-2.5 py-1 text-[11px] font-bold text-pink">
             ❗ Marcada para atención humana

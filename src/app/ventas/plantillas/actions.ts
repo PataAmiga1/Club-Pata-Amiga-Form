@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireCapability } from "@/lib/panel-guard";
+import { sincronizarPlantillasFlowly } from "@/lib/channels/flowly/plantillas";
 
 /**
  * Alta y edición de las plantillas de respuesta uno a uno.
@@ -67,4 +68,21 @@ export async function archivarPlantilla(id: string, archivar: boolean) {
     .eq("id", id);
   revalidar();
   return { ok: true as const };
+}
+
+/**
+ * Trae de Flowly las plantillas de WhatsApp (las crea su operador y las aprueba
+ * Meta). Su estado no llega por webhook: se sincroniza a mano o con la tarea
+ * de conciliación.
+ */
+export async function sincronizarPlantillasDeFlowly() {
+  await requireCapability("canales.administrar");
+  const admin = createAdminClient();
+  const res = await sincronizarPlantillasFlowly(admin);
+  revalidar();
+  if (!res.ok) return { error: res.error };
+  return {
+    ok: true as const,
+    aviso: `Listo: ${res.total} plantilla(s) de Flowly, ${res.aprobadas} aprobada(s) y enviables.`,
+  };
 }
