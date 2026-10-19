@@ -203,7 +203,10 @@ async function handleIncoming(msg: IncomingMessage) {
     conversation_id: conv.id,
     direction: "in",
     sender: "contact",
+    // Fotos, notas de voz, documentos…: el texto trae la etiqueta legible
+    // («[Imagen]») y aquí queda el detalle para poder descargarlo.
     content: msg.text,
+    attachments: msg.adjuntos,
     external_message_id: msg.externalMessageId,
   });
   if (msgError) {
