@@ -1,4 +1,13 @@
 import { createHmac, timingSafeEqual } from "crypto";
+// Con extensión .ts: así también lo cargan las pruebas con node --test.
+import {
+  ETIQUETA,
+  etiquetaContactos,
+  etiquetaDocumento,
+  etiquetaPorTipo,
+  etiquetaUbicacion,
+  unir,
+} from "./etiquetas.ts";
 
 /**
  * Conector de canales de Meta (Messenger, Instagram DM, WhatsApp Cloud API).
@@ -237,14 +246,6 @@ export type IncomingMessage = {
   adjuntos: AdjuntoEntrante[];
 };
 
-/** Quita lo vacío y une con espacio: «[Imagen] mira esto». */
-function unir(...partes: (string | null | undefined)[]): string {
-  return partes
-    .map((p) => (typeof p === "string" ? p.trim() : ""))
-    .filter(Boolean)
-    .join(" ");
-}
-
 function texto(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : undefined;
 }
@@ -254,12 +255,7 @@ function numero(v: unknown): number | undefined {
   return typeof n === "number" && Number.isFinite(n) ? n : undefined;
 }
 
-function etiquetaUbicacion(nombre?: string, direccion?: string): string {
-  const detalle = unir(nombre, direccion && direccion !== nombre ? direccion : undefined);
-  return detalle ? `[Ubicación: ${detalle}]` : "[Ubicación]";
-}
-
-const NO_SE_PUEDE_MOSTRAR = "[Mensaje que no se puede mostrar]";
+const NO_SE_PUEDE_MOSTRAR = ETIQUETA.noSePuedeMostrar;
 
 /**
  * Un mensaje de WhatsApp a texto legible + adjunto. Devuelve null para lo que
@@ -285,21 +281,21 @@ function normalizarWhatsApp(msg: any): { text: string; adjuntos: AdjuntoEntrante
       return body ? { text: body, adjuntos: [] } : null;
     }
     case "image":
-      return { text: unir("[Imagen]", msg.image?.caption), adjuntos: [media(msg.image)] };
+      return { text: unir(ETIQUETA.imagen, msg.image?.caption), adjuntos: [media(msg.image)] };
     case "sticker":
-      return { text: "[Sticker]", adjuntos: [media(msg.sticker)] };
+      return { text: ETIQUETA.sticker, adjuntos: [media(msg.sticker)] };
     case "audio":
       // `voice: true` = nota de voz grabada en el chat; `false` = archivo de audio.
       return {
-        text: msg.audio?.voice === false ? "[Audio]" : "[Nota de voz]",
+        text: etiquetaPorTipo("audio", { voz: msg.audio?.voice !== false }),
         adjuntos: [media(msg.audio)],
       };
     case "video":
-      return { text: unir("[Video]", msg.video?.caption), adjuntos: [media(msg.video)] };
+      return { text: unir(ETIQUETA.video, msg.video?.caption), adjuntos: [media(msg.video)] };
     case "document": {
       const nombre = texto(msg.document?.filename);
       return {
-        text: unir(nombre ? `[Documento: ${nombre}]` : "[Documento]", msg.document?.caption),
+        text: unir(etiquetaDocumento(nombre), msg.document?.caption),
         adjuntos: [media(msg.document)],
       };
     }
@@ -325,9 +321,7 @@ function normalizarWhatsApp(msg: any): { text: string; adjuntos: AdjuntoEntrante
         .map((c: any) => texto(c?.name?.formatted_name))
         .filter((n: string | undefined): n is string => Boolean(n));
       return {
-        text: nombres.length
-          ? `[Contacto compartido: ${nombres.join(", ")}]`
-          : "[Contacto compartido]",
+        text: etiquetaContactos(nombres),
         adjuntos: [],
       };
     }
@@ -335,7 +329,7 @@ function normalizarWhatsApp(msg: any): { text: string; adjuntos: AdjuntoEntrante
       // Botón de respuesta rápida de una plantilla: vale lo que dice el botón.
       const t = texto(msg.button?.text) ?? texto(msg.button?.payload);
       return {
-        text: t ?? "[Botón]",
+        text: t ?? ETIQUETA.boton,
         adjuntos: msg.button?.payload
           ? [{ origen: "meta", tipo, payload: String(msg.button.payload) }]
           : [],
@@ -345,7 +339,7 @@ function normalizarWhatsApp(msg: any): { text: string; adjuntos: AdjuntoEntrante
       const r = msg.interactive?.button_reply ?? msg.interactive?.list_reply;
       const t = texto(r?.title);
       return {
-        text: t ?? "[Botón]",
+        text: t ?? ETIQUETA.boton,
         adjuntos: r?.id ? [{ origen: "meta", tipo, payload: String(r.id) }] : [],
       };
     }
@@ -371,14 +365,14 @@ function normalizarAdjuntoMessenger(a: any): { etiqueta: string; adjunto: Adjunt
   switch (tipo) {
     case "image":
       // Messenger manda los stickers como imagen con sticker_id.
-      return { etiqueta: p.sticker_id ? "[Sticker]" : "[Imagen]", adjunto: base };
+      return { etiqueta: p.sticker_id ? ETIQUETA.sticker : ETIQUETA.imagen, adjunto: base };
     case "audio":
-      return { etiqueta: "[Nota de voz]", adjunto: base };
+      return { etiqueta: ETIQUETA.notaDeVoz, adjunto: base };
     case "video":
-      return { etiqueta: "[Video]", adjunto: base };
+      return { etiqueta: ETIQUETA.video, adjunto: base };
     case "ig_reel":
     case "reel":
-      return { etiqueta: "[Reel compartido]", adjunto: base };
+      return { etiqueta: ETIQUETA.reel, adjunto: base };
     case "file": {
       let nombre = "";
       try {
@@ -388,7 +382,7 @@ function normalizarAdjuntoMessenger(a: any): { etiqueta: string; adjunto: Adjunt
       }
       const valido = /\.[a-z0-9]{2,5}$/i.test(nombre);
       return {
-        etiqueta: valido ? `[Documento: ${nombre}]` : "[Documento]",
+        etiqueta: etiquetaDocumento(valido ? nombre : null),
         adjunto: { ...base, ...(valido ? { filename: nombre } : {}) },
       };
     }
@@ -406,11 +400,11 @@ function normalizarAdjuntoMessenger(a: any): { etiqueta: string; adjunto: Adjunt
       };
     }
     case "story_mention":
-      return { etiqueta: "[Te mencionó en su historia]", adjunto: base };
+      return { etiqueta: ETIQUETA.mencionHistoria, adjunto: base };
     case "share":
-      return { etiqueta: "[Publicación compartida]", adjunto: base };
+      return { etiqueta: ETIQUETA.publicacion, adjunto: base };
     default:
-      return { etiqueta: "[Adjunto]", adjunto: base };
+      return { etiqueta: ETIQUETA.adjunto, adjunto: base };
   }
 }
 
@@ -444,7 +438,7 @@ export function parseMetaWebhook(body: any): IncomingMessage[] {
           externalUserId,
           externalMessageId: event.postback.mid ?? null,
           displayName: null,
-          text: t ?? "[Botón]",
+          text: t ?? ETIQUETA.boton,
           kind: "postback",
           adjuntos: event.postback.payload
             ? [{ origen: "meta", tipo: "postback", payload: String(event.postback.payload) }]
