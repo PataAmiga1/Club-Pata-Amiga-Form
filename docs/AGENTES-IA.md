@@ -96,8 +96,16 @@ NEXT_PUBLIC_SITE_URL=https://pataamiga.mx   # el agente de ventas manda a la gen
 
 Sin estas variables, el webhook igual guarda los mensajes en la bandeja
 (`/admin/conversaciones`) y la IA genera la respuesta, pero **no se envía** al
-canal y la bandeja lo avisa. En desarrollo, sin `META_APP_SECRET` la firma de
-los webhooks no se verifica (se avisa en logs); en producción es obligatoria.
+canal y la bandeja lo avisa.
+
+**`META_APP_SECRET` es obligatorio para recibir mensajes.** Sin él, el webhook
+rechaza TODO con 401 (falla cerrado) y lo avisa una vez en los logs: un POST sin
+firma crearía contactos y oportunidades y haría gastar al agente de ventas. La
+única excepción es el desarrollo local: con `NODE_ENV` distinto de
+`production` **y** `META_WEBHOOK_ALLOW_UNSIGNED=1` se aceptan sin firma. En
+Vercel (producción y pruebas) `NODE_ENV` es `production`, así que ahí la
+excepción no aplica nunca. El alta del webhook (GET con `hub.verify_token`) no
+depende del secreto y sigue igual.
 
 ### 2.4 Reglas de Meta a tener en cuenta
 

@@ -26,18 +26,55 @@ export function channelConfigured(channel: Channel): boolean {
 }
 
 /**
+ * ¿Se permite aceptar webhooks SIN firma? Solo en desarrollo local y solo si
+ * se pide a propósito con META_WEBHOOK_ALLOW_UNSIGNED=1. En Vercel (producción
+ * Y pruebas) NODE_ENV es "production", así que ahí nunca aplica.
+ */
+export function webhookSinFirmaPermitido(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.META_WEBHOOK_ALLOW_UNSIGNED === "1"
+  );
+}
+
+// Para avisar una sola vez por proceso y no inundar los logs con cada POST.
+let avisoSinSecretoDado = false;
+
+/** Solo para pruebas: reinicia el aviso de "una sola vez". */
+export function _reiniciarAvisoFirma() {
+  avisoSinSecretoDado = false;
+}
+
+/**
  * Verifica la firma X-Hub-Signature-256 de un webhook de Meta.
- * Sin META_APP_SECRET configurado (desarrollo) acepta todo y avisa en logs.
+ *
+ * Falla CERRADO: sin META_APP_SECRET se rechaza todo. Antes aceptaba todo, y
+ * como el webhook crea contactos y oportunidades y despierta al agente de
+ * ventas (gasto de Anthropic), cualquiera podía mandarle POSTs sin firmar.
+ * La única excepción es el desarrollo local con opt-in explícito
+ * (ver webhookSinFirmaPermitido).
  */
 export function verifyMetaSignature(rawBody: string, signatureHeader: string | null): boolean {
   const secret = process.env.META_APP_SECRET;
   if (!secret) {
-    console.warn("[canales] META_APP_SECRET no configurado — firma de webhook SIN verificar (solo dev)");
-    return true;
+    const permitido = webhookSinFirmaPermitido();
+    if (!avisoSinSecretoDado) {
+      avisoSinSecretoDado = true;
+      if (permitido)
+        console.warn(
+          "[canales] META_APP_SECRET no configurado — webhook SIN verificar porque META_WEBHOOK_ALLOW_UNSIGNED=1 (solo desarrollo local)",
+        );
+      else
+        console.error(
+          "[canales] META_APP_SECRET no configurado — se RECHAZAN todos los webhooks de Meta hasta configurarlo",
+        );
+    }
+    return permitido;
   }
   if (!signatureHeader?.startsWith("sha256=")) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   const received = signatureHeader.slice("sha256=".length);
+  if (!/^[0-9a-f]{64}$/i.test(received)) return false;
   try {
     return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(received, "hex"));
   } catch {

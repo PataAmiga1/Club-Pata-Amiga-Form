@@ -87,6 +87,8 @@ export async function GET(request: Request) {
 /** Mensajes entrantes. Siempre respondemos 200 rápido para que Meta no reintente de más. */
 export async function POST(request: Request) {
   const rawBody = await request.text();
+  // Falla cerrado: sin META_APP_SECRET se rechaza todo (salvo desarrollo local
+  // con META_WEBHOOK_ALLOW_UNSIGNED=1). Ver verifyMetaSignature.
   if (!verifyMetaSignature(rawBody, request.headers.get("x-hub-signature-256"))) {
     return new Response("Firma inválida", { status: 401 });
   }
