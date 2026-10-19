@@ -261,7 +261,12 @@ export function InboxClient({ initial }: { initial: Conversation[] }) {
     setSending(true);
     setNotice(null);
     try {
-      const { sent } = await sendAdminMessage(selected.id, draft.trim());
+      const { sent, error } = await sendAdminMessage(selected.id, draft.trim());
+      if (error) {
+        // Ventana de 24 h cerrada: se conserva el borrador y se explica por qué.
+        setNotice(error);
+        return;
+      }
       setDraft("");
       await loadMessages(selected.id);
       if (!sent) {
