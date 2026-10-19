@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendChannelMessage } from "@/lib/channels/meta";
 import { enviarCorreo } from "@/lib/channels/email";
+import { enviarTextoPorFlowly } from "@/lib/channels/flowly/bandeja";
 import { emitEvent } from "@/lib/crm/events";
 import { uno } from "@/lib/crm/embed";
 import { comprobarVentana } from "@/lib/channels/ventana";
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   const { data: pendientes } = await admin
     .from("channel_messages")
     .select(
-      "id, conversation_id, content, channel_conversations(channel, external_user_id, contact_id)",
+      "id, conversation_id, content, author_id, channel_conversations(channel, external_user_id, contact_id, provider, flowly_conversation_id)",
     )
     .not("scheduled_for", "is", null)
     .is("sent_at", null)
@@ -55,6 +56,17 @@ export async function GET(request: Request) {
           .update({ message_id: res.messageId })
           .eq("id", msg.id);
       else error = res.error;
+    } else if (hilo.provider === "flowly") {
+      // Hilo de Flowly: sale por Flowly con la llave de la fila, así que si
+      // esta tarea corre dos veces sobre el mismo mensaje no se duplica.
+      const res = await enviarTextoPorFlowly(admin, {
+        conversationId: msg.conversation_id,
+        flowlyConversationId: hilo.flowly_conversation_id,
+        filaId: msg.id,
+        texto: msg.content,
+        userId: msg.author_id,
+      });
+      if (!res.ok) error = res.error;
     } else if (["facebook", "instagram", "whatsapp"].includes(hilo.channel)) {
       // La ventana de 24 h se vuelve a revisar al SALIR (no basta con que
       // estuviera abierta al programar): si se cerró, el mensaje queda con su

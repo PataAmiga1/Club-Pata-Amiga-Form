@@ -5,6 +5,7 @@ import {
   EditorPlantillas,
   type PlantillaFila,
 } from "@/components/panel/bandeja/EditorPlantillas";
+import { SincronizarFlowly } from "@/components/panel/bandeja/SincronizarFlowly";
 
 export const metadata = { title: "Plantillas · Portal de ventas" };
 
@@ -20,7 +21,7 @@ export default async function PlantillasPage() {
       .order("usos", { ascending: false }),
     admin
       .from("whatsapp_templates")
-      .select("meta_name, category, body_preview, status, language")
+      .select("meta_name, category, body_preview, status, language, provider, supported")
       .order("meta_name"),
   ]);
 
@@ -76,6 +77,7 @@ export default async function PlantillasPage() {
           solo se consultan: el compositor ofrece las que estén{" "}
           <strong>aprobadas</strong> y deja las demás apagadas.
         </p>
+        {session.can["canales.administrar"] && <SincronizarFlowly />}
         {(whatsapp ?? []).map((p) => (
           <div
             key={p.meta_name}
@@ -86,6 +88,8 @@ export default async function PlantillasPage() {
             </span>
             <span className="text-[10.5px] text-ink-tertiary">
               {p.language} · {p.category}
+              {p.provider === "flowly" ? " · Flowly" : ""}
+              {p.supported === false ? " · no se puede enviar desde la plataforma" : ""}
             </span>
             <span
               className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${
