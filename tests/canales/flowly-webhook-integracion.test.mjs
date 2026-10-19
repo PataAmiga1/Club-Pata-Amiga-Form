@@ -17,8 +17,10 @@ const pendiente = { todo: 'requiere Supabase local + next start (ver encabezado)
 test('message.received de texto → conversación provider=flowly, mensaje, contacto, primer_mensaje y oportunidad en nuevo_prospecto', pendiente);
 test('la misma entrega dos veces (mismo Flowly-Delivery) → un solo mensaje y una sola corrida del LLM', pendiente);
 test('número de WhatsApp con hilo viejo del camino directo → se adopta ese hilo, no se duplica', pendiente);
-test('message.received con referral → ad_referral en el hilo, contacts.source=whatsapp_ad y custom_fields.anuncio en contacto y oportunidad', pendiente);
-test('message.received de audio sin texto → placeholder "[🎤 Nota de voz]", needs_attention y la IA no responde', pendiente);
+test('message.received con referral → first_referral y last_referral en el hilo, contacts.source=whatsapp_ad y custom_fields.anuncio en contacto y oportunidad', pendiente);
+test('conversation.updated con first_referral antes de que la persona escriba (Messenger) → al llegar su primer mensaje queda atribuido', pendiente);
+test('segundo anuncio → solo cambia last_referral; first_referral y el CRM se quedan con el primero', pendiente);
+test('message.received de audio sin texto → «[Nota de voz]» y la IA pide la pregunta por escrito (regla 4 del prompt)', pendiente);
 test('message.sent con actor native_app → mensaje del equipo con external_actor=native_app y human_takeover=true', pendiente);
 test('message.sent de nuestro propio actor → no se duplica; message.updated amarra delivered/read', pendiente);
 test('conversation.updated viejo (created_at anterior al aplicado) → no pisa el estado', pendiente);

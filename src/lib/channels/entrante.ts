@@ -21,12 +21,15 @@ export const IDENTIDAD_POR_CANAL: Record<string, "instagram" | "messenger" | "wh
   whatsapp: "whatsapp",
 };
 
-/** Atribución de anuncio en la forma en que se guarda (ver flowly/mapeo.ts). */
+/**
+ * Atribución en la forma en que se guarda: el `referral` de Flowly (§4.5) tal
+ * cual (ver ReferralFlowly en flowly/tipos.ts).
+ */
 export type AnuncioGuardado = {
+  source_type: string;
   headline: string | null;
   ad_id: string | null;
   ctwa_clid: string | null;
-  source_url: string | null;
   [k: string]: unknown;
 };
 
@@ -52,6 +55,8 @@ export async function vincularContactoDeConversacion(
     fuente?: string;
     /** Si llegó por anuncio, queda en el contacto y en la oportunidad. */
     anuncio?: AnuncioGuardado | null;
+    /** Texto de la nota del anuncio («Llegó por anuncio · titular»). */
+    resumenAnuncio?: string | null;
   },
 ): Promise<{ contactId: string | null }> {
   try {
@@ -100,6 +105,7 @@ export async function vincularContactoDeConversacion(
         opportunityId,
         fuente,
         anuncio: datos.anuncio,
+        resumen: datos.resumenAnuncio,
       });
 
     return { contactId };
@@ -110,12 +116,12 @@ export async function vincularContactoDeConversacion(
 }
 
 /**
- * Deja constancia de que la persona llegó por un anuncio: en la conversación
- * (primer toque), en el contacto y en su oportunidad (custom_fields.anuncio y
- * la fuente, si estaba vacía), y como nota en su línea de tiempo.
+ * Deja en el CRM que la persona llegó por un anuncio (o publicación, o enlace):
+ * en el contacto y en su oportunidad (custom_fields.anuncio, y la fuente
+ * *_ad cuando fue anuncio), y como nota en su línea de tiempo. La conversación
+ * guarda first_referral / last_referral aparte (flowly/procesar.ts).
  *
- * Nunca pisa una atribución anterior: el primer anuncio es el que la trajo.
- * Nunca lanza.
+ * Primer toque: nunca pisa una atribución anterior. Nunca lanza.
  */
 export async function registrarAtribucion(
   admin: Admin,
@@ -125,16 +131,13 @@ export async function registrarAtribucion(
     opportunityId?: string | null;
     fuente: string;
     anuncio: AnuncioGuardado;
+    /** Texto de la nota, p. ej. «Llegó por anuncio · Consulta gratis». */
+    resumen?: string | null;
   },
 ): Promise<void> {
   try {
-    await admin
-      .from("channel_conversations")
-      .update({ ad_referral: input.anuncio })
-      .eq("id", input.conversationId)
-      .is("ad_referral", null);
-
     if (!input.contactId) return;
+    const esFuenteDeAnuncio = input.fuente.endsWith("_ad");
 
     const { data: contacto } = await admin
       .from("contacts")
@@ -147,7 +150,7 @@ export async function registrarAtribucion(
         .from("contacts")
         .update({
           custom_fields: { ...camposContacto, anuncio: input.anuncio },
-          ...(contacto.source ? {} : { source: input.fuente }),
+          ...(contacto.source || !esFuenteDeAnuncio ? {} : { source: input.fuente }),
         })
         .eq("id", input.contactId);
 
@@ -176,7 +179,8 @@ export async function registrarAtribucion(
             custom_fields: { ...camposOp, anuncio: input.anuncio },
             // La fuente de una oportunidad recién abierta por el mensaje es el
             // canal; si llegó por anuncio, el anuncio es la fuente buena.
-            ...(!op.source || ["whatsapp", "instagram", "facebook", "messenger"].includes(op.source)
+            ...(esFuenteDeAnuncio &&
+            (!op.source || ["whatsapp", "instagram", "facebook", "messenger"].includes(op.source))
               ? { source: input.fuente }
               : {}),
           })
@@ -187,7 +191,10 @@ export async function registrarAtribucion(
       await emitEvent(admin, {
         contactId: input.contactId,
         kind: "nota",
-        summary: `Llegó por anuncio${input.anuncio.headline ? `: «${String(input.anuncio.headline).slice(0, 120)}»` : ""}`,
+        summary: (
+          input.resumen ??
+          `Llegó por anuncio${input.anuncio.headline ? ` · ${String(input.anuncio.headline)}` : ""}`
+        ).slice(0, 200),
         payload: {
           conversationId: input.conversationId,
           adId: input.anuncio.ad_id,

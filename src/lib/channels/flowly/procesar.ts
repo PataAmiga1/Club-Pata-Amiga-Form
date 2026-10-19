@@ -10,14 +10,14 @@ import {
   ACTOR_AGENTE,
   adjuntosParaGuardar,
   apagaIA,
-  atribucionParaGuardar,
   contenidoDeMensaje,
   decisionEntregaRepetida,
   esCanalFlowly,
   esEstadoVigente,
   externalUserIdFlowly,
   filaDeSalienteExterno,
-  fuenteDeAnuncio,
+  esReferralMasReciente,
+  fuenteDeReferral,
   identidadDeContacto,
   leerConversacion,
   leerDatosMensaje,
@@ -25,9 +25,15 @@ import {
   origenDeSaliente,
   REPROCESAR_TRAS_MS,
   reflejoDeConversacion,
-  tieneTextoLegible,
+  selloDeReferral,
 } from "./mapeo";
-import type { CanalFlowly, ConversacionFlowly, DatosMensaje, EventoFlowly } from "./tipos";
+import type {
+  CanalFlowly,
+  ConversacionFlowly,
+  DatosMensaje,
+  EventoFlowly,
+  ReferralFlowly,
+} from "./tipos";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -43,7 +49,7 @@ type Admin = ReturnType<typeof createAdminClient>;
  */
 
 const COLUMNAS_HILO =
-  "id, channel, human_takeover, display_name, needs_attention, contact_id, ad_referral, flowly_state_at, flowly_taken_over_by";
+  "id, channel, human_takeover, display_name, needs_attention, contact_id, first_referral, last_referral, flowly_state_at, flowly_taken_over_by";
 
 type FilaHilo = {
   id: string;
@@ -52,7 +58,8 @@ type FilaHilo = {
   display_name: string | null;
   needs_attention: boolean;
   contact_id: string | null;
-  ad_referral: unknown;
+  first_referral: ReferralFlowly | null;
+  last_referral: ReferralFlowly | null;
   flowly_state_at: string | null;
   flowly_taken_over_by: string | null;
 };
@@ -271,7 +278,13 @@ async function aplicarEstado(
   conv: ConversacionFlowly,
   cuando: string | null,
 ): Promise<FilaHilo> {
-  if (!esEstadoVigente(hilo.flowly_state_at, cuando)) return hilo;
+  // La atribución no depende del orden (el primero nunca se reemplaza y el
+  // último se compara por received_at): se guarda aunque el estado sea viejo.
+  if (!esEstadoVigente(hilo.flowly_state_at, cuando))
+    return guardarReferrals(admin, hilo, conv.channel, {
+      primero: conv.first_referral,
+      ultimo: conv.last_referral,
+    });
   const reflejo = reflejoDeConversacion(conv, hilo.flowly_taken_over_by);
   const cambios: Record<string, unknown> = {
     ...reflejo,
@@ -298,12 +311,59 @@ async function aplicarEstado(
       actorLabel: "Flowly",
     });
   }
+  const conReferrals = await guardarReferrals(admin, hilo, conv.channel, {
+    primero: conv.first_referral,
+    ultimo: conv.last_referral,
+  });
   return {
     ...hilo,
+    first_referral: conReferrals.first_referral,
+    last_referral: conReferrals.last_referral,
     human_takeover: reflejo.human_takeover ?? hilo.human_takeover,
     flowly_taken_over_by: reflejo.flowly_taken_over_by,
     flowly_state_at: (cambios.flowly_state_at as string) ?? hilo.flowly_state_at,
     display_name: conv.contact.name ?? hilo.display_name,
+  };
+}
+
+/**
+ * Guarda la atribución del hilo (contrato §4.5): `first_referral` solo si no
+ * había (primer toque, nunca se reemplaza) y `last_referral` solo si el nuevo
+ * es más reciente. Si el primero es nuevo y el hilo ya tiene contacto, se
+ * lleva al CRM (contacto, oportunidad y nota).
+ */
+async function guardarReferrals(
+  admin: Admin,
+  hilo: FilaHilo,
+  canal: CanalFlowly,
+  r: { primero: ReferralFlowly | null; ultimo: ReferralFlowly | null },
+): Promise<FilaHilo> {
+  const primeroNuevo = !hilo.first_referral && r.primero ? r.primero : null;
+  const ultimoNuevo = esReferralMasReciente(hilo.last_referral, r.ultimo) ? r.ultimo : null;
+  if (!primeroNuevo && !ultimoNuevo) return hilo;
+
+  if (primeroNuevo)
+    await admin
+      .from("channel_conversations")
+      .update({ first_referral: primeroNuevo })
+      .eq("id", hilo.id)
+      .is("first_referral", null);
+  if (ultimoNuevo)
+    await admin.from("channel_conversations").update({ last_referral: ultimoNuevo }).eq("id", hilo.id);
+
+  if (primeroNuevo && hilo.contact_id)
+    await registrarAtribucion(admin, {
+      conversationId: hilo.id,
+      contactId: hilo.contact_id,
+      fuente: fuenteDeReferral(canal, primeroNuevo),
+      anuncio: primeroNuevo,
+      resumen: selloDeReferral(primeroNuevo),
+    });
+
+  return {
+    ...hilo,
+    first_referral: hilo.first_referral ?? primeroNuevo,
+    last_referral: ultimoNuevo ?? hilo.last_referral,
   };
 }
 
@@ -384,11 +444,16 @@ async function procesarEntrante(admin: Admin, datos: DatosMensaje) {
     .eq("id", hilo.id)
     .lt("last_message_at", m.created_at);
 
+  // Atribución: lo normal es que ya venga en first_referral de la lectura de
+  // arriba; el referral del propio mensaje cubre el caso sin API (o desfasada).
+  if (m.referral)
+    hilo = await guardarReferrals(admin, hilo, datos.channel, { primero: m.referral, ultimo: m.referral });
+
   if (!yaGuardado) {
     // CRM: igual que el camino directo (contacto, primer_mensaje y oportunidad
-    // en "Nuevo prospecto"), más la atribución del anuncio si la trae.
-    const anuncio = datos.referral ? atribucionParaGuardar(datos.referral, m.created_at) : null;
-    const fuente = anuncio ? fuenteDeAnuncio(datos.channel) : datos.channel;
+    // en "Nuevo prospecto"), con la atribución del PRIMER toque si existe.
+    const anuncio = hilo.first_referral;
+    const fuente = fuenteDeReferral(datos.channel, anuncio);
     if (!hilo.contact_id) {
       const { contactId } = await vincularContactoDeConversacion(admin, {
         conversationId: hilo.id,
@@ -399,34 +464,15 @@ async function procesarEntrante(admin: Admin, datos: DatosMensaje) {
         identidad: identidadDeContacto(datos.channel, datos.conversation_id, conv?.contact.handle ?? null),
         fuente,
         anuncio,
+        resumenAnuncio: selloDeReferral(anuncio),
       });
       hilo = { ...hilo, contact_id: contactId };
-    } else if (anuncio) {
-      await registrarAtribucion(admin, {
-        conversationId: hilo.id,
-        contactId: hilo.contact_id,
-        fuente,
-        anuncio,
-      });
     }
   }
 
-  // Un audio, una foto o un archivo sin texto: la IA no puede leerlo. Queda a
-  // la vista del equipo en lugar de recibir una respuesta a ciegas.
-  if (!tieneTextoLegible(m)) {
-    if (!yaGuardado && !hilo.needs_attention && !hilo.human_takeover)
-      await admin
-        .from("channel_conversations")
-        .update({
-          needs_attention: true,
-          attention_reason: `Mandó ${contenido.replace(/^\[|\]$/g, "").toLowerCase()} que la IA no puede leer`,
-          attention_at: new Date().toISOString(),
-          attention_notified_at: null,
-        })
-        .eq("id", hilo.id);
-    return;
-  }
-
+  // Un audio o una foto sin texto llega como su etiqueta («[Nota de voz]»),
+  // igual que por el camino directo: el prompt de ventas (regla 4) le pide a
+  // la IA agradecer y pedir la pregunta por escrito, sin inventar qué contiene.
   await turnoDelAgente(admin, cliente, hilo, datos);
 }
 
@@ -467,7 +513,7 @@ async function turnoDelAgente(
       conversationId: hilo.id,
       channel: datos.channel,
       displayName: hilo.display_name,
-      texto: datos.message.body ?? "",
+      texto: contenidoDeMensaje(datos.message),
       needsAttention: hilo.needs_attention,
       humanTakeover: hilo.human_takeover,
     },

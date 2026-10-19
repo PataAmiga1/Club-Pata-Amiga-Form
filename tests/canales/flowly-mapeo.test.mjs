@@ -4,8 +4,11 @@ import {
   actorDeEquipo,
   adjuntosParaGuardar,
   apagaIA,
-  atribucionParaGuardar,
   contenidoDeMensaje,
+  esAnuncio,
+  esReferralMasReciente,
+  fuenteDeReferral,
+  selloDeReferral,
   esEstadoVigente,
   estadoPlantilla,
   externalUserIdFlowly,
@@ -67,7 +70,7 @@ test('mensaje de texto entrante: canal, ids y contenido tal cual', () => {
   assert.equal(d.message.direction, 'in');
   assert.equal(contenidoDeMensaje(d.message), '¿Cuánto cuesta la membresía?');
   assert.equal(tieneTextoLegible(d.message), true);
-  assert.equal(d.referral, null);
+  assert.equal(d.message.referral, null);
 });
 
 test('canal desconocido o mensaje sin id = no se procesa', () => {
@@ -93,7 +96,7 @@ test('archivos: etiqueta legible, pie si lo trae, y sin url guardada', () => {
     conversation_id: 'c1',
     message: mensaje({ type: 'document', body: 'Adjunto la orden', attachment: pdf, attachments: [pdf] }),
   }).message;
-  assert.equal(contenidoDeMensaje(doc), '[📄 Documento: OC-1043.pdf] Adjunto la orden');
+  assert.equal(contenidoDeMensaje(doc), '[Documento: OC-1043.pdf] Adjunto la orden');
   const guardados = adjuntosParaGuardar(doc);
   assert.equal(guardados.length, 1);
   assert.equal(guardados[0].flowly_attachment_id, '3cf7e088');
@@ -109,8 +112,8 @@ test('archivos: etiqueta legible, pie si lo trae, y sin url guardada', () => {
       attachments: [],
     }),
   }).message;
-  assert.equal(contenidoDeMensaje(audio), '[🎤 Nota de voz]');
-  assert.equal(tieneTextoLegible(audio), false, 'la IA no responde a ciegas a un audio');
+  assert.equal(contenidoDeMensaje(audio), '[Nota de voz]');
+  assert.equal(tieneTextoLegible(audio), false);
 
   // Messenger/Instagram llaman "file" a un documento.
   const archivo = leerDatosMensaje({
@@ -118,7 +121,7 @@ test('archivos: etiqueta legible, pie si lo trae, y sin url guardada', () => {
     conversation_id: 'c2',
     message: mensaje({ type: 'file', body: null, attachment: null, attachments: [] }),
   }).message;
-  assert.equal(contenidoDeMensaje(archivo), '[📄 Documento]');
+  assert.equal(contenidoDeMensaje(archivo), '[Documento]');
 
   const plantilla = leerDatosMensaje({
     channel: 'whatsapp',
@@ -176,49 +179,122 @@ test('actor del equipo: prefijo propio, nunca un actor reservado, máximo 200', 
   assert.notEqual(actorDeEquipo('x').toLowerCase(), 'operator');
 });
 
-test('referral (forma provisional): se normaliza en un solo lugar', () => {
-  const crudo = {
-    source_type: 'ad',
-    source_id: '120210000000000001',
-    source_url: 'https://fb.me/anuncio',
-    headline: 'Membresía para tu peludo desde $599',
-    body: 'Reintegro en emergencias',
-    media_type: 'image',
-    ctwa_clid: 'ARAkLk-clid',
-    ad_id: '120210000000000001',
-    ref: null,
-  };
-  const evento = recibido(mensaje(), { referral: crudo });
+// Referral real de Flowly (§4.5, rama feat/ctwa-referral, f4cf547).
+const referralWa = {
+  channel: 'whatsapp',
+  received_at: '2026-10-19T15:00:00.000Z',
+  message_id: '55555555-5555-4555-8555-555555555555',
+  source_type: 'ad',
+  meta_source: 'ad',
+  source_id: '120214011111111111',
+  ad_id: '120214011111111111',
+  source_url: 'https://fb.me/3cr4Wqqkv',
+  headline: 'Consulta gratis',
+  body: 'Agenda hoy y recibe un 10% de descuento',
+  media_type: 'image',
+  image_url: 'https://scontent.xx.fbcdn.net/v/t45.1600-4/abc.jpg?oh=1',
+  video_url: null,
+  thumbnail_url: null,
+  ctwa_clid: 'ARAkLkA8rmlFeiCktEJQ',
+  welcome_message: null,
+  ref: null,
+  referral_type: null,
+  post_id: null,
+  product_id: null,
+};
+
+const referralMessenger = {
+  channel: 'facebook',
+  received_at: '2026-10-19T15:00:00.000Z',
+  message_id: null,
+  source_type: 'ad',
+  meta_source: 'ADS',
+  source_id: '6045246247433',
+  ad_id: '6045246247433',
+  source_url: null,
+  headline: 'Consulta gratis',
+  body: null,
+  media_type: null,
+  image_url: 'https://scontent.xx.fbcdn.net/photo.jpg',
+  video_url: null,
+  thumbnail_url: null,
+  ctwa_clid: null,
+  welcome_message: null,
+  ref: 'promo-octubre',
+  referral_type: 'OPEN_THREAD',
+  post_id: '1000_2000',
+  product_id: null,
+};
+
+test('referral en message.referral (clic a WhatsApp): se guarda con la forma del contrato', () => {
+  const evento = recibido(
+    mensaje({ id: '55555555-5555-4555-8555-555555555555', body: 'Hola, vi su anuncio', referral: referralWa }),
+  );
   const d = leerDatosMensaje(leerEvento(evento).data);
-  assert.deepEqual(d.referral, {
-    sourceType: 'ad',
-    sourceId: '120210000000000001',
-    sourceUrl: 'https://fb.me/anuncio',
-    headline: 'Membresía para tu peludo desde $599',
-    body: 'Reintegro en emergencias',
-    mediaType: 'image',
-    ctwaClid: 'ARAkLk-clid',
-    adId: '120210000000000001',
-    ref: null,
-  });
-  const guardada = atribucionParaGuardar(d.referral, '2026-10-19T10:00:00Z');
-  assert.equal(guardada.headline, 'Membresía para tu peludo desde $599');
-  assert.equal(guardada.ad_id, '120210000000000001');
-  assert.equal(guardada.ctwa_clid, 'ARAkLk-clid');
-  assert.equal(guardada.received_at, '2026-10-19T10:00:00Z');
+  assert.deepEqual(d.message.referral, referralWa);
+  assert.equal(esAnuncio(d.message.referral), true);
+  assert.equal(fuenteDeReferral('whatsapp', d.message.referral), 'whatsapp_ad');
+  assert.equal(selloDeReferral(d.message.referral), 'Llegó por anuncio · Consulta gratis');
 });
 
-test('referral: también dentro del mensaje, camelCase, ad_id desde source_id, y vacío = null', () => {
-  const dentro = leerDatosMensaje({
-    channel: 'instagram',
+test('referral: solo en entrantes; llaves desconocidas fuera, lo que no es texto queda null', () => {
+  const saliente = leerDatosMensaje({
+    channel: 'whatsapp',
     conversation_id: 'c1',
-    message: { ...mensaje(), referral: { sourceType: 'ad', sourceId: '777', ctwaClid: 'k' } },
+    message: mensaje({ direction: 'out', status: 'sent', referral: referralWa }),
   });
-  assert.equal(dentro.referral.adId, '777');
-  assert.equal(dentro.referral.ctwaClid, 'k');
+  assert.equal(saliente.message.referral, null);
+  const r = mapearReferral({ ...referralWa, campo_nuevo: 'x', headline: 42, body: { a: 1 }, channel: 'telegram' });
+  assert.equal('campo_nuevo' in r, false);
+  assert.equal(r.headline, '42');
+  assert.equal(r.body, null);
+  assert.equal(r.channel, null);
+  // Sin referral: null (se decide por referral !== null, nunca por llaves).
+  assert.equal(leerDatosMensaje(leerEvento(recibido(mensaje())).data).message.referral, null);
   assert.equal(mapearReferral(null), null);
-  assert.equal(mapearReferral({}), null);
-  assert.equal(mapearReferral({ headline: '  ' }), null);
+  assert.equal(mapearReferral([]), null);
+  assert.equal(mapearReferral({}).source_type, 'unknown');
+});
+
+test('first_referral / last_referral en el objeto conversación (Messenger antes de escribir)', () => {
+  const c = leerConversacion({
+    id: 'c-msgr',
+    channel: 'facebook',
+    contact: { name: null, handle: null },
+    connection_id: 'cx',
+    agent_enabled: true,
+    first_referral: referralMessenger,
+    last_referral: referralMessenger,
+  });
+  assert.deepEqual(c.first_referral, referralMessenger);
+  assert.equal(c.first_referral.message_id, null);
+  assert.equal(c.last_referral.ref, 'promo-octubre');
+  assert.equal(fuenteDeReferral('facebook', c.first_referral), 'messenger_ad');
+  const sin = leerConversacion({ id: 'c2', channel: 'whatsapp', contact: {}, connection_id: 'cx', first_referral: null });
+  assert.equal(sin.first_referral, null);
+  assert.equal(sin.last_referral, null);
+});
+
+test('last_referral solo avanza: uno viejo o reenviado no lo regresa', () => {
+  const viejo = { ...referralWa, received_at: '2026-10-01T00:00:00Z' };
+  const nuevo = { ...referralWa, received_at: '2026-10-19T15:00:00Z', headline: 'Otro anuncio' };
+  assert.equal(esReferralMasReciente(null, viejo), true);
+  assert.equal(esReferralMasReciente(viejo, nuevo), true);
+  assert.equal(esReferralMasReciente(nuevo, viejo), false);
+  assert.equal(esReferralMasReciente(nuevo, nuevo), false, 'el mismo reenviado no cuenta como nuevo');
+  assert.equal(esReferralMasReciente(nuevo, null), false);
+  assert.equal(esReferralMasReciente(nuevo, { ...nuevo, received_at: null }), false);
+});
+
+test('publicación o enlace m.me: se atribuye, pero la fuente sigue siendo el canal', () => {
+  const enlace = { ...referralMessenger, source_type: 'link', ad_id: null, source_id: null, headline: null };
+  assert.equal(esAnuncio(enlace), false);
+  assert.equal(fuenteDeReferral('facebook', enlace), 'facebook');
+  assert.equal(selloDeReferral(enlace), 'Llegó por un enlace');
+  const post = { ...enlace, source_type: 'post', headline: 'Nuestra guía' };
+  assert.equal(selloDeReferral(post), 'Llegó por una publicación · Nuestra guía');
+  assert.equal(selloDeReferral(null), null);
+  assert.equal(selloDeReferral({ ...referralWa, headline: null }), 'Llegó por anuncio');
 });
 
 test('fuente del contacto cuando llegó por anuncio', () => {
@@ -306,4 +382,35 @@ test('dedupe de entregas: una procesada nunca se repite (ni el LLM)', () => {
   // ya se intentó demasiadas veces
   assert.equal(decisionEntregaRepetida({ processed_at: null, received_at: '2026-10-19T10:00:00Z', attempts: MAX_INTENTOS }, ahora), 'duplicado');
   assert.equal(decisionEntregaRepetida(null, ahora), 'duplicado');
+});
+
+import { ETIQUETA, etiquetaPorTipo } from '../../src/lib/channels/etiquetas.ts';
+import { parseMetaWebhook } from '../../src/lib/channels/meta.ts';
+
+test('etiquetas compartidas: Flowly y el webhook directo de Meta escriben lo mismo, sin emojis', () => {
+  const porFlowly = (type, attachment, body = null) =>
+    contenidoDeMensaje(
+      leerDatosMensaje({
+        channel: 'whatsapp',
+        conversation_id: 'c',
+        message: mensaje({ type, body, attachment, attachments: attachment ? [attachment] : [] }),
+      }).message,
+    );
+  const porMeta = (m) =>
+    parseMetaWebhook({
+      object: 'whatsapp_business_account',
+      entry: [{ changes: [{ field: 'messages', value: { contacts: [], messages: [{ from: '521', id: 'w1', ...m }] } }] }],
+    })[0].text;
+
+  assert.equal(porFlowly('image', { id: 'a', kind: 'image' }), porMeta({ type: 'image', image: { id: 'm' } }));
+  assert.equal(porFlowly('audio', { id: 'a', kind: 'audio' }), porMeta({ type: 'audio', audio: { id: 'm', voice: true } }));
+  assert.equal(porFlowly('video', { id: 'a', kind: 'video' }, 'mira'), porMeta({ type: 'video', video: { id: 'm', caption: 'mira' } }));
+  assert.equal(porFlowly('sticker', { id: 'a', kind: 'sticker' }), porMeta({ type: 'sticker', sticker: { id: 'm' } }));
+  assert.equal(
+    porFlowly('document', { id: 'a', kind: 'document', filename: 'receta.pdf' }),
+    porMeta({ type: 'document', document: { id: 'm', filename: 'receta.pdf' } }),
+  );
+  assert.equal(porFlowly('document', { id: 'a', kind: 'document', filename: 'receta.pdf' }), '[Documento: receta.pdf]');
+  for (const e of Object.values(ETIQUETA)) assert.doesNotMatch(e, /\p{Extended_Pictographic}/u);
+  assert.equal(etiquetaPorTipo('audio', { voz: false }), '[Audio]');
 });

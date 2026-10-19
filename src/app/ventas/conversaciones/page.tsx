@@ -8,6 +8,7 @@ import {
   type FilaHilo,
 } from "@/components/panel/bandeja/ListaConversaciones";
 import { Hilo, type Pieza } from "@/components/panel/bandeja/Hilo";
+import { mapearReferral, selloDeReferral } from "@/lib/channels/flowly/mapeo";
 
 export const metadata = { title: "Conversaciones · Portal de ventas" };
 
@@ -181,7 +182,7 @@ export default async function ConversacionesPage({
     const { data: hilo } = await admin
       .from("channel_conversations")
       .select(
-        "id, channel, display_name, subject, contact_id, assigned_to, human_takeover, needs_attention, status, snoozed_until, starred_by, ad_referral",
+        "id, channel, display_name, subject, contact_id, assigned_to, human_takeover, needs_attention, status, snoozed_until, starred_by, first_referral",
       )
       .eq("id", convId)
       .maybeSingle();
@@ -270,7 +271,7 @@ export default async function ConversacionesPage({
         cerrado: hilo.status === "closed",
         pospuestoHasta: hilo.snoozed_until,
         ultimoEntrante,
-        anuncio: anuncioDe(hilo.ad_referral),
+        anuncio: selloDeReferral(mapearReferral(hilo.first_referral)),
       };
 
       // Abrirlo cuenta como leerlo — para mí, no para los demás.
@@ -496,12 +497,4 @@ export default async function ConversacionesPage({
       </div>
     </div>
   );
-}
-
-/** Lo mínimo del anuncio que trajo a la persona, para el sello del hilo. */
-function anuncioDe(referral: unknown): { titular: string | null } | null {
-  if (!referral || typeof referral !== "object") return null;
-  const r = referral as Record<string, unknown>;
-  const titular = typeof r.headline === "string" && r.headline.trim() ? r.headline.trim() : null;
-  return { titular };
 }

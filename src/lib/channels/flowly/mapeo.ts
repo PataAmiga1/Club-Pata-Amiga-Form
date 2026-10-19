@@ -1,11 +1,13 @@
+// Con extensión .ts: así también lo cargan las pruebas con node --test.
+import { etiquetaPorTipo, unir } from "../etiquetas.ts";
 import type {
   AdjuntoFlowly,
-  AtribucionAnuncio,
   CanalFlowly,
   ConversacionFlowly,
   DatosMensaje,
   EventoFlowly,
   MensajeFlowly,
+  ReferralFlowly,
 } from "./tipos";
 
 /**
@@ -105,6 +107,7 @@ function leerMensaje(m: unknown): MensajeFlowly | null {
     actor: texto(r.actor),
     attachment: primero,
     attachments: adjuntos.length ? adjuntos : primero ? [primero] : [],
+    referral: direction === "in" ? mapearReferral(r.referral) : null,
   };
 }
 
@@ -119,7 +122,6 @@ export function leerDatosMensaje(data: Record<string, unknown>): DatosMensaje | 
     conversation_id: conversationId,
     connection_id: texto(data.connection_id),
     message,
-    referral: mapearReferral(data.referral ?? (data.message as Record<string, unknown>)?.referral),
   };
 }
 
@@ -146,49 +148,75 @@ export function leerConversacion(c: unknown): ConversacionFlowly | null {
       typeof r.agent_enabled_override === "boolean" ? r.agent_enabled_override : null,
     taken_over_by: texto(r.taken_over_by),
     taken_over_at: texto(r.taken_over_at),
+    first_referral: mapearReferral(r.first_referral),
+    last_referral: mapearReferral(r.last_referral),
   };
 }
 
 // --------------------------------------------------------- atribución ------
 
+const LLAVES_REFERRAL = [
+  "message_id",
+  "meta_source",
+  "source_id",
+  "ad_id",
+  "source_url",
+  "headline",
+  "body",
+  "media_type",
+  "image_url",
+  "video_url",
+  "thumbnail_url",
+  "ctwa_clid",
+  "welcome_message",
+  "ref",
+  "referral_type",
+  "post_id",
+  "product_id",
+] as const;
+
 /**
- * ÚNICO punto que conoce la forma cruda del `referral` de Flowly (anuncios de
- * clic a WhatsApp/Messenger/Instagram). La forma es PROVISIONAL mientras Flowly
- * termina la rama feat/ctwa-referral:
+ * ÚNICO punto que lee el `referral` de Flowly (contrato §4.5): en
+ * `message.referral` y en `conversation.first_referral` / `last_referral`.
  *
- *   referral: { source_type, source_id, source_url, headline, body,
- *               media_type, ctwa_clid, ad_id, ref } | null
- *
- * Si Flowly la cambia, solo se toca esta función. Acepta también camelCase y
- * el `ad_id` dentro de source_id cuando source_type es "ad", por tolerancia.
+ * Flowly ya lo entrega normalizado y con todas sus llaves; aquí solo se
+ * valida el tipo de cada una (lo que no sea texto queda null, una llave nueva
+ * de Flowly se ignora) para guardarlo tal cual. Regla del contrato: se
+ * decide por `referral !== null`, nunca por si una llave viene o no.
  */
-export function mapearReferral(raw: unknown): AtribucionAnuncio | null {
-  if (!raw || typeof raw !== "object") return null;
+export function mapearReferral(raw: unknown): ReferralFlowly | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  const leer = (...llaves: string[]) => {
-    for (const k of llaves) {
-      const v = r[k];
-      if (typeof v === "string" && v.trim()) return v.trim();
-      if (typeof v === "number") return String(v);
-    }
+  const leer = (k: string): string | null => {
+    const v = r[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && Number.isFinite(v)) return String(v);
     return null;
   };
-  const sourceType = leer("source_type", "sourceType");
-  const sourceId = leer("source_id", "sourceId");
-  const atribucion: AtribucionAnuncio = {
-    sourceType,
-    sourceId,
-    sourceUrl: leer("source_url", "sourceUrl"),
-    headline: leer("headline"),
-    body: leer("body"),
-    mediaType: leer("media_type", "mediaType"),
-    ctwaClid: leer("ctwa_clid", "ctwaClid"),
-    adId: leer("ad_id", "adId") ?? (sourceType === "ad" ? sourceId : null),
-    ref: leer("ref"),
+  const resto = Object.fromEntries(LLAVES_REFERRAL.map((k) => [k, leer(k)])) as Record<
+    (typeof LLAVES_REFERRAL)[number],
+    string | null
+  >;
+  return {
+    channel: esCanalFlowly(r.channel) ? r.channel : null,
+    received_at: leer("received_at"),
+    source_type: (leer("source_type") ?? "unknown").toLowerCase(),
+    ...resto,
   };
-  // Un objeto vacío no es una atribución.
-  const algo = Object.values(atribucion).some((v) => v !== null);
-  return algo ? atribucion : null;
+}
+
+/** ¿Fue un anuncio pagado? (y no una publicación o un enlace m.me / ig.me). */
+export function esAnuncio(r: ReferralFlowly | null | undefined): boolean {
+  return Boolean(r && (r.source_type === "ad" || r.ad_id));
+}
+
+/**
+ * Fuente del contacto/oportunidad según lo que lo trajo: un anuncio da
+ * whatsapp_ad / instagram_ad / messenger_ad; una publicación o un enlace no
+ * cambian la fuente (sigue siendo el canal).
+ */
+export function fuenteDeReferral(canal: CanalFlowly, r: ReferralFlowly | null | undefined): string {
+  return esAnuncio(r) ? fuenteDeAnuncio(canal) : canal;
 }
 
 /** Fuente del contacto/oportunidad cuando llegó por anuncio. */
@@ -200,36 +228,45 @@ export function fuenteDeAnuncio(canal: CanalFlowly): string {
       : "messenger_ad";
 }
 
-/** Lo que se guarda en ad_referral / custom_fields.anuncio (snake_case, estable). */
-export function atribucionParaGuardar(a: AtribucionAnuncio, recibidaEn: string) {
-  return {
-    source_type: a.sourceType,
-    source_id: a.sourceId,
-    source_url: a.sourceUrl,
-    headline: a.headline,
-    body: a.body,
-    media_type: a.mediaType,
-    ctwa_clid: a.ctwaClid,
-    ad_id: a.adId,
-    ref: a.ref,
-    received_at: recibidaEn,
-  };
+/**
+ * ¿Hay que reemplazar el `last_referral` guardado? Solo si el nuevo es más
+ * reciente: uno viejo que llega tarde (o reenviado) no lo regresa (§4.5).
+ */
+export function esReferralMasReciente(
+  guardado: ReferralFlowly | null | undefined,
+  nuevo: ReferralFlowly | null | undefined,
+): boolean {
+  if (!nuevo) return false;
+  if (!guardado) return true;
+  const a = guardado.received_at ? Date.parse(guardado.received_at) : NaN;
+  const b = nuevo.received_at ? Date.parse(nuevo.received_at) : NaN;
+  if (Number.isNaN(b)) return false;
+  if (Number.isNaN(a)) return true;
+  return b > a;
+}
+
+/** Texto del sello del hilo: «Llegó por anuncio · <titular>». */
+export function selloDeReferral(r: ReferralFlowly | null | undefined): string | null {
+  if (!r) return null;
+  const origen =
+    r.source_type === "ad" || r.ad_id
+      ? "Llegó por anuncio"
+      : r.source_type === "post"
+        ? "Llegó por una publicación"
+        : r.source_type === "link"
+          ? "Llegó por un enlace"
+          : "Llegó por anuncio";
+  return r.headline ? `${origen} · ${r.headline}` : origen;
 }
 
 // ----------------------------------------------------------- mensajes ------
 
-const ETIQUETA_TIPO: Record<string, string> = {
-  image: "📷 Imagen",
-  audio: "🎤 Nota de voz",
-  video: "🎬 Video",
-  document: "📄 Documento",
-  sticker: "Sticker",
-};
-
 /**
  * Texto que se guarda en channel_messages.content (que no admite null).
- * Texto normal tal cual; un archivo, con su etiqueta y su pie si lo trae; una
- * plantilla, con su nombre (Flowly manda el NOMBRE, no el texto llenado).
+ * Texto normal tal cual; un archivo, con la MISMA etiqueta que el camino
+ * directo de Meta («[Nota de voz]», «[Documento: receta.pdf]», etiquetas.ts) y
+ * su pie si lo trae; una plantilla, con su nombre (Flowly manda el NOMBRE, no
+ * el texto llenado).
  */
 export function contenidoDeMensaje(m: MensajeFlowly): string {
   const cuerpo = m.body?.trim() ?? "";
@@ -237,10 +274,7 @@ export function contenidoDeMensaje(m: MensajeFlowly): string {
   if (m.type === "template") return `[plantilla ${cuerpo || "sin nombre"}]`;
 
   const kind = m.attachment?.kind ?? (m.type === "file" ? "document" : m.type);
-  let etiqueta = ETIQUETA_TIPO[kind] ?? `Mensaje de tipo «${m.type}»`;
-  if (kind === "document" && m.attachment?.filename)
-    etiqueta = `${etiqueta}: ${m.attachment.filename}`;
-  return cuerpo ? `[${etiqueta}] ${cuerpo}` : `[${etiqueta}]`;
+  return unir(etiquetaPorTipo(kind, { nombre: m.attachment?.filename }), cuerpo);
 }
 
 /** ¿Trae algo que la IA pueda leer? Un audio o una foto sin pie, no. */

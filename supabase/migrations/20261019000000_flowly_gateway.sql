@@ -32,9 +32,11 @@ alter table channel_conversations
   -- Fecha del último estado de Flowly aplicado: sus webhooks pueden llegar
   -- desordenados y uno viejo no debe pisar a uno nuevo.
   add column flowly_state_at        timestamptz,
-  -- Anuncio de clic a WhatsApp/Messenger/Instagram que abrió la conversación
-  -- (primer toque). Forma normalizada en src/lib/channels/flowly/mapeo.ts.
-  add column ad_referral            jsonb;
+  -- Atribución (contrato §4.5): el anuncio, publicación o enlace m.me/ig.me
+  -- que trajo a la persona. first = primer toque, NUNCA se reemplaza;
+  -- last = el más reciente por received_at. Mismo objeto que manda Flowly.
+  add column first_referral         jsonb,
+  add column last_referral          jsonb;
 
 create unique index idx_channel_conversations_flowly
   on channel_conversations(flowly_conversation_id)
@@ -46,8 +48,10 @@ create index idx_channel_conversations_flowly_conexion
 
 comment on column channel_conversations.provider is
   'Por dónde llegó y por dónde se le responde: direct_meta (webhook propio de Meta, camino viejo) o flowly.';
-comment on column channel_conversations.ad_referral is
-  'Atribución de anuncio (click-to-WhatsApp/Messenger/Instagram): {source_type, source_id, source_url, headline, body, media_type, ctwa_clid, ad_id, ref, received_at}. Primer toque.';
+comment on column channel_conversations.first_referral is
+  'Primer anuncio/publicación/enlace que trajo a la persona (referral de Flowly §4.5: channel, received_at, message_id, source_type, meta_source, source_id, ad_id, source_url, headline, body, media_type, image_url, video_url, thumbnail_url, ctwa_clid, welcome_message, ref, referral_type, post_id, product_id). Nunca se reemplaza. Las URL de medios son del CDN de Meta y caducan.';
+comment on column channel_conversations.last_referral is
+  'El referral más reciente (por received_at). Igual al primero hasta que la persona llega por otro anuncio.';
 
 -- ----------------------------------------------------------- mensajes ------
 
