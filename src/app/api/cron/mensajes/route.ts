@@ -58,15 +58,20 @@ export async function GET(request: Request) {
       else error = res.error;
     } else if (hilo.provider === "flowly") {
       // Hilo de Flowly: sale por Flowly con la llave de la fila, así que si
-      // esta tarea corre dos veces sobre el mismo mensaje no se duplica.
-      const res = await enviarTextoPorFlowly(admin, {
-        conversationId: msg.conversation_id,
-        flowlyConversationId: hilo.flowly_conversation_id,
-        filaId: msg.id,
-        texto: msg.content,
-        userId: msg.author_id,
-      });
-      if (!res.ok) error = res.error;
+      // esta tarea corre dos veces sobre el mismo mensaje no se duplica. La
+      // ventana se revisa aquí con la misma regla que el camino directo (y
+      // Flowly la vuelve a exigir de su lado).
+      error = await comprobarVentana(admin, msg.conversation_id, hilo.channel);
+      if (!error) {
+        const res = await enviarTextoPorFlowly(admin, {
+          conversationId: msg.conversation_id,
+          flowlyConversationId: hilo.flowly_conversation_id,
+          filaId: msg.id,
+          texto: msg.content,
+          userId: msg.author_id,
+        });
+        if (!res.ok) error = res.error;
+      }
     } else if (["facebook", "instagram", "whatsapp"].includes(hilo.channel)) {
       // La ventana de 24 h se vuelve a revisar al SALIR (no basta con que
       // estuviera abierta al programar): si se cerró, el mensaje queda con su
