@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { cerrarSesion } from "@/lib/cerrar-sesion";
 
 export type DashboardEntry = {
   href: string;
@@ -49,9 +49,7 @@ export function ProfileMenu({
   }, []);
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.assign("/");
+    await cerrarSesion("/");
   }
 
   return (

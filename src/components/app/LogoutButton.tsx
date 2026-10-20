@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { cerrarSesion } from "@/lib/cerrar-sesion";
 
 /**
- * Cerrar sesión (Supabase signOut + redirección al login).
+ * Cerrar sesión (servidor + cookies locales + navegación completa al login;
+ * ver src/lib/cerrar-sesion.ts).
  * variant: "sidebar" (link del menú lateral del miembro) ·
  * "admin" (menú lateral teal oscuro) · "button" (botón en Mi cuenta).
  */
@@ -14,15 +14,11 @@ export function LogoutButton({
 }: {
   variant?: "sidebar" | "admin" | "button";
 }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   const logout = async () => {
     setBusy(true);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/iniciar-sesion");
-    router.refresh();
+    await cerrarSesion("/iniciar-sesion");
   };
 
   const cls =
