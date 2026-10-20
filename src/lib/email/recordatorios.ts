@@ -336,7 +336,9 @@ export async function enviarRecordatoriosDeRenovacion(
     await import("@/lib/zona-horaria");
   const { fetchSiteSettings } = await import("@/lib/site");
   const { formatDateEs } = await import("@/lib/dates");
-  const { formatMxn } = await import("@/lib/format");
+  const { montoDelProximoCobro, variablesDeRenovacion } = await import(
+    "./renovacion"
+  );
 
   // La ventana se calcula en hora de MÉXICO, nunca con `new Date()` pelón: el
   // cron corre en UTC y "dentro de 7 días" se recorrería un día para quien
@@ -371,7 +373,7 @@ export async function enviarRecordatoriosDeRenovacion(
     const { data: subs } = await admin
       .from("subscriptions")
       .select(
-        "id, user_id, plan, amount, currency, current_period_end, cancel_at_period_end, status, pet_id, anual_prepagado, msi_meses, profiles!user_id(email, first_name), pets(name)",
+        "id, user_id, plan, amount, currency, price_tier, current_period_end, cancel_at_period_end, status, pet_id, anual_prepagado, msi_meses, profiles!user_id(email, first_name), pets(name), plan_versions(price_cents, additional_price_cents)",
       )
       // `trialing` = año pagado por adelantado: la suscripción existe pero no
       // cobra hasta el aniversario. También necesita su recordatorio.
@@ -407,28 +409,36 @@ export async function enviarRecordatoriosDeRenovacion(
         continue;
       }
 
-      const cuantoFalta =
-        d === 0 ? "hoy" : d === 1 ? "mañana" : `${d} días`;
-      const ok = await sendTemplatedEmail("renovacion_proxima", correo, {
-        firstName:
-          (perfil as { first_name?: string | null } | null)?.first_name ?? "",
-        fecha: formatDateEs(new Date(sub.current_period_end as string)),
-        dias: cuantoFalta,
-        monto: `${formatMxn(Number(sub.amount ?? 0))} ${String(sub.currency ?? "MXN").toUpperCase()}`,
-        // $599: cada peludo se cobra aparte, así que el correo dice de cuál
-        // («tu membresía Mensual de Luna se renueva…», sección 8).
-        plan: `${sub.plan === "annual" ? "Anual" : "Mensual"}${
-          sub.pet_id
-            ? ` de ${((Array.isArray(sub.pets) ? sub.pets[0] : sub.pets) as { name?: string } | null)?.name ?? "tu peludo"}`
-            : ""
-        }`,
-        cuentaUrl: `${SITE_URL}/app/cuenta`,
-        // Solo el anual pagado por adelantado puede volver a pagarse a meses:
-        // Stripe no ofrece meses sin intereses en un cobro automático.
-        msiLine: sub.anual_prepagado
-          ? `<p>Si quieres, puedes <strong>renovar tu año a 3 o 6 meses sin intereses</strong> antes de esa fecha, desde Mi cuenta (si tu tarjeta lo permite). Si prefieres no hacer nada, ese día te cobramos el año completo con tu tarjeta guardada.</p>`
-          : "",
-      });
+      // Saludo, «cuándo» y monto salen de `variablesDeRenovacion` (20-oct-2026:
+      // un correo real decía «en mañana», «$0 MXN» y «Hola,» sin nombre).
+      const ok = await sendTemplatedEmail(
+        "renovacion_proxima",
+        correo,
+        variablesDeRenovacion({
+          firstName: (perfil as { first_name?: string | null } | null)?.first_name,
+          fecha: formatDateEs(new Date(sub.current_period_end as string)),
+          dias: d,
+          // Lo que se VA a cobrar, no lo que se pagó en el alta (que puede ser
+          // $0 por un cupón de mes gratis). Sin dato, el correo omite la cifra.
+          monto: montoDelProximoCobro(sub),
+          moneda: sub.currency,
+          // $599: cada peludo se cobra aparte, así que el correo dice de cuál
+          // («tu membresía Mensual de Luna se renueva…», sección 8).
+          plan: `${sub.plan === "annual" ? "Anual" : "Mensual"}${
+            sub.pet_id
+              ? ` de ${((Array.isArray(sub.pets) ? sub.pets[0] : sub.pets) as { name?: string } | null)?.name ?? "tu peludo"}`
+              : ""
+          }`,
+          cuentaUrl: `${SITE_URL}/app/cuenta`,
+          // Solo el anual pagado por adelantado puede volver a pagarse a meses:
+          // Stripe no ofrece meses sin intereses en un cobro automático.
+          msiLine: sub.anual_prepagado
+            ? `<p>Si quieres, puedes <strong>renovar tu año a 3 o 6 meses sin intereses</strong> antes de esa fecha, desde Mi cuenta (si tu tarjeta lo permite). Si prefieres no hacer nada, ese día te cobramos el año completo con tu tarjeta guardada.</p>`
+            : "",
+        }),
+        // Nombre y peludo los escribió el miembro: van como texto, no HTML.
+        { escapar: ["saludo", "firstName", "plan"] },
+      );
       if (ok) enviados++;
       else {
         // El correo no salió: se borra el registro para que el siguiente

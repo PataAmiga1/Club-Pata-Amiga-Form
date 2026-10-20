@@ -460,31 +460,42 @@ ${BOTON("{{siteUrl}}/embajador", "Ir a mi perfil de embajador")}`),
     name: "Tu membresía se renueva pronto",
     description:
       "Aviso antes del cobro de renovación. Los días de anticipación se configuran en Sitio web → Recordatorios de renovación.",
+    // Corregido el 20-oct-2026 tras un correo real que decía «se renueva el
+    // 19 de octubre, en mañana», «El cobro es de $0 MXN» y «cobertura».
     variables: {
-      firstName: "Nombre del miembro",
+      saludo:
+        "Saludo ya armado: «¡Hola, Cipatli!», o «¡Hola!» si el perfil todavía no tiene nombre",
+      firstName: "Nombre del miembro (puede venir vacío: mejor usar {{saludo}})",
       fecha: "Fecha del próximo cobro, ya escrita en español",
-      dias: "Cuántos días faltan (ej. «7 días» o «mañana»)",
-      monto: "Importe del cobro con su moneda",
-      plan: "Mensual o Anual",
+      cuando:
+        "Cuándo se renueva, listo para ir tras «se renueva»: «hoy», «mañana» o «en 7 días» (no le antepongas «en»)",
+      monto:
+        "Importe del PRÓXIMO cobro con su moneda; vacío si no se pudo saber (nunca $0)",
+      cobroLine:
+        "Párrafo del cobro: con el importe si se conoce, sin él si no (para no anunciar $0)",
+      plan: "Mensual o Anual (y de qué peludo, en el $599)",
       cuentaUrl: "URL de Mi cuenta",
       msiLine:
         "Párrafo con la opción de renovar a meses sin intereses (solo en el anual pagado por adelantado; vacío en los demás)",
     },
     sample: {
+      saludo: "¡Hola, Cipatli!",
       firstName: "Cipatli",
       fecha: "9 de septiembre de 2026",
-      dias: "7 días",
-      monto: "$159.00 MXN",
-      plan: "Mensual",
+      cuando: "en 7 días",
+      monto: "$599.00 MXN",
+      cobroLine:
+        "<p>El cobro es de <strong>$599.00 MXN</strong> y se hace solo, con la tarjeta que tienes guardada. No tienes que hacer nada.</p>",
+      plan: "Mensual de Luna",
       cuentaUrl: "https://pataamiga.mx/app/cuenta",
       msiLine: "",
     },
-    subject: "Tu membresía se renueva en {{dias}} 🐾",
-    html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
-<p>Te avisamos que tu membresía <strong>{{plan}}</strong> se renueva el <strong>{{fecha}}</strong>, en {{dias}}.</p>
-<p>El cobro es de <strong>{{monto}}</strong> y se hace solo, con la tarjeta que tienes guardada. No tienes que hacer nada.</p>
+    subject: "Tu membresía se renueva {{cuando}} 🐾",
+    html: WRAP(`<h2 style="color:#1E5350">{{saludo}}</h2>
+<p>Te avisamos que tu membresía <strong>{{plan}}</strong> se renueva {{cuando}}, el <strong>{{fecha}}</strong>.</p>
+{{cobroLine}}
 {{msiLine}}
-<p><strong>Solo por si acaso:</strong> si cambiaste de tarjeta o está por vencer, actualízala antes de esa fecha para que tus peludos no se queden sin cobertura de reintegros.</p>
+<p><strong>Solo por si acaso:</strong> si cambiaste de tarjeta o está por vencer, actualízala antes de esa fecha para que tus peludos no pierdan su beneficio de reintegro.</p>
 ${BOTON("{{cuentaUrl}}", "Revisar mi tarjeta")}`),
   },
   {

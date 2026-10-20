@@ -152,6 +152,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   let periodoInicio: string | null = null;
   let periodoFin: string | null = null;
   let facturaInicial: string | null = null;
+  // Lo que se cobra en cada renovación (precio recurrente × cantidad), NO lo
+  // pagado en el checkout: con un cupón de mes gratis `amount_total` es 0 y el
+  // recordatorio de renovación anunciaba «El cobro es de $0 MXN» (18-oct-2026;
+  // 51 suscripciones de producción con primera factura en $0). Es el mismo
+  // criterio que ya usan `handleSubscriptionUpdated` y
+  // `registrarSuscripcionDePeludo`, así que la columna significa lo mismo
+  // antes y después de la primera renovación.
+  let montoRecurrente: number | null = null;
   if (session.subscription) {
     try {
       const suscripcion = await getStripe().subscriptions.retrieve(
@@ -162,6 +170,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         periodoInicio = new Date(item.current_period_start * 1000).toISOString();
       if (item?.current_period_end)
         periodoFin = new Date(item.current_period_end * 1000).toISOString();
+      if (item?.price.unit_amount != null)
+        montoRecurrente = (item.price.unit_amount * (item.quantity ?? 1)) / 100;
       facturaInicial =
         typeof suscripcion.latest_invoice === "string"
           ? suscripcion.latest_invoice
@@ -185,7 +195,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
           session.metadata?.plan as "monthly" | "annual" | undefined,
         ),
         ...(petId ? { pet_id: petId, price_tier: nivel } : {}),
-        amount: session.amount_total ? session.amount_total / 100 : null,
+        // Si Stripe no respondió, queda lo cobrado (o null si fue $0); la
+        // renovación lo corrige con el precio recurrente.
+        amount:
+          montoRecurrente ??
+          (session.amount_total ? session.amount_total / 100 : null),
         currency: (session.currency ?? "mxn").toUpperCase(),
         status: "active",
         ...(periodoInicio ? { current_period_start: periodoInicio } : {}),
