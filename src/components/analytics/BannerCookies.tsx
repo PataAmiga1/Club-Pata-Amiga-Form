@@ -26,14 +26,20 @@ export function BannerCookies() {
     guardarConsentimiento(valor);
   };
 
+  // La franja fija ocupa todo el ancho de la pantalla, pero la tarjeta solo
+  // el centro (max-w-3xl): sin pointer-events-none, la parte transparente se
+  // tragaba los clics de lo que queda detrás — «Cerrar sesión» y el botón de
+  // perfil al pie de los menús laterales de /app, /admin y /ventas no
+  // respondían mientras el banner estuviera a la vista (20-oct-2026). Solo la
+  // tarjeta recibe clics.
   return (
     <div
       role="dialog"
       aria-live="polite"
       aria-label="Preferencias de cookies"
-      className="fixed inset-x-0 bottom-0 z-50 p-3 sm:p-4"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 p-3 sm:p-4"
     >
-      <div className="mx-auto flex max-w-3xl flex-col gap-4 rounded-2xl border border-[#eee9dd] bg-white p-5 shadow-lg sm:flex-row sm:items-center sm:gap-6">
+      <div className="pointer-events-auto mx-auto flex max-w-3xl flex-col gap-4 rounded-2xl border border-[#eee9dd] bg-white p-5 shadow-lg sm:flex-row sm:items-center sm:gap-6">
         <p className="flex-1 text-sm leading-relaxed text-[#3d524f]">
           Usamos cookies para entender cómo se usa el sitio y mejorar lo que
           ofrecemos. <strong className="font-semibold">Las opcionales no se
