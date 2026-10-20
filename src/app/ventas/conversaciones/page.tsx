@@ -56,7 +56,18 @@ export default async function ConversacionesPage({
   const params = await searchParams;
   const admin = createAdminClient();
 
-  const alcance = (params.alcance ?? "mias") as (typeof ALCANCES)[number]["key"];
+  // Sin alcance en la liga, la bandeja abre en «Sin asignar» si hay hilos sin
+  // dueño: los prospectos nuevos (anuncios, Flowly) llegan sin asignar y en
+  // «Mías» nadie los vería (Pablo, 20-oct-2026). Si no hay, abre en «Mías».
+  let alcance = params.alcance as (typeof ALCANCES)[number]["key"] | undefined;
+  if (!alcance) {
+    const { count: sinDueno } = await admin
+      .from("channel_conversations")
+      .select("id", { count: "exact", head: true })
+      .is("assigned_to", null)
+      .not("channel", "in", `(${CANALES_SUPERVISION.join(",")})`);
+    alcance = (sinDueno ?? 0) > 0 ? "sin" : "mias";
+  }
   const filtro = (params.filtro ?? "todo") as (typeof FILTROS)[number]["key"];
   const canal = params.canal ?? "";
   const convId = params.conv ?? null;
@@ -317,7 +328,9 @@ export default async function ConversacionesPage({
   const qs = (extra: Record<string, string>) => {
     const sp = new URLSearchParams();
     for (const [k, v] of Object.entries({ alcance, filtro, canal, ...extra }))
-      if (v && !(k === "alcance" && v === "mias") && !(k === "filtro" && v === "todo"))
+      // El alcance siempre va en la liga: el default ya no es fijo y «Mías»
+      // tiene que poder elegirse aunque haya hilos sin asignar.
+      if (v && !(k === "filtro" && v === "todo"))
         sp.set(k, v);
     return sp.toString();
   };
