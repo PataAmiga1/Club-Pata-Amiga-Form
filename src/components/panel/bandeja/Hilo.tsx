@@ -17,6 +17,8 @@ import {
   votarMensaje,
 } from "@/app/ventas/conversaciones/actions";
 import { CANAL_SELLO } from "./ListaConversaciones";
+// La regla de las 24 h vive en un solo lugar: la misma que aplica el servidor.
+import { ventanaAbierta } from "@/lib/channels/ventana";
 
 export type PlantillaResumen = {
   id: string;
@@ -67,6 +69,11 @@ export type CabezaHilo = {
   pospuestoHasta: string | null;
   /** Fecha del último mensaje entrante, para la ventana de 24 h de Meta. */
   ultimoEntrante: string | null;
+  /**
+   * Sello de atribución, ya armado: «Llegó por anuncio · <titular>» (o por una
+   * publicación / un enlace). Null si no llegó por ninguno.
+   */
+  anuncio?: string | null;
 };
 
 const HORA = new Intl.DateTimeFormat("es-MX", {
@@ -90,13 +97,6 @@ function etiquetaDia(iso: string) {
   if (d === hoy.toISOString().slice(0, 10)) return "Hoy";
   if (d === ayer.toISOString().slice(0, 10)) return "Ayer";
   return FECHA_LARGA.format(new Date(iso));
-}
-
-/** ¿Se puede escribir texto libre? Meta cierra la ventana a las 24 h. */
-function ventanaAbierta(canal: string, ultimoEntrante: string | null) {
-  if (!["whatsapp", "instagram", "facebook"].includes(canal)) return true;
-  if (!ultimoEntrante) return false;
-  return Date.now() - new Date(ultimoEntrante).getTime() < 24 * 60 * 60 * 1000;
 }
 
 /**
@@ -240,6 +240,14 @@ export function Hilo({
 
       {/* Estado de la IA / atención */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border-divider bg-cream/60 px-4 py-2">
+        {cabeza.anuncio && (
+          <span
+            title={cabeza.anuncio}
+            className="max-w-full truncate rounded-full bg-teal/10 px-2.5 py-1 text-[11px] font-bold text-teal-deep"
+          >
+            {cabeza.anuncio}
+          </span>
+        )}
         {cabeza.necesitaAtencion && (
           <span className="rounded-full bg-pink/15 px-2.5 py-1 text-[11px] font-bold text-pink">
             ❗ Marcada para atención humana

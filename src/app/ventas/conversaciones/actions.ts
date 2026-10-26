@@ -6,6 +6,13 @@ import { requireCapability } from "@/lib/panel-guard";
 import { emitEvent } from "@/lib/crm/events";
 import { sendChannelMessage, sendWhatsAppTemplate } from "@/lib/channels/meta";
 import { enviarCorreo } from "@/lib/channels/email";
+import { comprobarVentana } from "@/lib/channels/ventana";
+import {
+  enviarPlantillaPorFlowly,
+  enviarTextoPorFlowly,
+} from "@/lib/channels/flowly/bandeja";
+import { reflejarInterruptorEnFlowly } from "@/lib/channels/flowly/interruptor";
+import { actorDeEquipo } from "@/lib/channels/flowly/mapeo";
 import {
   renderizar,
   valoresDelContacto,
@@ -37,7 +44,9 @@ async function datosHilo(
 ) {
   const { data } = await admin
     .from("channel_conversations")
-    .select("id, channel, display_name, contact_id, human_takeover, external_user_id")
+    .select(
+      "id, channel, display_name, contact_id, human_takeover, external_user_id, provider, flowly_conversation_id",
+    )
     .eq("id", conversationId)
     .maybeSingle();
   return data;
@@ -91,6 +100,13 @@ export async function tomarConversacion(conversationId: string) {
     })
     .eq("id", conversationId);
 
+  // Hilo de Flowly: el interruptor que de verdad frena al agente es el suyo.
+  await reflejarInterruptorEnFlowly(admin, {
+    conversationId,
+    encendido: false,
+    actor: actorDeEquipo(userId),
+  });
+
   if (hilo?.contact_id)
     await emitEvent(admin, {
       contactId: hilo.contact_id,
@@ -118,6 +134,12 @@ export async function devolverAlAgente(conversationId: string) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", conversationId);
+
+  await reflejarInterruptorEnFlowly(admin, {
+    conversationId,
+    encendido: true,
+    actor: actorDeEquipo(userId),
+  });
 
   if (hilo?.contact_id)
     await emitEvent(admin, {
@@ -287,6 +309,13 @@ export async function enviarMensaje(
       };
   }
 
+  // Ventana de 24 h de Meta: fuera de ella no hay texto libre (sí plantillas,
+  // que van por enviarPlantillaWhatsApp). Antes solo lo bloqueaba la interfaz.
+  // También aplica a los programados: el despachador lo vuelve a revisar al
+  // enviarlo, por si la persona escribió de nuevo entretanto.
+  const ventanaCerrada = await comprobarVentana(admin, conversationId, hilo.channel);
+  if (ventanaCerrada) return { error: ventanaCerrada };
+
   const { data: guardado, error: errorGuardar } = await admin
     .from("channel_messages")
     .insert({
@@ -330,6 +359,17 @@ export async function enviarMensaje(
     } else {
       errorEnvio = res.error;
     }
+  } else if (hilo.provider === "flowly") {
+    // Llegó por Flowly: sale por Flowly. La ventana de 24 h la decide Flowly y
+    // su negativa llega con frase clara (p. ej. "solo con plantilla").
+    const res = await enviarTextoPorFlowly(admin, {
+      conversationId,
+      flowlyConversationId: hilo.flowly_conversation_id,
+      filaId: guardado.id,
+      texto: contenido,
+      userId,
+    });
+    if (!res.ok) errorEnvio = res.error;
   } else if (ENVIABLES.includes(hilo.channel as (typeof ENVIABLES)[number])) {
     try {
       const salio = await sendChannelMessage(
@@ -450,12 +490,12 @@ export async function enviarPlantillaWhatsApp(
   const [{ data: hilo }, { data: plantilla }] = await Promise.all([
     admin
       .from("channel_conversations")
-      .select("id, channel, external_user_id, contact_id")
+      .select("id, channel, external_user_id, contact_id, provider, flowly_conversation_id")
       .eq("id", conversationId)
       .maybeSingle(),
     admin
       .from("whatsapp_templates")
-      .select("meta_name, language, body_preview, status, variables")
+      .select("meta_name, language, body_preview, status, variables, provider, supported")
       .eq("id", templateId)
       .maybeSingle(),
   ]);
@@ -472,12 +512,27 @@ export async function enviarPlantillaWhatsApp(
   const parametros =
     plantilla.variables > 0 ? [valores.nombre || "hola"] : [];
 
-  const res = await sendWhatsAppTemplate(
-    hilo.external_user_id,
-    plantilla.meta_name,
-    plantilla.language,
-    parametros,
-  );
+  // Hilo de Flowly: la plantilla sale por Flowly; si no, directo a Meta.
+  let res: { ok: true } | { ok: false; error: string };
+  let flowlyMessageId: string | null = null;
+  if (hilo.provider === "flowly") {
+    const r = await enviarPlantillaPorFlowly(admin, {
+      conversationId,
+      flowlyConversationId: hilo.flowly_conversation_id,
+      plantilla,
+      parametros,
+      userId,
+    });
+    if (r.ok) flowlyMessageId = r.flowlyMessageId;
+    res = r.ok ? { ok: true } : r;
+  } else {
+    res = await sendWhatsAppTemplate(
+      hilo.external_user_id,
+      plantilla.meta_name,
+      plantilla.language,
+      parametros,
+    );
+  }
 
   const texto = renderizar(
     plantilla.body_preview.replace(/\{\{1\}\}/g, "{{nombre}}"),
@@ -490,6 +545,7 @@ export async function enviarPlantillaWhatsApp(
     sender: "admin",
     author_id: userId,
     content: `[plantilla ${plantilla.meta_name}] ${texto}`,
+    ...(flowlyMessageId ? { flowly_message_id: flowlyMessageId, delivery_status: "sent" } : {}),
     ...(res.ok
       ? { sent_at: new Date().toISOString() }
       : { send_error: res.error }),

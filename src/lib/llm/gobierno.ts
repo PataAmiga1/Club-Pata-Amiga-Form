@@ -1,6 +1,15 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { costoEnCentavos, preciosDe } from "@/lib/newsletter/costos";
 import { inicioDelDia } from "@/lib/zona-horaria";
+import {
+  reglaCanal,
+  reglaGasto,
+  reglaPersona,
+  reglaRitmo,
+  type Veredicto,
+} from "@/lib/llm/gobierno-reglas";
+import { reflejarInterruptorEnFlowly } from "@/lib/channels/flowly/interruptor";
+import { AJUSTE_PROVEEDOR } from "@/lib/channels/proveedor";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -33,6 +42,13 @@ export const AJUSTES_IA = [
     label: "Máximo de respuestas por conversación por hora",
     hint: "Freno contra bucles y abuso. 0 = sin límite.",
     default: "12",
+    soloSuper: true,
+  },
+  {
+    key: AJUSTE_PROVEEDOR,
+    label: "Proveedor por canal (directo o Flowly)",
+    hint: "Qué webhook atiende los mensajes NUEVOS de cada canal, p. ej. «whatsapp=flowly, facebook=flowly, instagram=flowly». Vacío = todos por el webhook directo de Meta. Responder siempre va por donde llegó cada conversación.",
+    default: "",
     soloSuper: true,
   },
   {
@@ -158,9 +174,7 @@ export async function leerAjustesIA(admin: Admin): Promise<AjustesIA> {
   );
 }
 
-export type Veredicto =
-  | { puede: true }
-  | { puede: false; motivo: string; avisar: boolean };
+export type { Veredicto };
 
 /**
  * ¿Puede la IA responder en este momento?
@@ -168,32 +182,23 @@ export type Veredicto =
  * Orden de precedencia: la persona manda sobre el hilo, el hilo manda sobre el
  * canal. Cuando NO puede, se dice por qué — y si toca avisar al equipo, porque
  * quedarse callado con un cliente es peor que gastar unos centavos de más.
+ *
+ * Las reglas en sí viven en gobierno-reglas.ts (puras, con pruebas); aquí solo
+ * se consultan los datos que cada una necesita, y solo si hace falta.
  */
 export async function puedeResponderIA(
   admin: Admin,
   input: { canal: string; conversationId: string; humanTakeover: boolean },
 ): Promise<Veredicto> {
   // 1. Una persona tomó el hilo
-  if (input.humanTakeover)
-    return {
-      puede: false,
-      motivo: "Alguien del equipo tomó esta conversación",
-      avisar: false,
-    };
+  const persona = reglaPersona(input.humanTakeover);
+  if (!persona.puede) return persona;
 
   const ajustes = await leerAjustesIA(admin);
 
   // 2. Interruptor por canal
-  const apagados = (ajustes.ia_canales_apagados ?? "")
-    .split(",")
-    .map((c) => c.trim().toLowerCase())
-    .filter(Boolean);
-  if (apagados.includes(input.canal.toLowerCase()))
-    return {
-      puede: false,
-      motivo: `La IA está apagada para ${input.canal}`,
-      avisar: true,
-    };
+  const canal = reglaCanal(input.canal, ajustes.ia_canales_apagados ?? "");
+  if (!canal.puede) return canal;
 
   // 3. Freno por conversación: contra bucles y abuso
   const maxHora = Number(ajustes.ia_max_por_conversacion_hora ?? 0);
@@ -204,12 +209,8 @@ export async function puedeResponderIA(
       .select("id", { count: "exact", head: true })
       .eq("conversation_id", input.conversationId)
       .gte("created_at", desde);
-    if ((count ?? 0) >= maxHora)
-      return {
-        puede: false,
-        motivo: `Esta conversación llegó al límite de ${maxHora} respuestas por hora`,
-        avisar: true,
-      };
+    const ritmo = reglaRitmo(maxHora, count ?? 0);
+    if (!ritmo.puede) return ritmo;
   }
 
   // 4. Tope de gasto diario. El día es el mexicano: con la medianoche del
@@ -224,12 +225,8 @@ export async function puedeResponderIA(
       (s, u) => s + (u.cost_cents ?? 0),
       0,
     );
-    if (totalCentavos >= topeMxn * 100)
-      return {
-        puede: false,
-        motivo: `Se alcanzó el tope de gasto del día ($${topeMxn} MXN)`,
-        avisar: true,
-      };
+    const tope = reglaGasto(topeMxn, totalCentavos);
+    if (!tope.puede) return tope;
   }
 
   return { puede: true };
@@ -326,6 +323,13 @@ export async function escalarConversacion(
       ...(guardia ? { assigned_to: guardia } : {}),
     })
     .eq("id", input.conversationId);
+
+  // Si el hilo llegó por Flowly, el traspaso también se hace allá: su
+  // interruptor es el que de verdad frena al agente (contrato §8.1).
+  await reflejarInterruptorEnFlowly(admin, {
+    conversationId: input.conversationId,
+    encendido: false,
+  });
 
   return { asignadaA: guardia };
 }
