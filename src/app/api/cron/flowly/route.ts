@@ -11,9 +11,8 @@ import { sincronizarPlantillasFlowly } from "@/lib/channels/flowly/plantillas";
  *   su MISMA llave: Flowly nunca las manda dos veces.
  * - Vuelve a traer las plantillas de WhatsApp (su estado no llega por webhook).
  *
- * PENDIENTE AL SALIR A PRODUCCIÓN: registrarla en vercel.json (cada 5–10 min).
- * No se registró en esta rama a propósito: el merge de crons a main se revisa
- * aparte.
+ * Registrada en vercel.json cada 10 min (salida a producción de Flowly). Sin
+ * FLOWLY_API_KEY ni FLOWLY_WEBHOOK_SECRET responde "omitido" y no hace nada.
  */
 export const maxDuration = 60;
 
