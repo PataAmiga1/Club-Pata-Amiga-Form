@@ -1,3 +1,4 @@
+import { OrigenDePauta } from "@/components/panel/OrigenDePauta";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -104,6 +105,13 @@ export default async function AdminMiembroDetailPage({
     .order("created_at", { ascending: false });
 
   if (!m) notFound();
+  // Aparte y tolerante a error: si la columna aún no existe (la migración
+  // 20261028000000 se corre a mano en producción), el expediente sale igual.
+  const { data: origen } = await admin
+    .from("profiles")
+    .select("attribution")
+    .eq("id", id)
+    .maybeSingle();
 
   // Registro de peludos por el super admin (8-oct-2026): el formulario
   // necesita saber su modelo, su cupo y su fecha de inscripción.
@@ -294,6 +302,7 @@ export default async function AdminMiembroDetailPage({
             Miembro desde:{" "}
             {m.member_since ? formatDateEs(new Date(m.member_since)) : "—"}
           </span>
+          <OrigenDePauta atribucion={origen?.attribution ?? null} />
           {porPeludo.length > 0 ? (
             <div className="flex flex-col gap-1">
               <span>Membresía $599 · {porPeludo.length} {porPeludo.length === 1 ? "peludo" : "peludos"}:</span>
