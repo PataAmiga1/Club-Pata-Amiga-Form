@@ -10,6 +10,7 @@ import {
   type CampoDef,
 } from "@/components/panel/contactos/FichaLateral";
 import { NotasYTareas } from "@/components/panel/contactos/NotasYTareas";
+import { OrigenDePauta } from "@/components/panel/OrigenDePauta";
 
 export const metadata = { title: "Perfil de contacto · Portal de ventas" };
 
@@ -145,10 +146,11 @@ export default async function FichaContactoPage({
     desde: string | null;
     mascotas: { name: string; species: string }[];
     reintegros: number;
+    atribucion: unknown;
   } | null = null;
 
   if (contacto.profile_id) {
-    const [{ data: perfil }, { data: mascotas }, { count: reintegros }] =
+    const [{ data: perfil }, { data: mascotas }, { count: reintegros }, { data: origen }] =
       await Promise.all([
         admin
           .from("profiles")
@@ -164,12 +166,19 @@ export default async function FichaContactoPage({
           .from("reimbursements")
           .select("id", { count: "exact", head: true })
           .eq("user_id", contacto.profile_id),
+        // Aparte: si la columna aún no existe, el resto del perfil sale igual.
+        admin
+          .from("profiles")
+          .select("attribution")
+          .eq("id", contacto.profile_id)
+          .maybeSingle(),
       ]);
     membresia = {
       estado: perfil?.membership_status ?? null,
       desde: perfil?.member_since ?? null,
       mascotas: (mascotas ?? []) as { name: string; species: string }[],
       reintegros: reintegros ?? 0,
+      atribucion: origen?.attribution ?? null,
     };
   }
 
@@ -266,6 +275,10 @@ export default async function FichaContactoPage({
                 />
                 <Dato label="REINTEGROS" valor={String(membresia.reintegros)} />
               </div>
+              <OrigenDePauta
+                atribucion={membresia.atribucion}
+                className="text-[12.5px] text-ink-body"
+              />
               <p className="text-[11px] leading-snug text-ink-tertiary">
                 🔒 Identidad, domicilio, datos bancarios y fiscales, y los
                 expedientes de reintegro no son visibles desde el portal de
