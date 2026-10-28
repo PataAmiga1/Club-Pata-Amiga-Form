@@ -8,13 +8,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
 import { formatDateEs } from "@/lib/dates";
 import { aperturasDePeludos } from "@/lib/reintegros-599";
+import { getStripe } from "@/lib/stripe";
+import { PurchaseEvent } from "@/components/analytics/PurchaseEvent";
+import { idCompraCheckout } from "@/lib/medicion/eventos";
 
 export default async function PeludosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ registrado?: string; membresia?: string; baja?: string }>;
+  searchParams: Promise<{
+    registrado?: string;
+    membresia?: string;
+    baja?: string;
+    session_id?: string;
+  }>;
 }) {
-  const { registrado, membresia, baja } = await searchParams;
+  const { registrado, membresia, baja, session_id } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -37,6 +45,25 @@ export default async function PeludosPage({
   ]);
 
   const petList = (pets ?? []) as PetRow[];
+
+  // Peludo adicional pagado por Stripe Checkout: vuelve aquí con su sesión.
+  // Se mide la compra con el monto REAL y el mismo id que el webhook manda
+  // por la API de Conversiones. Solo si la sesión es de esta persona y está
+  // pagada; si algo falla, la pantalla sale igual, sin medir.
+  let compra: { montoCentavos: number; moneda: string; transaccion: string } | null = null;
+  if (membresia && session_id) {
+    try {
+      const sesion = await getStripe().checkout.sessions.retrieve(session_id);
+      if (sesion.payment_status === "paid" && sesion.metadata?.user_id === user.id)
+        compra = {
+          montoCentavos: sesion.amount_total ?? 0,
+          moneda: sesion.currency ?? "mxn",
+          transaccion: sesion.id,
+        };
+    } catch {
+      /* sin medición */
+    }
+  }
 
   // Membresía $599 (sección 4): cada peludo con su suscripción. Se lee con la
   // llave de servicio porque la política de `subscriptions` es por persona y
@@ -65,6 +92,14 @@ export default async function PeludosPage({
           Dimos de baja a tu peludo. Su membresía termina al final del período
           que ya pagaste y no se te vuelve a cobrar por él.
         </div>
+      )}
+      {compra && (
+        <PurchaseEvent
+          montoCentavos={compra.montoCentavos}
+          moneda={compra.moneda}
+          transaccion={compra.transaccion}
+          eventoId={idCompraCheckout(compra.transaccion)}
+        />
       )}
       {membresia && (
         <div className="rounded-[14px] bg-success-bg px-4 py-3 text-sm font-semibold text-success-text">

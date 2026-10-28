@@ -21,6 +21,31 @@ export const LLAVE_CONSENTIMIENTO = "pa-cookies-v1";
 /** Se dispara al guardar, para que la medición reaccione sin recargar. */
 export const EVENTO_CONSENTIMIENTO = "pa-consentimiento";
 
+/**
+ * Copia de la decisión en una cookie, para que el SERVIDOR también la conozca.
+ *
+ * localStorage no viaja en las peticiones, y la API de Conversiones de Meta se
+ * manda desde el servidor (registro del peludo, webhook de Stripe): sin esta
+ * cookie el servidor no tendría cómo saber si la persona aceptó y mandaría (o
+ * dejaría de mandar) a ciegas. Solo existe con un «sí»; con un «no» o al
+ * reabrir el banner, se borra. Ver `src/lib/medicion/consentimiento-servidor.ts`.
+ */
+export const COOKIE_MEDICION = "pa_medicion";
+
+/** Pone (o quita) la cookie espejo según la decisión guardada. */
+export function sincronizarCookieMedicion(valor: Consentimiento | null) {
+  if (typeof document === "undefined") return;
+  try {
+    const seguro = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie =
+      valor === "aceptado"
+        ? `${COOKIE_MEDICION}=1; Max-Age=${395 * 86_400}; Path=/; SameSite=Lax${seguro}`
+        : `${COOKIE_MEDICION}=; Max-Age=0; Path=/; SameSite=Lax${seguro}`;
+  } catch {
+    // Cookies bloqueadas: el servidor no mide, que es lo seguro.
+  }
+}
+
 export function leerConsentimiento(): Consentimiento | null {
   if (typeof window === "undefined") return null;
   try {
@@ -40,6 +65,7 @@ export function guardarConsentimiento(valor: Consentimiento) {
   } catch {
     // Si no se puede guardar, al menos la decisión vale para esta pestaña.
   }
+  sincronizarCookieMedicion(valor);
   window.dispatchEvent(new CustomEvent(EVENTO_CONSENTIMIENTO, { detail: valor }));
 }
 
@@ -54,5 +80,6 @@ export function reabrirConsentimiento() {
   } catch {
     /* nada que hacer */
   }
+  sincronizarCookieMedicion(null);
   window.dispatchEvent(new CustomEvent(EVENTO_CONSENTIMIENTO, { detail: null }));
 }

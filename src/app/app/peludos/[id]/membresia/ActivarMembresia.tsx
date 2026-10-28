@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Oferta599 } from "@/lib/plans/oferta";
 import { activarMembresiaDePeludo } from "./actions";
 import { AceptoLegales } from "@/components/legal/AceptoLegales";
+import { registrarCompra, registrarInicioDePago } from "@/lib/analytics";
 
 const mxn = (n: number) =>
   `$${n.toLocaleString("es-MX", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
@@ -46,6 +47,7 @@ export function ActivarMembresia({
     });
     const cuerpo = await res.json().catch(() => ({}));
     if (!res.ok) return setError(cuerpo.error ?? "No pudimos abrir el pago. Intenta de nuevo.");
+    await registrarInicioDePago(cuerpo.medicion);
     window.location.href = cuerpo.url;
   }
 
@@ -138,7 +140,17 @@ export function ActivarMembresia({
               startTransition(async () => {
                 setError(null);
                 const r = await activarMembresiaDePeludo(petId, plan, acepto);
-                if ("ok" in r) return setHecho(true);
+                if ("ok" in r) {
+                  if (r.medicion?.transaccion && r.medicion.valorCentavos)
+                    registrarCompra({
+                      montoCentavos: r.medicion.valorCentavos,
+                      moneda: r.medicion.moneda ?? "mxn",
+                      transaccion: r.medicion.transaccion,
+                      eventoId: r.medicion.eventoId,
+                      plan: r.medicion.contenidoId,
+                    });
+                  return setHecho(true);
+                }
                 if (r.error) setError(r.error);
                 else if (r.checkout) await conOtraTarjeta();
               });

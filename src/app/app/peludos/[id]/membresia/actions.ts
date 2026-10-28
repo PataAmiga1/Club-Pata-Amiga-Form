@@ -15,6 +15,14 @@ import {
 } from "@/lib/plans/peludos-599";
 import { notifyTeam } from "@/lib/alerts";
 import { registrarAceptacion } from "@/lib/legal/aceptacion";
+import { after } from "next/server";
+import { idCompraSuscripcion, type MedicionDeEvento } from "@/lib/medicion/eventos";
+import {
+  capiConfigurada,
+  contextoDeMedicion,
+  enviarEventoMeta,
+  urlDelSitio,
+} from "@/lib/medicion/capi-servidor";
 
 /**
  * Activa la membresía $599 de un peludo con la TARJETA GUARDADA (sección 4).
@@ -30,7 +38,7 @@ export async function activarMembresiaDePeludo(
   petId: string,
   plan: "monthly" | "annual",
   aceptaTerminos: boolean,
-): Promise<{ ok: true } | { error?: string; checkout?: true }> {
+): Promise<{ ok: true; medicion?: MedicionDeEvento } | { error?: string; checkout?: true }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -145,5 +153,57 @@ export async function activarMembresiaDePeludo(
 
   revalidatePath("/app/peludos");
   revalidatePath("/app/cuenta");
-  return filaId ? { ok: true } : { error: "Se cobró, pero no pudimos registrar la membresía. El equipo ya fue avisado." };
+  if (!filaId)
+    return { error: "Se cobró, pero no pudimos registrar la membresía. El equipo ya fue avisado." };
+
+  // Purchase (28-oct-2026): este cobro no pasa por Stripe Checkout, así que
+  // no hay webhook de checkout que lo mida. El navegador lo manda con
+  // `medicion` y el servidor por la API de Conversiones, con el mismo id.
+  const factura =
+    suscripcion.latest_invoice && typeof suscripcion.latest_invoice !== "string"
+      ? suscripcion.latest_invoice
+      : null;
+  const medicion: MedicionDeEvento = {
+    eventoId: idCompraSuscripcion(suscripcion.id),
+    valorCentavos: factura?.amount_paid ?? 0,
+    moneda: factura?.currency ?? "mxn",
+    contenidoId: PLAN_599,
+    transaccion: suscripcion.id,
+  };
+  try {
+    const contexto = capiConfigurada() ? await contextoDeMedicion() : null;
+    if (contexto?.consentido) {
+      const { data: perfil } = await admin
+        .from("profiles")
+        .select("email, phone")
+        .eq("id", user.id)
+        .maybeSingle();
+      after(() =>
+        enviarEventoMeta({
+          nombre: "Purchase",
+          eventoId: medicion.eventoId,
+          instante: Date.now() / 1000,
+          url: urlDelSitio(`/app/peludos/${pet.id}/membresia`),
+          persona: {
+            correo: perfil?.email ?? user.email ?? null,
+            telefono: perfil?.phone ?? null,
+            idExterno: user.id,
+            ip: contexto.ip,
+            agente: contexto.agente,
+            fbp: contexto.fbp,
+            fbc: contexto.fbc,
+          },
+          datos: {
+            valor: (medicion.valorCentavos ?? 0) / 100,
+            moneda: medicion.moneda,
+            contenidoIds: [PLAN_599],
+            tipoContenido: "product",
+          },
+        }),
+      );
+    }
+  } catch (e) {
+    console.error("[capi] Purchase con tarjeta guardada", e);
+  }
+  return { ok: true, medicion };
 }

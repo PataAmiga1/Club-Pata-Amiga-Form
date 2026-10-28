@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -32,6 +32,8 @@ import { acumularComisionDelPeriodo } from "@/lib/comisiones";
 import { anualParaMSI, mesesDelPago, siguienteAniversario } from "@/lib/plans/msi";
 import { diaEnMexico } from "@/lib/zona-horaria";
 import { registrarAceptacion } from "@/lib/legal/aceptacion";
+import { capiConfigurada, enviarEventoMeta, urlDelSitio } from "@/lib/medicion/capi-servidor";
+import { idCompraCheckout } from "@/lib/medicion/eventos";
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.user_id;
@@ -777,6 +779,61 @@ async function handleAnualPrepagado(
 }
 
 /**
+ * Purchase por la API de Conversiones de Meta (28-oct-2026), con el MISMO id
+ * que la pantalla de bienvenida (o /app/peludos) manda desde el navegador.
+ *
+ * Qué cuenta como compra: un Checkout COMPLETADO y cobrado (o sin cobro por
+ * un cupón de 100%), que es siempre un alta — la del primer peludo, un peludo
+ * adicional o el anual a meses sin intereses. NO cuentan:
+ *  · las renovaciones mensuales/anuales de Stripe: llegan como `invoice.paid`,
+ *    nunca como checkout;
+ *  · la renovación anual adelantada (`renovacion_de`), que sí usa Checkout.
+ * Solo si la persona aceptó cookies (el checkout copió `medicion=1` a la
+ * metadata) y si hay llave de la CAPI. Corre en `after()`: el webhook le
+ * contesta a Stripe sin esperar a Meta, y un fallo de Meta no lo rompe.
+ */
+function medirCompraDeCheckout(session: Stripe.Checkout.Session) {
+  try {
+    const md = session.metadata ?? {};
+    const userId = md.user_id;
+    if (!userId || md.medicion !== "1" || md.renovacion_de) return;
+    if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required")
+      return;
+    if (!capiConfigurada()) return;
+    after(async () => {
+      const { data: perfil } = await createAdminClient()
+        .from("profiles")
+        .select("email, phone")
+        .eq("id", userId)
+        .maybeSingle();
+      await enviarEventoMeta({
+        nombre: "Purchase",
+        eventoId: idCompraCheckout(session.id),
+        instante: Date.now() / 1000,
+        url: urlDelSitio(md.price_tier === "adicional" ? "/app/peludos" : "/registro/bienvenida"),
+        persona: {
+          correo: session.customer_details?.email ?? perfil?.email ?? null,
+          telefono: session.customer_details?.phone ?? perfil?.phone ?? null,
+          idExterno: userId,
+          ip: md.cliente_ip ?? null,
+          agente: md.cliente_ua ?? null,
+          fbp: md.fbp ?? null,
+          fbc: md.fbc ?? null,
+        },
+        datos: {
+          valor: (session.amount_total ?? 0) / 100,
+          moneda: session.currency ?? "mxn",
+          contenidoIds: md.plan_slug ? [md.plan_slug] : undefined,
+          tipoContenido: "product",
+        },
+      });
+    });
+  } catch (e) {
+    console.error("[capi] Purchase del webhook", e);
+  }
+}
+
+/**
  * Libro de cobros (sección 2): una fila por factura pagada. Es la fuente de
  * los «meses pagados» que hacen crecer los montos del $599 y de las comisiones
  * mensuales del embajador. Idempotente por el id de la factura: Stripe puede
@@ -812,6 +869,7 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed":
         await handleCheckoutCompleted(event.data.object);
+        medirCompraDeCheckout(event.data.object);
         break;
       case "customer.subscription.updated":
         await handleSubscriptionUpdated(event.data.object);

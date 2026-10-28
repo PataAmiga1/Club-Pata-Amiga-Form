@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { registrarInicioDePago } from "@/lib/analytics";
 import { Stepper } from "@/components/registro/Stepper";
 import { useValorLocal } from "@/lib/hooks";
 import type { GrupoCatalogo } from "@/lib/catalogo-cuidados";
@@ -137,6 +138,7 @@ export function PlanSelector599({
       return;
     }
     window.localStorage.removeItem("pa_ambassador_code");
+    await registrarInicioDePago(cuerpo.medicion);
     window.location.href = cuerpo.url;
   }
 

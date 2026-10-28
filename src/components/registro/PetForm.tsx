@@ -3,6 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { registrarPeludo } from "@/lib/analytics";
+import { leerConsentimiento } from "@/lib/consentimiento";
+import { idRegistroPeludo } from "@/lib/medicion/eventos";
+import { medirPeludoRegistrado } from "@/lib/medicion/acciones";
 import { SelectField, TextField, ToggleGroup } from "@/components/ui/Field";
 import { AutocompleteField } from "@/components/ui/AutocompleteField";
 import { Button } from "@/components/ui/Button";
@@ -120,6 +124,25 @@ export function PetForm({
       }
     });
   }, [router, mode]);
+
+  /**
+   * CompleteRegistration: píxel en el navegador y la API de Conversiones desde
+   * el servidor, con el mismo id. Se espera (con tope de 1.5 s) porque lo que
+   * sigue es una navegación que podría cortar el envío. Sin consentimiento no
+   * se llama a nada. Nunca frena el alta.
+   */
+  async function medirPeludo(petId: string, origen: "registro" | "cuenta") {
+    if (leerConsentimiento() !== "aceptado") return;
+    try {
+      registrarPeludo({ eventoId: idRegistroPeludo(petId), origen, especie: species });
+      await Promise.race([
+        medirPeludoRegistrado(petId, origen).catch(() => {}),
+        new Promise((listo) => setTimeout(listo, 1500)),
+      ]);
+    } catch {
+      /* la medición no detiene nada */
+    }
+  }
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -247,6 +270,7 @@ export function PetForm({
         setLoading(false);
         return;
       }
+      if (nuevo) await medirPeludo(nuevo.id, "cuenta");
       // $599: el peludo recién registrado todavía no tiene membresía; lo
       // siguiente es activarla.
       window.location.assign(
@@ -292,11 +316,19 @@ export function PetForm({
     // Se emparejan con lo que ya existía (por si regresó a este paso): el
     // i-ésimo actualiza al i-ésimo, y lo que sobre se elimina — son capturas
     // pre-pago de esta misma persona, sin tiempo de espera todavía.
+    // El id del primer peludo, solo si se CREÓ ahora (no si se actualizó al
+    // volver a este paso): es la conversión «peludo registrado».
+    let primeroNuevo: string | null = null;
     for (const [i, datos] of todos.entries()) {
       const previo = existing?.[i];
-      const { error: saveError } = previo
-        ? await supabase.from("pets").update(datos).eq("id", previo.id)
-        : await supabase.from("pets").insert(datos);
+      let saveError: unknown = null;
+      if (previo) {
+        ({ error: saveError } = await supabase.from("pets").update(datos).eq("id", previo.id));
+      } else {
+        const r = await supabase.from("pets").insert(datos).select("id").single();
+        saveError = r.error;
+        if (i === 0 && r.data) primeroNuevo = r.data.id;
+      }
       if (saveError) {
         setError("No pudimos guardar a tu peludo. Intenta de nuevo.");
         setLoading(false);
@@ -307,6 +339,7 @@ export function PetForm({
     if (sobrantes.length > 0)
       await supabase.from("pets").delete().in("id", sobrantes);
 
+    if (primeroNuevo) await medirPeludo(primeroNuevo, "registro");
     router.push("/registro/plan");
   }
 
