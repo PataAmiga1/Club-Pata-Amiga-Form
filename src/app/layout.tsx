@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google";
 import localFont from "next/font/local";
 import { Analytics } from "@/components/analytics/Analytics";
 import { BannerCookies } from "@/components/analytics/BannerCookies";
+import { CapturaOrigen } from "@/components/analytics/CapturaOrigen";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -37,6 +38,8 @@ export default function RootLayout({
         {children}
         {/* Medición: no carga NADA sin llaves configuradas Y sin un sí explícito */}
         <Analytics />
+        {/* De qué campaña llegó (utm/fbclid): misma regla, solo con un sí */}
+        <CapturaOrigen />
         <BannerCookies />
       </body>
     </html>

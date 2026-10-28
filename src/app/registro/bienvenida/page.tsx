@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 import { PurchaseEvent } from "@/components/analytics/PurchaseEvent";
+import { idCompraCheckout } from "@/lib/medicion/eventos";
 
 export default async function BienvenidaPage({
   searchParams,
@@ -66,6 +67,7 @@ export default async function BienvenidaPage({
           montoCentavos={compra.montoCentavos}
           moneda={compra.moneda}
           transaccion={compra.transaccion}
+          eventoId={idCompraCheckout(compra.transaccion)}
         />
       )}
       <div className="blob absolute -left-[90px] -top-[70px] size-[320px] bg-white/[.12]" />

@@ -10,6 +10,9 @@ import { registroAbierto } from "@/lib/registro";
 import { anualParaMSI, sesionDePagoAnual } from "@/lib/plans/msi";
 import { buscarPromocion, esCodigoDeEmbajador, limpiarCodigo } from "@/lib/plans/codigos";
 import { crearSesionConTerminos, registrarAceptacion } from "@/lib/legal/aceptacion";
+import { contextoDeMedicion, metadataDeMedicion } from "@/lib/medicion/capi-servidor";
+import type { MedicionDeEvento } from "@/lib/medicion/eventos";
+import { guardarAtribucionDelMiembro } from "@/lib/atribucion-servidor";
 
 const PRICE_BY_PLAN: Record<string, string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
@@ -78,6 +81,21 @@ export async function POST(request: Request) {
     );
   }
   await registrarAceptacion(createAdminClient(), user.id);
+
+  // Medición (28-oct-2026). Si la persona aceptó cookies, sus datos de
+  // navegador (_fbp/_fbc, IP, navegador) viajan en la metadata del pago para
+  // que el webhook mande el Purchase por la API de Conversiones; sin «sí», la
+  // metadata queda como siempre. Y quien se da de alta deja ligada la campaña
+  // de la que llegó (red de seguridad del paso del peludo; la primera gana).
+  const medicionMeta = metadataDeMedicion(await contextoDeMedicion());
+  if (!yaEsMiembro599) await guardarAtribucionDelMiembro(createAdminClient(), user.id);
+  /** InitiateCheckout del navegador: id propio (no se deduplica con nada). */
+  const inicioDePago = (valorCentavos: number | null | undefined): MedicionDeEvento => ({
+    eventoId: `checkout-${crypto.randomUUID()}`,
+    ...(typeof valorCentavos === "number" ? { valorCentavos } : {}),
+    moneda: "mxn",
+    contenidoId: PLAN_DE_ALTAS,
+  });
 
   // Quien se registra contrata el plan de altas (PLAN_DE_ALTAS). La versión
   // publicada manda sobre la variable de entorno; si todavía no hay versión con
@@ -277,10 +295,11 @@ export async function POST(request: Request) {
           plan_version_id: anual.planVersionId,
           msi: "1",
           ...(validCode ? { ambassador_code: validCode } : {}),
+          ...medicionMeta,
         },
         successUrl:
           peludo.nivel === "adicional"
-            ? `${siteUrl}/app/peludos?membresia=1`
+            ? `${siteUrl}/app/peludos?membresia=1&session_id={CHECKOUT_SESSION_ID}`
             : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl:
           peludo.nivel === "adicional"
@@ -300,7 +319,7 @@ export async function POST(request: Request) {
       interval: "year",
       payload: { plan: "annual_msi", petId: peludo.id, nivel: peludo.nivel },
     });
-    return NextResponse.json({ url });
+    return NextResponse.json({ url, medicion: inicioDePago(anual.centavos) });
   }
 
   // Membresía $599 (sección 9): un checkout nuevo reemplaza a los que esta
@@ -342,7 +361,7 @@ export async function POST(request: Request) {
       // a la bienvenida del alta.
       success_url:
         peludo?.nivel === "adicional"
-          ? `${siteUrl}/app/peludos?membresia=1`
+          ? `${siteUrl}/app/peludos?membresia=1&session_id={CHECKOUT_SESSION_ID}`
           : `${siteUrl}/registro/bienvenida?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:
         peludo?.nivel === "adicional"
@@ -357,6 +376,7 @@ export async function POST(request: Request) {
         // versión fue este pago al tomar la foto de beneficios.
         ...(versionPublicada ? { plan_version_id: versionPublicada.id } : {}),
         ...(validCode ? { ambassador_code: validCode } : {}),
+        ...medicionMeta,
       },
       subscription_data: {
         metadata: {
@@ -386,7 +406,14 @@ export async function POST(request: Request) {
     payload: { sessionId: session.id, plan, ...(peludo ? { petId: peludo.id, nivel: peludo.nivel } : {}) },
   });
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({
+    url: session.url,
+    medicion: inicioDePago(
+      peludo?.nivel === "adicional"
+        ? versionPublicada?.additional_price_cents
+        : versionPublicada?.price_cents,
+    ),
+  });
 }
 
 /**

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { registrarInicioDePago } from "@/lib/analytics";
 import { Stepper } from "@/components/registro/Stepper";
 import { useValorLocal } from "@/lib/hooks";
 import { AceptoLegales } from "@/components/legal/AceptoLegales";
@@ -91,8 +92,9 @@ export function PlanSelector({
       setLoading(null);
       return;
     }
-    const { url } = await res.json();
+    const { url, medicion } = await res.json();
     window.localStorage.removeItem("pa_ambassador_code");
+    await registrarInicioDePago(medicion);
     window.location.href = url;
   }
 
