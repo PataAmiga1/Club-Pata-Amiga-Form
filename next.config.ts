@@ -48,7 +48,11 @@ const nextConfig: NextConfig = {
 
   // Embed en Webflow
   async rewrites() {
-    return [{ source: "/embed", destination: "/usuarios/registro" }];
+    return [
+      { source: "/embed", destination: "/usuarios/registro" },
+      // Calculadora «Haz las cuentas» (página estática, link de la pauta).
+      { source: "/haz-las-cuentas", destination: "/haz-las-cuentas.html" },
+    ];
   },
 };
 
