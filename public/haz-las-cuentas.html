@@ -257,6 +257,17 @@ footer img { height: 34px; width: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Aviso de cookies: mismo texto y la misma decisión que el resto del sitio */
+.ck { position: fixed; inset-inline: 0; bottom: 0; z-index: 50; padding: 12px; pointer-events: none; }
+.ck[hidden] { display: none; }
+.ck-box { pointer-events: auto; max-width: 760px; margin: 0 auto; background: #fff; border: 1px solid #eee9dd; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.12); padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
+.ck-box p { flex: 1 1 320px; font-size: .88rem; line-height: 1.5; color: #3d524f; margin: 0; }
+.ck-box a { color: #0e8377; font-weight: 600; }
+.ck-btns { display: flex; gap: 10px; flex: 1 1 220px; }
+.ck-btns button { flex: 1; border-radius: 99px; padding: 10px 18px; font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; border: 1px solid #0e8377; }
+.ck-no { background: #fff; color: #0e8377; }
+.ck-si { background: #0e8377; color: #fff; }
 </style>
 </head>
 <body>
@@ -629,6 +640,60 @@ footer img { height: 34px; width: auto; }
   }
 
   render();
+})();
+</script>
+
+<div class="ck" id="ck" hidden role="region" aria-label="Aviso de cookies">
+  <div class="ck-box">
+    <p>Usamos cookies para entender cómo se usa el sitio y mejorar lo que ofrecemos. <strong>Las opcionales no se activan si no las aceptas.</strong> <a href="/legales/politica-de-cookies" target="_blank" rel="noopener">Ver la política de cookies</a></p>
+    <div class="ck-btns"><button type="button" class="ck-no" id="ckNo">Rechazar</button><button type="button" class="ck-si" id="ckSi">Aceptar</button></div>
+  </div>
+</div>
+
+<script>
+/* Píxel de Meta, con las mismas dos reglas del sitio (Analytics.tsx):
+   solo con un «sí» explícito (misma llave pa-cookies-v1 y cookie pa_medicion,
+   así la decisión vale aquí y en /registro), y solo en el dominio real: la
+   copia de pruebas usa el mismo archivo y no debe mandarle visitas al píxel. */
+(() => {
+  const PIXEL = "881661401454063";
+  const LLAVE = "pa-cookies-v1";
+  const real = /(^|\.)pataamiga\.mx$/.test(location.hostname);
+  let cargado = false, usado = false;
+
+  const leer = () => { try { const v = localStorage.getItem(LLAVE); return v === "aceptado" || v === "rechazado" ? v : null; } catch { return null; } };
+  const guardar = (v) => {
+    try { localStorage.setItem(LLAVE, v); } catch {}
+    const seg = location.protocol === "https:" ? "; Secure" : "";
+    try { document.cookie = v === "aceptado" ? "pa_medicion=1; Max-Age=" + 395 * 86400 + "; Path=/; SameSite=Lax" + seg : "pa_medicion=; Max-Age=0; Path=/; SameSite=Lax" + seg; } catch {}
+  };
+
+  function cargar() {
+    if (cargado || !real) return;
+    cargado = true;
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version="2.0";n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");
+    fbq("init", PIXEL);
+    fbq("track", "PageView");
+    if (usado) fbq("track", "ViewContent", { content_name: "Haz las cuentas" });
+  }
+
+  // La primera vez que mueve algo de la calculadora: «hizo las cuentas».
+  const marcarUso = (ev) => {
+    if (usado || (ev.target.closest && ev.target.closest("#ck"))) return;
+    usado = true;
+    if (cargado && window.fbq) fbq("track", "ViewContent", { content_name: "Haz las cuentas" });
+  };
+  document.addEventListener("input", marcarUso, true);
+  document.addEventListener("change", marcarUso, true);
+
+  const ck = document.getElementById("ck");
+  const decidir = (v) => { guardar(v); ck.hidden = true; if (v === "aceptado") cargar(); };
+  document.getElementById("ckSi").addEventListener("click", () => decidir("aceptado"));
+  document.getElementById("ckNo").addEventListener("click", () => decidir("rechazado"));
+
+  const d = leer();
+  if (d === "aceptado") { guardar("aceptado"); cargar(); }
+  else if (d === null) ck.hidden = false;
 })();
 </script>
 
