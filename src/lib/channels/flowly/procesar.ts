@@ -3,6 +3,7 @@ import { notifyTeam, reportError } from "@/lib/alerts";
 import { emitEvent } from "@/lib/crm/events";
 import { registrarAtribucion, vincularContactoDeConversacion } from "@/lib/channels/entrante";
 import { responderComoAgenteVentas } from "@/lib/channels/agente-ventas";
+import { avisarMensajeEntrante } from "@/lib/channels/aviso-mensaje";
 import { mapaDeProveedores, proveedorDe } from "@/lib/channels/proveedor";
 import { reglaFlowly } from "@/lib/llm/gobierno-reglas";
 import { clienteFlowly, decisionEnvioAgente, type ClienteFlowly } from "./client";
@@ -425,15 +426,19 @@ async function procesarEntrante(admin: Admin, datos: DatosMensaje) {
   if (conv) hilo = await aplicarEstado(admin, hilo, conv, new Date().toISOString());
 
   const contenido = contenidoDeMensaje(m);
-  const { error: errorMsg } = await admin.from("channel_messages").insert({
-    conversation_id: hilo.id,
-    direction: "in",
-    sender: "contact",
-    content: contenido,
-    flowly_message_id: m.id,
-    attachments: adjuntosParaGuardar(m),
-    created_at: m.created_at,
-  });
+  const { data: guardado, error: errorMsg } = await admin
+    .from("channel_messages")
+    .insert({
+      conversation_id: hilo.id,
+      direction: "in",
+      sender: "contact",
+      content: contenido,
+      flowly_message_id: m.id,
+      attachments: adjuntosParaGuardar(m),
+      created_at: m.created_at,
+    })
+    .select("id, created_at")
+    .single();
   const yaGuardado = errorMsg?.code === "23505";
   if (errorMsg && !yaGuardado) throw errorMsg;
 
@@ -470,10 +475,28 @@ async function procesarEntrante(admin: Admin, datos: DatosMensaje) {
     }
   }
 
+  // Correo al equipo si es su primer mensaje o vuelve tras 6+ horas (solo la
+  // primera entrega, no los reintentos). Va después de guardar la atribución
+  // para que el correo diga si llegó por anuncio; corre en paralelo con la IA
+  // y nunca lanza.
+  const aviso =
+    !yaGuardado && guardado
+      ? avisarMensajeEntrante(admin, {
+          conversationId: hilo.id,
+          messageId: guardado.id,
+          createdAt: guardado.created_at,
+          texto: contenido,
+        })
+      : null;
+
   // Un audio o una foto sin texto llega como su etiqueta («[Nota de voz]»),
   // igual que por el camino directo: el prompt de ventas (regla 4) le pide a
   // la IA agradecer y pedir la pregunta por escrito, sin inventar qué contiene.
-  await turnoDelAgente(admin, cliente, hilo, datos);
+  try {
+    await turnoDelAgente(admin, cliente, hilo, datos);
+  } finally {
+    await aviso;
+  }
 }
 
 /**

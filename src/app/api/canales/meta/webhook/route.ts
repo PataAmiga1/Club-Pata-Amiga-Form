@@ -8,6 +8,7 @@ import {
 } from "@/lib/channels/meta";
 import { reportError } from "@/lib/alerts";
 import { vincularContactoDeConversacion } from "@/lib/channels/entrante";
+import { avisarMensajeEntrante } from "@/lib/channels/aviso-mensaje";
 import { responderComoAgenteVentas } from "@/lib/channels/agente-ventas";
 import { mapaDeProveedores, proveedorDe } from "@/lib/channels/proveedor";
 
@@ -89,19 +90,23 @@ async function handleIncoming(msg: IncomingMessage) {
   if (error || !conv) throw error ?? new Error("No se pudo crear la conversación");
 
   // Guardar el mensaje entrante (dedupe: Meta reintenta webhooks)
-  const { error: msgError } = await admin.from("channel_messages").insert({
-    conversation_id: conv.id,
-    direction: "in",
-    sender: "contact",
-    // Fotos, notas de voz, documentos…: el texto trae la etiqueta legible
-    // («[Imagen]») y aquí queda el detalle para poder descargarlo.
-    content: msg.text,
-    attachments: msg.adjuntos,
-    external_message_id: msg.externalMessageId,
-  });
-  if (msgError) {
-    if (msgError.code === "23505") return; // duplicado: ya procesado
-    throw msgError;
+  const { data: guardado, error: msgError } = await admin
+    .from("channel_messages")
+    .insert({
+      conversation_id: conv.id,
+      direction: "in",
+      sender: "contact",
+      // Fotos, notas de voz, documentos…: el texto trae la etiqueta legible
+      // («[Imagen]») y aquí queda el detalle para poder descargarlo.
+      content: msg.text,
+      attachments: msg.adjuntos,
+      external_message_id: msg.externalMessageId,
+    })
+    .select("id, created_at")
+    .single();
+  if (msgError || !guardado) {
+    if (msgError?.code === "23505") return; // duplicado: ya procesado
+    throw msgError ?? new Error("No se pudo guardar el mensaje entrante");
   }
 
   // CRM: al primer mensaje la persona entra como contacto y como oportunidad en
@@ -117,23 +122,36 @@ async function handleIncoming(msg: IncomingMessage) {
     });
   }
 
+  // Correo al equipo si es su primer mensaje o vuelve tras 6+ horas. Corre en
+  // paralelo con la IA (no retrasa la respuesta) y nunca lanza.
+  const aviso = avisarMensajeEntrante(admin, {
+    conversationId: conv.id,
+    messageId: guardado.id,
+    createdAt: guardado.created_at,
+    texto: msg.text,
+  });
+
   // El turno del agente (gobierno, LLM, guardado) es el mismo que usa Flowly;
   // aquí solo cambia cómo sale la respuesta: directo a Meta. Si el conector no
   // está configurado (dev), el mensaje igual queda en la bandeja para revisión.
-  await responderComoAgenteVentas(
-    admin,
-    {
-      conversationId: conv.id,
-      channel: msg.channel,
-      displayName: conv.display_name ?? msg.displayName,
-      texto: msg.text,
-      needsAttention: conv.needs_attention,
-      humanTakeover: conv.human_takeover,
-    },
-    {
-      enviar: async (respuesta) => {
-        await sendChannelMessage(msg.channel, msg.externalUserId, respuesta);
+  try {
+    await responderComoAgenteVentas(
+      admin,
+      {
+        conversationId: conv.id,
+        channel: msg.channel,
+        displayName: conv.display_name ?? msg.displayName,
+        texto: msg.text,
+        needsAttention: conv.needs_attention,
+        humanTakeover: conv.human_takeover,
       },
-    },
-  );
+      {
+        enviar: async (respuesta) => {
+          await sendChannelMessage(msg.channel, msg.externalUserId, respuesta);
+        },
+      },
+    );
+  } finally {
+    await aviso;
+  }
 }

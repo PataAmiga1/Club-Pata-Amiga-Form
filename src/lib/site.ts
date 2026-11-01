@@ -215,6 +215,11 @@ export const NOTIFY_EVENTS = [
     hint: "Aviso cuando alguien en Messenger/Instagram/WhatsApp pide un humano, está molesto o menciona temas legales.",
   },
   {
+    key: "notify_channel_new_message",
+    label: "Nuevo mensaje en WhatsApp, Messenger o Instagram",
+    hint: "Aviso cuando alguien escribe por primera vez, o vuelve a escribir tras más de 6 horas sin mensajes suyos. Incluye el inicio del mensaje, si llegó por anuncio y la liga a la conversación en el portal de ventas.",
+  },
+  {
     key: "notify_ambassadors",
     label: "Nueva solicitud de embajador",
     hint: "Aviso al llegar una solicitud del programa de embajadores.",
