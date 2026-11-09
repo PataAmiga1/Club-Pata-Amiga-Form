@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { RegistroHeader } from "@/components/registro/Header";
 import { StashAmbassadorCode } from "@/components/registro/StashAmbassadorCode";
+import { StashPromoCampana } from "@/components/registro/StashPromoCampana";
 import { BenefitsMarquee } from "@/components/landing/BenefitsMarquee";
 import { Stepper } from "@/components/registro/Stepper";
 import { TextField } from "@/components/ui/Field";
@@ -124,6 +125,7 @@ export function RegistroCliente({ es599 }: { es599: boolean }) {
     <div className="flex min-h-dvh flex-col bg-cream">
       <RegistroHeader step={1} />
       <StashAmbassadorCode />
+      <StashPromoCampana />
       {/* Banda de beneficios — refuerzo en móvil como en la app anterior */}
       <div className="sm:hidden">
         <BenefitsMarquee variant="light" es599={es599} />

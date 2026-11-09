@@ -57,6 +57,11 @@ export async function buscarPromocion(
   const pc = data[0];
   const cupon = pc?.promotion?.coupon;
   if (!pc || !cupon || typeof cupon === "string" || !cupon.valid) return null;
+  // Vencida o agotada: Stripe la rechazaría al pagar. Mejor saberlo aquí, para
+  // que la página del plan no prometa un descuento que no va a llegar.
+  const ahora = Math.floor(Date.now() / 1000);
+  if (pc.expires_at && pc.expires_at <= ahora) return null;
+  if (pc.max_redemptions && pc.times_redeemed >= pc.max_redemptions) return null;
   return {
     promotionCodeId: pc.id,
     promocion: promocionDeCupon(pc.code, cupon),

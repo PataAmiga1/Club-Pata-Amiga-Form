@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { registrarInicioDePago } from "@/lib/analytics";
 import { Stepper } from "@/components/registro/Stepper";
 import { useValorLocal } from "@/lib/hooks";
 import type { GrupoCatalogo } from "@/lib/catalogo-cuidados";
 import type { Oferta599 } from "@/lib/plans/oferta";
-import { describirPromocion, type Promocion } from "@/lib/plans/promocion-texto";
+import {
+  cobrosConPromocion,
+  describirPromocion,
+  type Promocion,
+} from "@/lib/plans/promocion-texto";
+import { LLAVE_PROMO_GUARDADA, leerPromoGuardada } from "@/lib/campanas/buen-fin";
 import { AceptoLegales } from "@/components/legal/AceptoLegales";
 
 /**
@@ -43,7 +48,18 @@ export function PlanSelector599({
   oferta: Oferta599;
   catalogo: GrupoCatalogo[];
 }) {
-  const [selected, setSelected] = useState<Plan>("annual");
+  // Landing de campaña (El Buen Fin, 9-nov-2026): el enlace trae la modalidad
+  // y la promoción, guardadas en /registro por `StashPromoCampana`. SOLO para el
+  // primer peludo: quien ya es miembro y paga otro peludo tiene su 15% y no se
+  // le aplica sola ninguna promoción de campaña.
+  const crudoCampana = useValorLocal(LLAVE_PROMO_GUARDADA);
+  const campana = useMemo(
+    () => (oferta.nivel === "principal" ? leerPromoGuardada(crudoCampana) : null),
+    [crudoCampana, oferta.nivel],
+  );
+  // Lo que la persona toca manda; si no ha tocado nada, la modalidad del enlace.
+  const [elegido, setSelected] = useState<Plan | null>(null);
+  const selected: Plan = elegido ?? (campana?.modalidad === "mensual" ? "monthly" : "annual");
   const [loading, setLoading] = useState<Cobro | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [acepto, setAcepto] = useState(false);
@@ -58,7 +74,16 @@ export function PlanSelector599({
   const [revisando, setRevisando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [embajador, setEmbajador] = useState<string | null>(null);
-  const [promo, setPromo] = useState<Promocion | null>(null);
+  const [promoTecleada, setPromo] = useState<Promocion | null>(null);
+  // La del enlace de campaña se revisa en Stripe una vez. Si no existe (staging,
+  // o la PM todavía no la crea) no se aplica y el pago sigue igual: la casilla
+  // de Stripe en la página de pago sigue ahí.
+  const [promoDeCampana, setPromoDeCampana] = useState<Promocion | null>(null);
+  const [campanaQuitada, setCampanaQuitada] = useState(false);
+  const [avisoCampana, setAvisoCampana] = useState<string | null>(null);
+  const promoCampanaVigente = !campanaQuitada ? promoDeCampana : null;
+  const promo = promoTecleada ?? promoCampanaVigente;
+  const promoEsDeCampana = !promoTecleada && !!promoCampanaVigente;
   // El del enlace se revisa una vez; si lo quitan, no vuelve.
   const [prellenadoQuitado, setPrellenadoQuitado] = useState(false);
   const [prellenadoValido, setPrellenadoValido] = useState<boolean | null>(null);
@@ -79,6 +104,28 @@ export function PlanSelector599({
       cancelado = true;
     };
   }, [codigoPrellenado]);
+
+  const palabraDeCampana = campana?.promo ?? null;
+  useEffect(() => {
+    if (!palabraDeCampana) return;
+    let cancelado = false;
+    reconocerCodigo(palabraDeCampana)
+      .then((r) => {
+        if (cancelado) return;
+        if (r?.tipo === "promocion") setPromoDeCampana(r.promocion);
+        else
+          setAvisoCampana(
+            `El código ${palabraDeCampana} no está activo en este momento. Puedes continuar con el precio regular.`,
+          );
+      })
+      .catch(() => {
+        // Sin respuesta: se paga sin el descuento puesto y Stripe sigue
+        // ofreciendo su casilla de código.
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [palabraDeCampana]);
 
   async function aplicarCodigo() {
     const codigo = texto.trim().toUpperCase();
@@ -112,6 +159,9 @@ export function PlanSelector599({
   const promoAnual = promo
     ? describirPromocion(promo, { centavos: Math.round(oferta.anualPesos * 100), intervalo: "year" })
     : null;
+  // Lo que se paga hoy y después, con la promoción puesta (El Buen Fin).
+  const cobroMensual = promo ? cobrosConPromocion(promo, Math.round(oferta.mensualPesos * 100)) : null;
+  const cobroAnual = promo ? cobrosConPromocion(promo, Math.round(oferta.anualPesos * 100)) : null;
 
   async function checkout(plan: Cobro) {
     setError(null);
@@ -128,6 +178,9 @@ export function PlanSelector599({
         plan,
         ambassadorCode: embajadorVigente ?? undefined,
         promotionCode: promo?.codigo,
+        // La del enlace de campaña es opcional: si vence entre esta página y
+        // el pago, se cobra sin ella en vez de frenar a la persona.
+        promoOpcional: promoEsDeCampana || undefined,
         aceptaTerminos: acepto,
       }),
     });
@@ -138,6 +191,7 @@ export function PlanSelector599({
       return;
     }
     window.localStorage.removeItem("pa_ambassador_code");
+    window.localStorage.removeItem(LLAVE_PROMO_GUARDADA);
     await registrarInicioDePago(cuerpo.medicion);
     window.location.href = cuerpo.url;
   }
@@ -201,6 +255,12 @@ export function PlanSelector599({
             </span>
             <span className="text-[15px] text-ink-tertiary">MXN / mes</span>
           </div>
+          {promo && cobroMensual && (
+            <div className="rounded-[12px] bg-success-bg px-3 py-2 text-[13px] font-semibold leading-snug text-success-text">
+              Con {promo.codigo}: hoy pagas {mxn(cobroMensual.hoy / 100)} · después{" "}
+              {mxn(cobroMensual.despues / 100)} al mes
+            </div>
+          )}
           <div className="flex flex-col gap-2.5 text-sm leading-snug text-ink-body">
             <div className="flex gap-2.5">{CHECK}Cancelas cuando quieras</div>
             <div className="flex gap-2.5">{CHECK}Tus montos crecen cada mes pagado</div>
@@ -239,6 +299,12 @@ export function PlanSelector599({
             </span>
             <span className="text-[15px] text-ink-tertiary">MXN / año</span>
           </div>
+          {promo && cobroAnual && (
+            <div className="rounded-[12px] bg-success-bg px-3 py-2 text-[13px] font-semibold leading-snug text-success-text">
+              Con {promo.codigo}: hoy pagas {mxn(cobroAnual.hoy / 100)} por 12 meses · al
+              renovar, {mxn(cobroAnual.despues / 100)} al año
+            </div>
+          )}
           <div className="flex flex-col gap-2.5 text-sm leading-snug text-ink-body">
             <div className="flex gap-2.5">{CHECK}Un solo pago al año</div>
             <div className="flex gap-2.5">{CHECK}Tus montos crecen cada mes</div>
@@ -433,7 +499,10 @@ export function PlanSelector599({
                   : `${promoMensual} en el mensual · ${promoAnual?.replace(/ en tu primer pago$/, "")} en el anual`}
                 <button
                   type="button"
-                  onClick={() => setPromo(null)}
+                  onClick={() => {
+                    setPromo(null);
+                    setCampanaQuitada(true);
+                  }}
                   aria-label={`Quitar ${promo.codigo}`}
                   className="grid size-6 place-items-center rounded-full hover:bg-white/60"
                 >
@@ -464,6 +533,11 @@ export function PlanSelector599({
             {aviso}
           </div>
         )}
+        {avisoCampana && !promo && (
+          <div className="rounded-[12px] bg-info-bg px-4 py-2.5 text-sm text-info-text">
+            {avisoCampana}
+          </div>
+        )}
       </div>
       {error && (
         <div className="rounded-[12px] bg-error-bg px-4 py-3 text-sm text-error-text">
@@ -481,7 +555,11 @@ export function PlanSelector599({
         >
           {loading
             ? "Un momento…"
-            : `Pagar ${mxn(selected === "annual" ? oferta.anualPesos : oferta.mensualPesos)} MXN`}
+            : `Pagar ${mxn(
+                (selected === "annual"
+                  ? (cobroAnual?.hoy ?? oferta.anualPesos * 100)
+                  : (cobroMensual?.hoy ?? oferta.mensualPesos * 100)) / 100,
+              )} MXN`}
         </button>
       </div>
 

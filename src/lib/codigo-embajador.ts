@@ -57,6 +57,9 @@ const RESERVADOS = [
   "PATASPRING", "PATA2026", "PATAEVENTO", "PATANEWYEAR", "PATACEO",
   "PATADIRECTOR", "PATAGERENTE", "PATAAYUDA", "PATAFUNDADOR",
   "PATAEMBAJADOR",
+  // Palabras de promoción de campaña (se teclean en la misma casilla que el
+  // código de embajador, y si coinciden gana el embajador: no pueden ser suyas).
+  "BUENFIN", "EXPOCAN",
 ];
 
 /**

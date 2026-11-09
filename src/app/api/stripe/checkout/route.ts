@@ -13,6 +13,7 @@ import { crearSesionConTerminos, registrarAceptacion } from "@/lib/legal/aceptac
 import { contextoDeMedicion, metadataDeMedicion } from "@/lib/medicion/capi-servidor";
 import type { MedicionDeEvento } from "@/lib/medicion/eventos";
 import { guardarAtribucionDelMiembro } from "@/lib/atribucion-servidor";
+import { PROMOS_SOLO_PRIMER_PELUDO } from "@/lib/campanas/buen-fin";
 
 const PRICE_BY_PLAN: Record<string, string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
@@ -52,8 +53,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const { plan: planPedido, ambassadorCode, promotionCode, petId, aceptaTerminos } =
-    await request.json();
+  const {
+    plan: planPedido,
+    ambassadorCode,
+    promotionCode,
+    promoOpcional,
+    petId,
+    aceptaTerminos,
+  } = await request.json();
   // «annual_msi» es el MISMO plan anual, pagado de una vez y a meses sin
   // intereses (17-sep-2026). Stripe no admite MSI dentro de una suscripción,
   // así que cambia CÓMO se cobra, no qué se contrata: de ahí `plan` para todo
@@ -252,16 +259,32 @@ export async function POST(request: Request) {
   // la PALABRA y se vuelve a buscar en Stripe: el id nunca viene del navegador.
   // Con él, el descuento va ya puesto en el pago; sin él, la casilla de Stripe
   // en la página de pago sigue ahí, como siempre.
+  //
+  // `promoOpcional` = la puso sola el enlace de una campaña (El Buen Fin): si no
+  // existe en Stripe o ya venció, se cobra sin ella y la casilla de Stripe queda
+  // disponible, en vez de frenar el pago. La tecleada sí avisa.
   let promotionCodeId: string | undefined;
   const palabraPromo = limpiarCodigo(promotionCode);
   if (palabraPromo) {
-    const promo = await buscarPromocion(palabraPromo).catch(() => null);
-    if (!promo)
-      return NextResponse.json(
-        { error: "Ese código de promoción ya no está activo.", motivo: "promocion_invalida" },
-        { status: 400 },
-      );
-    promotionCodeId = promo.promotionCodeId;
+    // Las de campaña son para el primer peludo; el adicional ya tiene su 15%.
+    if (peludo?.nivel === "adicional" && PROMOS_SOLO_PRIMER_PELUDO.includes(palabraPromo)) {
+      if (promoOpcional !== true)
+        return NextResponse.json(
+          {
+            error: `${palabraPromo} aplica a la membresía de tu primer peludo. Tu peludo adicional ya tiene 15% de descuento.`,
+            motivo: "promocion_solo_primer_peludo",
+          },
+          { status: 400 },
+        );
+    } else {
+      const promo = await buscarPromocion(palabraPromo).catch(() => null);
+      if (promo) promotionCodeId = promo.promotionCodeId;
+      else if (promoOpcional !== true)
+        return NextResponse.json(
+          { error: "Ese código de promoción ya no está activo.", motivo: "promocion_invalida" },
+          { status: 400 },
+        );
+    }
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
