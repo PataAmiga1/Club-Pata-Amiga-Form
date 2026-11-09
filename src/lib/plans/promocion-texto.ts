@@ -56,3 +56,20 @@ export function describirPromocion(
   if (p.duracion === "forever") return `${descuento} en cada pago`;
   return "descuento aplicado";
 }
+
+/**
+ * Cuánto se cobra HOY y cuánto en los cobros siguientes con la promoción, en
+ * centavos (El Buen Fin, 9-nov-2026): la página del plan dice las dos cifras
+ * antes de mandar a Stripe. Mismo criterio que Stripe: el descuento nunca deja
+ * un cobro negativo y `once` solo toca el primero.
+ */
+export function cobrosConPromocion(
+  p: Promocion,
+  centavos: number,
+): { hoy: number; despues: number } {
+  const conDescuento =
+    p.porcentaje !== null
+      ? Math.round(centavos * (1 - p.porcentaje / 100))
+      : Math.max(0, centavos - (p.montoCentavos ?? 0));
+  return { hoy: conDescuento, despues: p.duracion === "once" ? centavos : conDescuento };
+}
