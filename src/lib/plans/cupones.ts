@@ -1,5 +1,6 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { getStripe } from "@/lib/stripe";
+import { finDelDia } from "@/lib/zona-horaria";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -31,7 +32,7 @@ export type EntradaCupon = {
   montoPesos?: number;
   duracion: "once" | "repeating" | "forever";
   duracionMeses?: number;
-  /** ISO date (yyyy-mm-dd) o vacío para sin vencimiento */
+  /** Día (yyyy-mm-dd) o vacío para sin vencimiento. Vale hasta las 23:59:59 de ese día EN MÉXICO. */
   venceEl?: string;
   usosMax?: number;
   /** Restringir a un plan. Vacío = cualquier plan. */
@@ -78,7 +79,15 @@ export async function crearCupon(
   if (input.usosMax !== undefined && input.usosMax !== null && input.usosMax < 1)
     return { ok: false, error: "El tope de usos debe ser al menos 1." };
 
-  const venceEl = input.venceEl ? new Date(`${input.venceEl}T23:59:59`) : null;
+  // El último instante de ese día en hora de México. Antes era
+  // `new Date("…T23:59:59")`, que toma la zona del PROCESO: en Vercel (UTC) un
+  // cupón «hasta el 17» vencía el 17 a las 17:59 de México, seis horas antes de
+  // lo anunciado (se vio al preparar El Buen Fin, 9-nov-2026).
+  const venceEl = input.venceEl
+    ? /^\d{4}-\d{2}-\d{2}$/.test(input.venceEl)
+      ? finDelDia(input.venceEl)
+      : new Date(NaN)
+    : null;
   if (venceEl && (Number.isNaN(venceEl.getTime()) || venceEl.getTime() < Date.now()))
     return { ok: false, error: "La fecha de vigencia ya pasó." };
 

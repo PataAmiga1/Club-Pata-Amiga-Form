@@ -179,6 +179,9 @@ export function Cupones({
                 onChange={(e) => setVenceEl(e.target.value)}
                 className={`${CAMPO} w-[170px]`}
               />
+              <span className="text-[11px] text-ink-tertiary">
+                Vale hasta las 23:59 h de México de ese día.
+              </span>
             </label>
             <label className="flex flex-col gap-1">
               <span className={ETIQUETA_INPUT}>TOPE DE USOS (opcional)</span>
