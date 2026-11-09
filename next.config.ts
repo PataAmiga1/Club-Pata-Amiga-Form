@@ -46,6 +46,12 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
 
+  // El Buen Fin 2026: la pauta puede escribir el enlace con guion. La búsqueda
+  // (utm_*, fbclid) viaja sola en un redirect de Next.
+  async redirects() {
+    return [{ source: "/buen-fin", destination: "/buenfin", permanent: false }];
+  },
+
   // Embed en Webflow
   async rewrites() {
     return [
