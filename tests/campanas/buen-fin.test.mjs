@@ -10,6 +10,7 @@ import {
   estadoDeLaCampana,
   leerPromoGuardada,
   promoDeLaUrl,
+  tiempoParaElCierre,
   vistaForzada,
 } from '../../src/lib/campanas/buen-fin.ts';
 
@@ -32,19 +33,27 @@ test('vista forzada solo acepta los tres estados', () => {
   assert.equal(vistaForzada(undefined), null);
 });
 
-test('las cuentas con $599 y $7,188 dan lo que dice la pauta', () => {
-  const c = cuentasBuenFin({ mensualPesos: 599, anualPesos: 7188 });
+test('las cuentas con los precios publicados ($599 y $6,612) dan la pauta corregida', () => {
+  const c = cuentasBuenFin({ mensualPesos: 599, anualPesos: 6612 });
   assert.deepEqual(c, {
     mensual: 599,
     primerMes: 0,
-    anualRegular: 7188,
-    anualBuenFin: 6589,
+    anualRegular: 6612,
+    anualBuenFin: 6013,
     ahorroAnual: 599,
     primerAnioMensual: 6589,
   });
   assert.equal(cuadraConLaPauta(c), true);
-  // Comparación honesta: el primer año cuesta lo mismo en las dos modalidades.
-  assert.equal(c.primerAnioMensual, c.anualBuenFin);
+  // Las cifras del documento maestro original ya no cuadran.
+  assert.equal(cuadraConLaPauta(cuentasBuenFin({ mensualPesos: 599, anualPesos: 7188 })), false);
+});
+
+test('cuenta regresiva al 17-nov 23:59 de México', () => {
+  // 17-nov 23:00 en México = 18-nov 05:00 UTC → falta 1 hora.
+  assert.deepEqual(tiempoParaElCierre(Date.parse('2026-11-18T05:00:00Z')), { dias: 0, horas: 1, minutos: 0 });
+  // 13-nov 00:00 en México → 4 días 23 h 60 min redondeado hacia arriba = 5 días justos.
+  assert.deepEqual(tiempoParaElCierre(Date.parse('2026-11-13T06:00:00Z')), { dias: 5, horas: 0, minutos: 0 });
+  assert.equal(tiempoParaElCierre(Date.parse('2026-11-18T06:00:00Z')), null);
 });
 
 test('si el precio real cambia, la página lo sabe', () => {

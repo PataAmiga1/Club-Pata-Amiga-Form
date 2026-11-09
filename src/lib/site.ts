@@ -141,6 +141,12 @@ export const SITE_ASSET_SLOTS = [
     label: "Red veterinaria y de cuidado",
     hint: "Collage con fondo transparente (PNG/WebP) — flota sobre blanco. Ideal ~1400px.",
   },
+  {
+    // El Buen Fin 2026 (/buenfin). Vacío = usa «Tarjeta de planes».
+    slot: "buenfin-hero",
+    label: "El Buen Fin — foto principal",
+    hint: "Persona con su peludo, foto real, sin texto ni huellas encima. Se recorta vertical (5:6) en computadora y horizontal (4:3) en celular: deja aire alrededor. Ideal ~1200×1400.",
+  },
 ] as const;
 
 export type SiteAssetSlot = (typeof SITE_ASSET_SLOTS)[number]["slot"];

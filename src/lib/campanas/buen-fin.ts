@@ -17,7 +17,7 @@
  * contra los reales y avisa si no cuadran, pero nunca los enseña en lugar de
  * los reales.
  */
-import { diaEnMexico } from "../zona-horaria.ts";
+import { diaEnMexico, finDelDia } from "../zona-horaria.ts";
 
 export const BUEN_FIN = {
   /** La palabra que se teclea. Una sola, para las dos modalidades. */
@@ -33,11 +33,17 @@ export const BUEN_FIN = {
   fechasEnTexto: "Del 13 al 17 de noviembre",
 } as const;
 
-/** Lo que prometen los anuncios ya aprobados (documento maestro, «Lineamientos»). */
+/**
+ * Lo que deben decir los anuncios. El documento maestro decía anual regular
+ * $7,188 → $6,589, pero el anual publicado es $6,612: se le pidió al cliente
+ * corregir la pauta a $6,612 → $6,013 (9-nov-2026). Estas son las cifras
+ * CORREGIDAS; si la versión publicada cambia, la página avisa fuera de
+ * producción.
+ */
 export const CIFRAS_DE_PAUTA = {
   mensualPesos: 599,
-  anualRegularPesos: 7188,
-  anualBuenFinPesos: 6589,
+  anualRegularPesos: 6612,
+  anualBuenFinPesos: 6013,
   primerMesPesos: 0,
 } as const;
 
@@ -49,6 +55,20 @@ export function estadoDeLaCampana(ahora: Date = new Date()): EstadoCampana {
   if (hoy < BUEN_FIN.inicio) return "antes";
   if (hoy > BUEN_FIN.fin) return "terminada";
   return "activa";
+}
+
+/** Lo que falta para que cierre la promoción (17-nov 23:59:59 de México). `null` si ya cerró. */
+export function tiempoParaElCierre(
+  ahoraMs: number,
+): { dias: number; horas: number; minutos: number } | null {
+  const faltanMs = finDelDia(BUEN_FIN.fin).getTime() - ahoraMs;
+  if (faltanMs <= 0) return null;
+  const minutosTotales = Math.ceil(faltanMs / 60_000);
+  return {
+    dias: Math.floor(minutosTotales / 1440),
+    horas: Math.floor((minutosTotales % 1440) / 60),
+    minutos: minutosTotales % 60,
+  };
 }
 
 /** `?vista=` para revisar los tres estados antes de tiempo (solo QA). */
