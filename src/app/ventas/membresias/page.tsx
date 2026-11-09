@@ -147,6 +147,9 @@ export default async function MembresiasPage() {
         : (DURACION[c.duracion] ?? c.duracion),
     venceEl: c.vence_el
       ? new Date(c.vence_el).toLocaleDateString("es-MX", {
+          // El día de México: vence a las 23:59 de México, que en UTC ya es el
+          // día siguiente (y Vercel corre en UTC).
+          timeZone: "America/Mexico_City",
           day: "numeric",
           month: "long",
           year: "numeric",
