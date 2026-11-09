@@ -12,8 +12,98 @@ import { acumularComisionDeCobro } from "@/lib/comisiones";
 import { lineaDelCobro } from "@/lib/plans/factura";
 import { notifyTeam, reportError } from "@/lib/alerts";
 import { reembolsarEnStripe } from "@/lib/garantia";
+import { esErrorDeSuscripcionTerminada, suscripcionTerminada } from "@/lib/plans/estado-stripe";
 
 type Admin = ReturnType<typeof createAdminClient>;
+
+/** Lo mínimo de una fila de `subscriptions` para conciliarla con Stripe. */
+type FilaDeSuscripcion = {
+  id: string;
+  user_id: string | null;
+  pet_id?: string | null;
+  stripe_subscription_id: string;
+};
+
+/**
+ * La fila local decía «viva» y Stripe dice que ya terminó: se perdió el
+ * webhook de la baja. Se corrige con el mismo efecto que
+ * `customer.subscription.deleted` (estado de la fila, precio principal del
+ * siguiente peludo y estado del miembro) y queda en la sección de errores para
+ * que el equipo sepa que un webhook no llegó.
+ */
+export async function conciliarSuscripcionTerminada(
+  admin: Admin,
+  fila: FilaDeSuscripcion,
+  status: string,
+  opciones: { reacomodar?: boolean } = {},
+): Promise<void> {
+  await admin.from("subscriptions").update({ status }).eq("id", fila.id);
+  await reportError(
+    "suscripción desfasada: Stripe ya la terminó",
+    new Error(`la fila decía viva y Stripe dice ${status}`),
+    {
+      userId: fila.user_id,
+      subscription_row_id: fila.id,
+      stripe_subscription_id: fila.stripe_subscription_id,
+      pendiente: "nada: la fila ya se corrigió; revisar por qué no llegó el webhook de la baja",
+    },
+  );
+  if (!fila.user_id) return;
+  if (fila.pet_id && opciones.reacomodar !== false) {
+    try {
+      await reacomodarPrecioPrincipal(admin, fila.user_id);
+    } catch (e) {
+      await reportError("reacomodar-precio-principal", e, {
+        userId: fila.user_id,
+        stripe_subscription_id: fila.stripe_subscription_id,
+      });
+    }
+  }
+  await recalcularEstadoDelMiembro(admin, fila.user_id);
+}
+
+/**
+ * Trae de Stripe la suscripción de una fila ANTES de moverla. Si ya terminó
+ * (cancelada o incompleta vencida), concilia la fila y devuelve null: quien
+ * llama no debe mandarle ningún `subscriptions.update`.
+ */
+export async function suscripcionMovible(
+  admin: Admin,
+  fila: FilaDeSuscripcion,
+  opciones: { reacomodar?: boolean } = {},
+): Promise<Stripe.Subscription | null> {
+  const sub = await getStripe().subscriptions.retrieve(fila.stripe_subscription_id);
+  if (!suscripcionTerminada(sub.status)) return sub;
+  await conciliarSuscripcionTerminada(admin, fila, sub.status, opciones);
+  return null;
+}
+
+/**
+ * `subscriptions.update` que no revienta si la suscripción ya terminó: la
+ * revisa antes, y si Stripe la cancela entre la lectura y el cambio, también
+ * concilia. Devuelve null cuando ya no había nada que mover.
+ */
+export async function actualizarSiSigueViva(
+  admin: Admin,
+  fila: FilaDeSuscripcion,
+  cambios:
+    | Stripe.SubscriptionUpdateParams
+    | ((actual: Stripe.Subscription) => Stripe.SubscriptionUpdateParams),
+  opciones: { reacomodar?: boolean } = {},
+): Promise<Stripe.Subscription | null> {
+  const actual = await suscripcionMovible(admin, fila, opciones);
+  if (!actual) return null;
+  try {
+    return await getStripe().subscriptions.update(
+      fila.stripe_subscription_id,
+      typeof cambios === "function" ? cambios(actual) : cambios,
+    );
+  } catch (e) {
+    if (!esErrorDeSuscripcionTerminada(e)) throw e;
+    await conciliarSuscripcionTerminada(admin, fila, "canceled", opciones);
+    return null;
+  }
+}
 
 /**
  * PELUDOS DE LA MEMBRESÍA $599 — sección 4 (17-sep-2026).
@@ -332,25 +422,48 @@ export async function reacomodarPrecioPrincipal(
   const vivas = (subs ?? []).filter((s) => ESTADOS_VIVOS.includes(s.status ?? ""));
   if (vivas.length === 0 || vivas.some((s) => s.price_tier === "principal")) return null;
 
-  const siguiente = vivas[0];
-  if (!siguiente.stripe_subscription_id || !siguiente.plan_version_id) return null;
-  const { data: version } = await admin
-    .from("plan_versions")
-    .select("stripe_price_id, price_cents")
-    .eq("id", siguiente.plan_version_id)
-    .maybeSingle();
-  if (!version?.stripe_price_id) return null;
+  // Se recorre en orden de antigüedad: si la fila del más antiguo está
+  // desfasada (Stripe ya la terminó), se concilia y sube el siguiente.
+  for (const siguiente of vivas) {
+    if (!siguiente.stripe_subscription_id || !siguiente.plan_version_id) return null;
+    const { data: version } = await admin
+      .from("plan_versions")
+      .select("stripe_price_id, price_cents")
+      .eq("id", siguiente.plan_version_id)
+      .maybeSingle();
+    if (!version?.stripe_price_id) return null;
 
-  const stripe = getStripe();
-  const actual = await stripe.subscriptions.retrieve(siguiente.stripe_subscription_id);
-  await stripe.subscriptions.update(siguiente.stripe_subscription_id, {
-    items: [{ id: actual.items.data[0].id, price: version.stripe_price_id }],
-    proration_behavior: "none",
-    metadata: { ...actual.metadata, price_tier: "principal" },
-  });
+    const actualizada = await actualizarSiSigueViva(
+      admin,
+      {
+        id: siguiente.id,
+        user_id: userId,
+        pet_id: siguiente.pet_id,
+        stripe_subscription_id: siguiente.stripe_subscription_id,
+      },
+      (actual) => ({
+        items: [{ id: actual.items.data[0].id, price: version.stripe_price_id! }],
+        proration_behavior: "none",
+        metadata: { ...actual.metadata, price_tier: "principal" },
+      }),
+      // Ya estamos reacomodando: que la conciliación no vuelva a entrar aquí.
+      { reacomodar: false },
+    );
+    if (!actualizada) continue;
+    return promoverAPrincipal(admin, userId, siguiente, version.price_cents);
+  }
+  return null;
+}
+
+async function promoverAPrincipal(
+  admin: Admin,
+  userId: string,
+  siguiente: { id: string; pets: unknown },
+  priceCents: number,
+): Promise<string> {
   await admin
     .from("subscriptions")
-    .update({ price_tier: "principal", amount: version.price_cents / 100 })
+    .update({ price_tier: "principal", amount: priceCents / 100 })
     .eq("id", siguiente.id);
 
   const pet = (Array.isArray(siguiente.pets) ? siguiente.pets[0] : siguiente.pets) as
@@ -360,25 +473,36 @@ export async function reacomodarPrecioPrincipal(
     user_id: userId,
     type: "plan_changed",
     title: `${pet?.name ?? "Tu peludo"} ahora paga el precio del primer peludo`,
-    message: `Como terminó la membresía de tu primer peludo, desde su próximo cobro ${pet?.name ?? "tu peludo"} paga $${(version.price_cents / 100).toLocaleString("es-MX")} MXN. Hoy no se te cobra nada.`,
+    message: `Como terminó la membresía de tu primer peludo, desde su próximo cobro ${pet?.name ?? "tu peludo"} paga $${(priceCents / 100).toLocaleString("es-MX")} MXN. Hoy no se te cobra nada.`,
   });
   return siguiente.id;
 }
 
-/** Cancela al final de su período la membresía de UN peludo. */
+/**
+ * Cancela al final de su período la membresía de UN peludo.
+ *
+ * Si la suscripción ya había terminado en Stripe (fila desfasada, 4-nov-2026)
+ * no hay nada que cancelar: se concilia la fila y se devuelve `yaTerminada`
+ * en vez de reventar con `invalid_canceled_subscription_fields`.
+ */
 export async function cancelarAlCorte(
   admin: Admin,
   subscriptionRowId: string,
-): Promise<{ hasta: string | null } | null> {
+): Promise<{ hasta: string | null; yaTerminada?: true } | null> {
   const { data: fila } = await admin
     .from("subscriptions")
-    .select("id, stripe_subscription_id")
+    .select("id, user_id, pet_id, status, stripe_subscription_id, current_period_end")
     .eq("id", subscriptionRowId)
     .maybeSingle();
   if (!fila?.stripe_subscription_id) return null;
-  const actualizada = await getStripe().subscriptions.update(fila.stripe_subscription_id, {
-    cancel_at_period_end: true,
-  });
+  if (suscripcionTerminada(fila.status))
+    return { hasta: fila.current_period_end ?? null, yaTerminada: true };
+  const actualizada = await actualizarSiSigueViva(
+    admin,
+    { ...fila, stripe_subscription_id: fila.stripe_subscription_id },
+    { cancel_at_period_end: true },
+  );
+  if (!actualizada) return { hasta: fila.current_period_end ?? null, yaTerminada: true };
   const fin = actualizada.items.data[0]?.current_period_end;
   const hasta = fin ? new Date(fin * 1000).toISOString() : null;
   await admin

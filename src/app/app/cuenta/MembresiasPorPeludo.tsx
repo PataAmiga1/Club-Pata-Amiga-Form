@@ -52,13 +52,18 @@ export function MembresiasPorPeludo({ membresias }: { membresias: MembresiaDePel
   const [garantiaDe, setGarantiaDe] = useState<string | null>(null);
   const [aviso, setAviso] = useState<{ texto: string; error: boolean } | null>(null);
 
-  const correr = (accion: () => Promise<{ ok?: true; error?: string }>, exito: string) =>
+  const correr = (
+    accion: () => Promise<{ ok?: true; error?: string; aviso?: string }>,
+    exito: string,
+  ) =>
     startTransition(async () => {
       setAviso(null);
       const r = await accion();
       if (r.error) setAviso({ texto: r.error, error: true });
       else {
-        setAviso({ texto: exito, error: false });
+        // `aviso` lo manda el servidor cuando no pasó lo esperado pero tampoco
+        // es un error (p. ej. la membresía ya había terminado en Stripe).
+        setAviso({ texto: r.aviso ?? exito, error: false });
         setConfirmando(null);
         setGarantiaDe(null);
         router.refresh();

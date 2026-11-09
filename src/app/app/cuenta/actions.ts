@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getStripe } from "@/lib/stripe";
 import { sendTemplatedEmail } from "@/lib/email/send";
 import { notifyTeam } from "@/lib/alerts";
 import { ZONA_MX } from "@/lib/zona-horaria";
@@ -20,6 +19,10 @@ const PRICE_BY_PLAN: Record<"monthly" | "annual", string | undefined> = {
   monthly: process.env.STRIPE_PRICE_MONTHLY,
   annual: process.env.STRIPE_PRICE_ANNUAL,
 };
+
+// No se exporta: un archivo "use server" solo puede exportar funciones async.
+const MEMBRESIA_TERMINADA =
+  "Tu membresía ya había terminado, así que no hay cambio que hacer. Ya actualizamos tu cuenta.";
 
 async function getOwnSubscription() {
   const supabase = await createClient();
@@ -90,15 +93,20 @@ export async function switchPlan(target: "monthly" | "annual") {
     (planDelMiembro === PLAN_159 ? PRICE_BY_PLAN[target] : undefined);
   if (!price) throw new Error("Plan inválido");
 
-  const stripe = getStripe();
-  const current = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
-  const item = current.items.data[0];
-
-  const updated = await stripe.subscriptions.update(sub.stripe_subscription_id, {
-    items: [{ id: item.id, price }],
-    proration_behavior: "always_invoice",
-    metadata: { ...current.metadata, plan: target },
-  });
+  const { actualizarSiSigueViva } = await import("@/lib/plans/peludos-599");
+  const updated = await actualizarSiSigueViva(
+    admin,
+    { id: sub.id, user_id: userId, pet_id: null, stripe_subscription_id: sub.stripe_subscription_id },
+    (current) => ({
+      items: [{ id: current.items.data[0].id, price }],
+      proration_behavior: "always_invoice",
+      metadata: { ...current.metadata, plan: target },
+    }),
+  );
+  if (!updated) {
+    revalidatePath("/app/cuenta");
+    throw new Error(MEMBRESIA_TERMINADA);
+  }
 
   const newItem = updated.items.data[0];
   await admin
@@ -201,10 +209,18 @@ export async function cancelMembership(reason: string, comments: string) {
   let coverageEnd: Date | null = null;
 
   if (sub?.stripe_subscription_id) {
-    const stripe = getStripe();
-    const updated = await stripe.subscriptions.update(sub.stripe_subscription_id, {
-      cancel_at_period_end: true,
-    });
+    const { actualizarSiSigueViva } = await import("@/lib/plans/peludos-599");
+    const updated = await actualizarSiSigueViva(
+      admin,
+      { id: sub.id, user_id: userId, pet_id: null, stripe_subscription_id: sub.stripe_subscription_id },
+      { cancel_at_period_end: true },
+    );
+    // Ya había terminado en Stripe: la fila quedó conciliada, no hay baja que asentar.
+    if (!updated) {
+      revalidatePath("/app/cuenta");
+      revalidatePath("/app");
+      return { ok: true as const, coverageEnd: null };
+    }
     const endTs = updated.items.data[0]?.current_period_end;
     coverageEnd = endTs ? new Date(endTs * 1000) : null;
     await admin
@@ -254,10 +270,16 @@ export async function cancelMembership(reason: string, comments: string) {
 /** Undo a pending cancellation before the period ends. */
 export async function reactivateMembership() {
   const { userId, sub, admin } = await getOwnSubscription();
-  const stripe = getStripe();
-  await stripe.subscriptions.update(sub.stripe_subscription_id, {
-    cancel_at_period_end: false,
-  });
+  const { actualizarSiSigueViva } = await import("@/lib/plans/peludos-599");
+  const sigue = await actualizarSiSigueViva(
+    admin,
+    { id: sub.id, user_id: userId, pet_id: null, stripe_subscription_id: sub.stripe_subscription_id },
+    { cancel_at_period_end: false },
+  );
+  if (!sigue) {
+    revalidatePath("/app/cuenta");
+    throw new Error(MEMBRESIA_TERMINADA);
+  }
   await admin
     .from("subscriptions")
     .update({ cancel_at_period_end: false })
@@ -458,6 +480,16 @@ async function suscripcionPropiaDePeludo(subscriptionId: string) {
   return { admin, userId: user.id, sub, petName: pet?.name ?? "tu peludo" };
 }
 
+/** La fila del peludo en la forma que pide la conciliación con Stripe. */
+function filaParaStripe(ctx: NonNullable<Awaited<ReturnType<typeof suscripcionPropiaDePeludo>>>) {
+  return {
+    id: ctx.sub.id,
+    user_id: ctx.userId,
+    pet_id: ctx.sub.pet_id,
+    stripe_subscription_id: ctx.sub.stripe_subscription_id!,
+  };
+}
+
 /** Cancela al corte la membresía de UN peludo; los demás siguen igual. */
 export async function cancelarMembresiaDePeludo(subscriptionId: string, reason: string) {
   const ctx = await suscripcionPropiaDePeludo(subscriptionId);
@@ -465,6 +497,17 @@ export async function cancelarMembresiaDePeludo(subscriptionId: string, reason: 
   const { cancelarAlCorte } = await import("@/lib/plans/peludos-599");
   const r = await cancelarAlCorte(ctx.admin, ctx.sub.id);
   if (!r) return { error: "No pudimos cancelar. Intenta de nuevo." };
+  // Ya había terminado en Stripe (4-nov-2026): la fila quedó conciliada y no
+  // hay cancelación que asentar ni avisar.
+  if (r.yaTerminada) {
+    revalidatePath("/app/cuenta");
+    revalidatePath("/app/peludos");
+    return {
+      ok: true as const,
+      hasta: r.hasta,
+      aviso: `La membresía de ${ctx.petName} ya había terminado, así que no hay nada que cancelar. Ya actualizamos tu cuenta.`,
+    };
+  }
 
   await ctx.admin.from("cancellations").insert({
     user_id: ctx.userId,
@@ -490,9 +533,15 @@ export async function reactivarMembresiaDePeludo(subscriptionId: string) {
   const { data: pet } = await ctx.admin.from("pets").select("is_active").eq("id", ctx.sub.pet_id!).maybeSingle();
   if (!pet?.is_active)
     return { error: `${ctx.petName} está dado de baja; su membresía termina al final del período.` };
-  await getStripe().subscriptions.update(ctx.sub.stripe_subscription_id!, {
+  const { actualizarSiSigueViva } = await import("@/lib/plans/peludos-599");
+  const sigue = await actualizarSiSigueViva(ctx.admin, filaParaStripe(ctx), {
     cancel_at_period_end: false,
   });
+  if (!sigue) {
+    revalidatePath("/app/cuenta");
+    revalidatePath("/app/peludos");
+    return { error: `La membresía de ${ctx.petName} ya terminó, así que ya no se puede conservar.` };
+  }
   await ctx.admin
     .from("subscriptions")
     .update({ cancel_at_period_end: false })
@@ -531,14 +580,17 @@ export async function cambiarIntervaloDePeludo(
       : version?.stripe_price_id;
   if (!version || !price) return { error: "Ese plan no está disponible en este momento." };
 
-  const stripe = getStripe();
-  const actual = await stripe.subscriptions.retrieve(ctx.sub.stripe_subscription_id!);
-  const item = actual.items.data[0];
-  const nueva = await stripe.subscriptions.update(ctx.sub.stripe_subscription_id!, {
-    items: [{ id: item.id, price }],
+  const { actualizarSiSigueViva } = await import("@/lib/plans/peludos-599");
+  const nueva = await actualizarSiSigueViva(ctx.admin, filaParaStripe(ctx), (actual) => ({
+    items: [{ id: actual.items.data[0].id, price }],
     proration_behavior: "always_invoice",
     metadata: { ...actual.metadata, plan: target, plan_version_id: version.id },
-  });
+  }));
+  if (!nueva) {
+    revalidatePath("/app/cuenta");
+    revalidatePath("/app/peludos");
+    return { error: `La membresía de ${ctx.petName} ya terminó, así que no se puede cambiar de plan.` };
+  }
   const nuevoItem = nueva.items.data[0];
   await ctx.admin
     .from("subscriptions")
