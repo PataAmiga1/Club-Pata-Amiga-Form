@@ -11,7 +11,11 @@ import {
   describirPromocion,
   type Promocion,
 } from "@/lib/plans/promocion-texto";
-import { LLAVE_PROMO_GUARDADA, leerPromoGuardada } from "@/lib/campanas/buen-fin";
+import {
+  LLAVE_PROMO_GUARDADA,
+  leerPromoGuardada,
+  type PromoGuardada,
+} from "@/lib/campanas/buen-fin";
 import { AceptoLegales } from "@/components/legal/AceptoLegales";
 
 /**
@@ -190,8 +194,26 @@ export function PlanSelector599({
       setLoading(null);
       return;
     }
-    window.localStorage.removeItem("pa_ambassador_code");
-    window.localStorage.removeItem(LLAVE_PROMO_GUARDADA);
+    // NO se borra nada aquí (staging, 9-nov): mucha gente se regresa desde
+    // Stripe con «atrás» o «cancelar», y al volver la página perdía BUENFIN,
+    // la modalidad y el código del embajador — el precio parecía subir. Se
+    // guarda lo ÚLTIMO que eligió (también un código tecleado a mano) y se
+    // borra en la bienvenida, cuando el pago ya está confirmado
+    // (`LimpiarCodigosGuardados`). Si nunca paga, caduca a los 30 días.
+    if (oferta.nivel === "principal") {
+      try {
+        const ultima: PromoGuardada = {
+          promo: promo?.codigo ?? null,
+          modalidad: plan === "monthly" ? "mensual" : "anual",
+          ts: Date.now(),
+        };
+        window.localStorage.setItem(LLAVE_PROMO_GUARDADA, JSON.stringify(ultima));
+        if (embajadorVigente) window.localStorage.setItem("pa_ambassador_code", embajadorVigente);
+        else window.localStorage.removeItem("pa_ambassador_code");
+      } catch {
+        // Sin localStorage: al volver de Stripe se elige de nuevo.
+      }
+    }
     await registrarInicioDePago(cuerpo.medicion);
     window.location.href = cuerpo.url;
   }

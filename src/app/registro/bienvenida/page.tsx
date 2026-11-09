@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 import { PurchaseEvent } from "@/components/analytics/PurchaseEvent";
+import { LimpiarCodigosGuardados } from "@/components/registro/LimpiarCodigosGuardados";
 import { idCompraCheckout } from "@/lib/medicion/eventos";
 
 export default async function BienvenidaPage({
@@ -27,7 +28,12 @@ export default async function BienvenidaPage({
   if (session_id) {
     try {
       const session = await getStripe().checkout.sessions.retrieve(session_id);
-      if (session.payment_status !== "paid") redirect("/registro/plan");
+      // `no_payment_required`: el primer cobro quedó en $0 con un código
+      // (BUENFIN o EXPOCAN en el mensual). La suscripción sí nació; sin esto
+      // la bienvenida lo mandaba de vuelta al plan como si no hubiera pagado.
+      // El webhook ya acepta los dos estados.
+      if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required")
+        redirect("/registro/plan");
       compra = {
         montoCentavos: session.amount_total ?? 0,
         moneda: session.currency ?? "mxn",
@@ -62,6 +68,7 @@ export default async function BienvenidaPage({
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-teal px-6 py-16">
+      {compra && <LimpiarCodigosGuardados />}
       {compra && (
         <PurchaseEvent
           montoCentavos={compra.montoCentavos}
