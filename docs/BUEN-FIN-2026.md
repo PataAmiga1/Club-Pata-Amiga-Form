@@ -10,35 +10,28 @@ noviembre de 2026**, hora del centro de México. Código único: **BUENFIN**.
 
 ---
 
-## ⚠ Antes de publicar: el precio anual no cuadra con la pauta
+## Precios: la pauta del anual se corrige
 
-La pauta dice **anual regular $7,188 → $6,589 en Buen Fin (ahorras $599)**.
-La plataforma vende el anual a **$6,612** (versión publicada del plan $599;
-es también lo que cobra Stripe). Con el cupón de $599:
+El documento maestro decía **anual regular $7,188 → $6,589**. La plataforma
+vende el anual a **$6,612** (versión publicada del plan $599, lo que cobra
+Stripe). Se le pidió al cliente corregir la pauta del anual a:
 
-| | Pauta | Lo que cobraría el checkout |
+| | Pauta corregida | Checkout |
 |---|---|---|
 | Mes a mes, primer mes | $0 | $0 ✓ |
 | Mes a mes, desde el 2.º mes | $599 | $599 ✓ |
-| Anual, precio regular | $7,188 | **$6,612** |
-| Anual con BUENFIN | $6,589 | **$6,013** |
+| Anual, precio regular | $6,612 | $6,612 ✓ |
+| Anual con BUENFIN | $6,013 | $6,013 ✓ |
+| Primer año mes a mes | $0 + 11 × $599 = $6,589 | — |
 
-Consecuencias: el «precio regular $7,188» no existe (en El Buen Fin un precio
-de referencia que no es el real es un riesgo con PROFECO), y el anual quedaría
-**más barato** que el primer año mes a mes ($6,013 contra $6,589), lo
-contrario de lo que dice la «comparación honesta».
+Con estos precios el anual sí sale más barato el primer año ($6,013 contra
+$6,589), así que la página ya **no** dice que «cuestan lo mismo»: enseña los
+dos totales del primer año y deja que la persona elija.
 
-La página **no inventa cifras**: enseña lo que de verdad se cobra. Mientras no
-cuadre, fuera de producción aparece una franja negra que lo avisa, y la
-comparación deja de decir «cuestan lo mismo». Hay que decidir una de dos:
-
-1. **Corregir la pauta del anual** a $6,612 → $6,013 (ahorras $599). No toca
-   la plataforma.
-2. **Cambiar el precio anual** a $7,188 publicando una versión nueva del plan.
-   Sube el anual para todos los que contraten desde ese día; es una decisión
-   de negocio, no de la campaña.
-
----
+La página siempre pinta lo que de verdad se cobra, nunca cifras escritas a
+mano. Las cifras que debe decir la pauta están en `CIFRAS_DE_PAUTA`
+(`src/lib/campanas/buen-fin.ts`); si la versión publicada cambia y dejan de
+cuadrar, fuera de producción aparece una franja negra que lo avisa.
 
 ## 1. Crear el código BUENFIN (la PM, en el panel)
 
@@ -155,14 +148,44 @@ Base: `https://www.pataamiga.mx/buenfin`
 
 Los anuncios de Meta agregan `fbclid` solos; la página lo pasa al registro.
 
-## 6. Medición
+## 6. Diseño de la página e imágenes
+
+- **Insignia oficial «El Buen Fin · MIPYMES»**:
+  `public/campanas/buen-fin-2026/buen-fin-2026-mipymes.png`. Se sacó **sin
+  alterar** (solo recortado el margen transparente y reducido a 720 px) de la
+  imagen original de la *Guía de integración del código QR en materiales
+  promocionales* de El Buen Fin 2026 (`guia-integracion-qr.pdf`, página 4),
+  el PDF oficial que mandó el cliente junto con su QR. No se descargó nada de
+  internet. Va sobre blanco y con aire alrededor, como pide la guía.
+- **QR oficial**: tarjeta blanca «Comercio participante · Escanea y verifica»,
+  132 px (mínimo 60), sin nada encima.
+- **Foto principal**: casilla nueva **`buenfin-hero`** en Admin → Sitio web
+  («El Buen Fin — foto principal»). Debe ser una **persona con su peludo**,
+  foto real, sin texto ni huellas encima, ~1200×1400. Mientras esté vacía se
+  usa «Tarjeta de planes» (la tutora con su bulldog). Si se llena, la de la
+  tutora pasa a la sección «Haz la cuenta».
+- La foto nunca va detrás del texto: va a un lado en computadora y como
+  bloque aparte en el celular.
+- **Fondo liso** crema. Se probó un patrón de mascotas en línea y se
+  descartó.
+- Mientras la promoción está activa: cuenta regresiva al martes 17, 23:59 h de
+  México, y en el celular una barra fija abajo con los dos botones (mismo
+  peso).
+
+## 7. Medición
 
 La página manda **ViewContent** al píxel de Meta (y `view_promotion` a GA4),
 solo si la persona aceptó cookies. Lo demás sale como siempre: Lead al crear
 la cuenta, CompleteRegistration al registrar al peludo, InitiateCheckout al
-abrir el pago y Purchase al pagar.
+abrir el pago y Purchase al pagar. Los clics en los botones no mandan evento
+propio: el sitio no tiene ese patrón y el Lead del paso siguiente ya mide el
+avance.
 
-## 7. Textos que cambiamos respecto al documento maestro
+**Ayuda:** la página ofrece el correo de contacto de Ajustes del sitio. No hay
+un WhatsApp de atención configurado en el sitio; si el equipo quiere uno, que
+se agregue como ajuste y la página lo toma.
+
+## 8. Textos que cambiamos respecto al documento maestro
 
 - «Sin deducible ni copago» → **«Sin copago»**. *Deducible* está prohibida aun
   en negativo.
