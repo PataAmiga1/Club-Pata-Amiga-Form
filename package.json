@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:canales": "node --test tests/canales/*.test.mjs",
-    "test:medicion": "node --test tests/medicion/*.test.mjs"
+    "test:medicion": "node --test tests/medicion/*.test.mjs",
+    "test:campanas": "node --test tests/campanas/*.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

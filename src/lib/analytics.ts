@@ -168,6 +168,27 @@ export function registrarCompra(datos: {
   );
 }
 
+/**
+ * Vista de una página de campaña (ViewContent). Solo navegador y solo con
+ * consentimiento; el PageView ya lo manda el píxel al cargar (Analytics.tsx).
+ * Id propio: este evento no sale por la API de Conversiones.
+ */
+export function registrarVistaDeContenido(datos: { nombre: string; categoria?: string }) {
+  if (!medicionPermitida()) return;
+  enviarGA4("view_promotion", {
+    promotion_name: datos.nombre,
+    ...(datos.categoria ? { creative_name: datos.categoria } : {}),
+  });
+  enviarMeta(
+    "ViewContent",
+    {
+      content_name: datos.nombre,
+      ...(datos.categoria ? { content_category: datos.categoria } : {}),
+    },
+    `vista-${crypto.randomUUID()}`,
+  );
+}
+
 /** Cuenta recién creada (Lead). Solo navegador. */
 export function registrarCuentaCreada(datos: { eventoId: string; metodo?: string }) {
   if (!medicionPermitida()) return;
