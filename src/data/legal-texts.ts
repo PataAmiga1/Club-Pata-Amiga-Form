@@ -3521,7 +3521,21 @@ medir la efectividad de las campañas (atribución y conversión).
 - _fbp (identificador de navegador para atribución de campañas)
 Categoría: Marketing (opcional, requiere consentimiento).
 
-4.5 Mapas de calor y grabación de sesión (Microsoft Clarity)
+4.5 Medición de campañas (píxel de TikTok)
+Finalidad: entender cómo llegan las personas al sitio desde nuestros anuncios en
+TikTok y medir la efectividad de esas campañas (atribución y conversión). Se
+registran únicamente estos momentos: visita a la página, vista de una página de
+campaña, creación de cuenta, registro del peludo, inicio de pago y pago
+completado (con su monto y moneda). Cuando aceptas, esos mismos eventos pueden
+enviarse también desde nuestro servidor a TikTok, con el identificador de
+navegador y de clic de la campaña, tu dirección IP y el tipo de navegador, para
+que no se pierdan ni se cuenten dos veces. No se comparten con TikTok tu nombre,
+correo, teléfono, CURP ni datos de tu peludo.
+- _ttp (identificador de navegador para atribución de campañas)
+- ttclid (identificador del clic en el anuncio, cuando llegas desde uno)
+Categoría: Marketing (opcional, requiere consentimiento).
+
+4.6 Mapas de calor y grabación de sesión (Microsoft Clarity)
 Finalidad: ver de forma agregada hasta dónde se desplaza la gente en la página y
 dónde hace clic, para detectar y corregir problemas de uso.
 IMPORTANTE — qué implica esta herramienta: a diferencia de las anteriores,
@@ -3540,7 +3554,7 @@ del peludo).
 - _clck, _clsk (identificadores de sesión de la herramienta)
 Categoría: Analítica (opcional, requiere consentimiento).
 
-4.6 Cookies técnicas de rendimiento/hosting (Vercel)
+4.7 Cookies técnicas de rendimiento/hosting (Vercel)
 Finalidad: asegurar disponibilidad, rendimiento y estabilidad del portal (carga rápida,
 continuidad del servicio).
 Categoría: Estrictamente necesarias.
@@ -3548,9 +3562,9 @@ Categoría: Estrictamente necesarias.
 5) Consentimiento
 Al entrar a https://www.pataamiga.mx/ se muestra un banner para que elijas:
 - Aceptar: se activan las cookies de analítica y marketing descritas en los
-puntos 4.3, 4.4 y 4.5.
+puntos 4.3, 4.4, 4.5 y 4.6.
 - Solo las necesarias: NO se carga ninguna de esas herramientas. No se envía una
-sola petición a Google, Meta ni Microsoft.
+sola petición a Google, Meta, TikTok ni Microsoft.
 Mientras no elijas, no se activa ninguna cookie opcional: el estado por omisión
 es no medir.
 Tu elección se guarda en tu propio navegador y puedes cambiarla en cualquier

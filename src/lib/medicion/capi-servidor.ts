@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { reportError } from "@/lib/alerts";
 import { COOKIE_MEDICION } from "@/lib/consentimiento";
+import { COOKIE_ATRIBUCION, leerAtribucion } from "@/lib/atribucion";
 import {
   VERSION_GRAPH_POR_OMISION,
   cookieFbValida,
@@ -9,6 +10,7 @@ import {
   type ContextoDeMedicion,
   type EventoMeta,
 } from "./capi";
+import { cookieTtpValida, ttclidValido } from "./tiktok";
 
 export { metadataDeMedicion } from "./capi";
 
@@ -69,18 +71,22 @@ export async function enviarEventoMeta(evento: EventoMeta): Promise<void> {
 }
 
 /**
- * Lee consentimiento, `_fbp`/`_fbc`, IP y navegador de la petición en curso
- * (Server Action o Route Handler). Nunca lanza.
+ * Lee consentimiento, `_fbp`/`_fbc`, `_ttp`, el último `ttclid`, IP y
+ * navegador de la petición en curso (Server Action o Route Handler). Nunca
+ * lanza. `pa_origen` solo existe si la persona aceptó (CapturaOrigen.tsx).
  */
 export async function contextoDeMedicion(): Promise<ContextoDeMedicion> {
   try {
     const [galletas, cabeceras] = await Promise.all([cookies(), headers()]);
+    const origen = leerAtribucion(galletas.get(COOKIE_ATRIBUCION)?.value);
     return {
       consentido: galletas.get(COOKIE_MEDICION)?.value === "1",
       fbp: cookieFbValida(galletas.get("_fbp")?.value),
       fbc: cookieFbValida(galletas.get("_fbc")?.value),
       ip: ipDelCliente(cabeceras.get("x-forwarded-for"), cabeceras.get("x-real-ip")),
       agente: cabeceras.get("user-agent")?.slice(0, 400) ?? null,
+      ttp: cookieTtpValida(galletas.get("_ttp")?.value),
+      ttclid: ttclidValido(origen?.ultimo.ttclid),
     };
   } catch {
     return { consentido: false, fbp: null, fbc: null, ip: null, agente: null };

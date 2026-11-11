@@ -32,7 +32,8 @@ import { acumularComisionDelPeriodo } from "@/lib/comisiones";
 import { anualParaMSI, mesesDelPago, siguienteAniversario } from "@/lib/plans/msi";
 import { diaEnMexico } from "@/lib/zona-horaria";
 import { registrarAceptacion } from "@/lib/legal/aceptacion";
-import { capiConfigurada, enviarEventoMeta, urlDelSitio } from "@/lib/medicion/capi-servidor";
+import { urlDelSitio } from "@/lib/medicion/capi-servidor";
+import { enviarConversion, medicionServidorConfigurada } from "@/lib/medicion/conversiones-servidor";
 import { idCompraCheckout } from "@/lib/medicion/eventos";
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
@@ -779,7 +780,8 @@ async function handleAnualPrepagado(
 }
 
 /**
- * Purchase por la API de Conversiones de Meta (28-oct-2026), con el MISMO id
+ * Purchase por la API de Conversiones de Meta (28-oct-2026) y la API de
+ * Eventos de TikTok (11-nov-2026), con el MISMO id
  * que la pantalla de bienvenida (o /app/peludos) manda desde el navegador.
  *
  * Qué cuenta como compra: un Checkout COMPLETADO y cobrado (o sin cobro por
@@ -799,14 +801,14 @@ function medirCompraDeCheckout(session: Stripe.Checkout.Session) {
     if (!userId || md.medicion !== "1" || md.renovacion_de) return;
     if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required")
       return;
-    if (!capiConfigurada()) return;
+    if (!medicionServidorConfigurada()) return;
     after(async () => {
       const { data: perfil } = await createAdminClient()
         .from("profiles")
         .select("email, phone")
         .eq("id", userId)
         .maybeSingle();
-      await enviarEventoMeta({
+      await enviarConversion({
         nombre: "Purchase",
         eventoId: idCompraCheckout(session.id),
         instante: Date.now() / 1000,
@@ -819,6 +821,8 @@ function medirCompraDeCheckout(session: Stripe.Checkout.Session) {
           agente: md.cliente_ua ?? null,
           fbp: md.fbp ?? null,
           fbc: md.fbc ?? null,
+          ttp: md.ttp ?? null,
+          ttclid: md.ttclid ?? null,
         },
         datos: {
           valor: (session.amount_total ?? 0) / 100,

@@ -10,6 +10,7 @@ import { diaEnMexico } from "@/lib/zona-horaria";
 import { reportePorGrano, type GranoDeReporte } from "@/lib/exportacion";
 import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
 import { aporteMensual, esCobroDe599, etiquetaDePlanDelMiembro } from "@/lib/plans/ingresos";
+import { describirToque, leerAtribucionGuardada } from "@/lib/atribucion";
 
 /**
  * Exportación a CSV de Finanzas (equipo, 26-ago): el admin elige qué es un
@@ -110,7 +111,7 @@ async function cargarPerfiles(admin: ClienteAdmin) {
       admin
         .from("profiles")
         .select(
-          "id, email, first_name, last_name, mother_last_name, phone, curp, gender, birth_date, nationality, postal_code, state, city, colony, membership_status, member_since, created_at, ambassador_code_used, cfdi_requested, rfc, utm_source, utm_medium, utm_campaign",
+          "id, email, first_name, last_name, mother_last_name, phone, curp, gender, birth_date, nationality, postal_code, state, city, colony, membership_status, member_since, created_at, ambassador_code_used, cfdi_requested, rfc, utm_source, utm_medium, utm_campaign, attribution",
         )
         .eq("role", "member"),
       admin
@@ -152,6 +153,11 @@ function filaDeMiembro(p: PerfilExport["perfiles"][number], ctx: PerfilExport): 
   const vivas = ctx.vivasDe.get(p.id) ?? [];
   const de599 = vivas.filter(esCobroDe599);
   const { sexo, origen } = sexoDeMiembro(p.gender, p.curp);
+  // Atribución de pauta: el origen se describe con el PRIMER toque (lo que la
+  // trajo); el id de clic, el más reciente que haya (último, si no el primero).
+  const pauta = leerAtribucionGuardada(p.attribution);
+  const clic = (k: "fbclid" | "gclid" | "ttclid") =>
+    pauta?.ultimo[k] ?? pauta?.primero[k] ?? "";
   return {
     nombre: p.first_name ?? "",
     apellido_paterno: p.last_name ?? "",
@@ -185,6 +191,10 @@ function filaDeMiembro(p: PerfilExport["perfiles"][number], ctx: PerfilExport): 
     utm_source: p.utm_source ?? "",
     utm_medium: p.utm_medium ?? "",
     utm_campaign: p.utm_campaign ?? "",
+    origen_pauta: pauta ? describirToque(pauta.primero) : "",
+    fbclid: clic("fbclid"),
+    gclid: clic("gclid"),
+    ttclid: clic("ttclid"),
     estado: p.state ?? "",
     ciudad: p.city ?? "",
     colonia: p.colony ?? "",
