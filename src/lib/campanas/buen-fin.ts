@@ -130,9 +130,9 @@ export function cuadraConLaPauta(c: CuentasBuenFin): boolean {
 export type Modalidad = "mensual" | "anual";
 
 /** Lo que se lleva de la URL de la landing al registro: campaña y nada más. */
-const PARAMETROS_DE_CAMPANA = /^(utm_[a-z_]+|fbclid|gclid)$/;
+const PARAMETROS_DE_CAMPANA = /^(utm_[a-z_]+|fbclid|gclid|ttclid)$/;
 
-/** El enlace del botón de cada tarjeta, con la pauta (utm/fbclid) intacta. */
+/** El enlace del botón de cada tarjeta, con la pauta (utm/fbclid/ttclid) intacta. */
 export function enlaceDeRegistro(
   modalidad: Modalidad,
   busquedaDeLaLanding: Record<string, string | string[] | undefined> = {},

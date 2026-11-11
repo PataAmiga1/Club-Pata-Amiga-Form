@@ -120,6 +120,11 @@ export const REPORTES: ReporteExportable[] = [
       { key: "utm_source", label: "UTM source", grupo: "Origen" },
       { key: "utm_medium", label: "UTM medium", grupo: "Origen" },
       { key: "utm_campaign", label: "UTM campaign", grupo: "Origen" },
+      // De `profiles.attribution` (cookie de pauta, solo con consentimiento).
+      { key: "origen_pauta", label: "Origen de pauta (primer toque)", grupo: "Origen" },
+      { key: "fbclid", label: "Clic de Meta (fbclid)", grupo: "Origen" },
+      { key: "gclid", label: "Clic de Google (gclid)", grupo: "Origen" },
+      { key: "ttclid", label: "Clic de TikTok (ttclid)", grupo: "Origen" },
       { key: "estado", label: "Estado", grupo: "Ubicación", porOmision: true },
       { key: "ciudad", label: "Ciudad", grupo: "Ubicación" },
       { key: "colonia", label: "Colonia", grupo: "Ubicación" },

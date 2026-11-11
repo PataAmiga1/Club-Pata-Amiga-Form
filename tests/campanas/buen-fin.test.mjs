@@ -67,6 +67,7 @@ test('el enlace lleva modalidad, promo y SOLO la pauta; nunca `codigo`', () => {
     utm_source: 'instagram',
     utm_campaign: 'buenfin2026',
     fbclid: 'AbC',
+    ttclid: 'TtC',
     codigo: 'PATAMIGA-X',
     vista: 'activa',
     otra: ['a', 'b'],
@@ -79,6 +80,7 @@ test('el enlace lleva modalidad, promo y SOLO la pauta; nunca `codigo`', () => {
   assert.equal(q.get('utm_source'), 'instagram');
   assert.equal(q.get('utm_campaign'), 'buenfin2026');
   assert.equal(q.get('fbclid'), 'AbC');
+  assert.equal(q.get('ttclid'), 'TtC');
   assert.equal(q.has('codigo'), false);
   assert.equal(q.has('vista'), false);
   assert.equal(q.has('otra'), false);

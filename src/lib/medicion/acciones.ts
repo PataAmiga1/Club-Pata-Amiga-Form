@@ -4,15 +4,12 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idRegistroPeludo } from "./eventos";
-import {
-  capiConfigurada,
-  contextoDeMedicion,
-  enviarEventoMeta,
-  urlDelSitio,
-} from "./capi-servidor";
+import { contextoDeMedicion, urlDelSitio } from "./capi-servidor";
+import { enviarConversion, medicionServidorConfigurada } from "./conversiones-servidor";
 
 /**
- * CompleteRegistration por la API de Conversiones: un peludo recién
+ * CompleteRegistration por la API de Conversiones de Meta y la API de Eventos
+ * de TikTok (las que estén configuradas): un peludo recién
  * registrado. El alta del peludo se hace desde el navegador (PetForm inserta
  * directo en `pets` con la sesión del miembro), así que el formulario llama a
  * esta acción justo después de guardarlo, con el id que le devolvió la base.
@@ -21,15 +18,15 @@ import {
  * quien llama y se creó hace menos de una hora: nadie puede inflar
  * conversiones mandando ids al azar o repitiendo uno viejo.
  *
- * El envío a Meta corre en `after()`: la respuesta vuelve de inmediato y el
- * alta no espera a Meta. Sin llave o sin consentimiento, no hace nada.
+ * El envío corre en `after()`: la respuesta vuelve de inmediato y el alta no
+ * espera a Meta ni a TikTok. Sin llave o sin consentimiento, no hace nada.
  */
 export async function medirPeludoRegistrado(
   petId: string,
   origen: "registro" | "cuenta",
 ): Promise<void> {
   try {
-    if (!capiConfigurada() || typeof petId !== "string" || !petId) return;
+    if (!medicionServidorConfigurada() || typeof petId !== "string" || !petId) return;
     const contexto = await contextoDeMedicion();
     if (!contexto.consentido) return;
 
@@ -48,7 +45,7 @@ export async function medirPeludoRegistrado(
     if (Date.now() - new Date(pet.created_at).getTime() > 60 * 60 * 1000) return;
 
     after(() =>
-      enviarEventoMeta({
+      enviarConversion({
         nombre: "CompleteRegistration",
         eventoId: idRegistroPeludo(pet.id),
         instante: Date.now() / 1000,
@@ -61,6 +58,8 @@ export async function medirPeludoRegistrado(
           agente: contexto.agente,
           fbp: contexto.fbp,
           fbc: contexto.fbc,
+          ttp: contexto.ttp,
+          ttclid: contexto.ttclid,
         },
         datos: {
           nombreContenido: origen === "registro" ? "Peludo · alta" : "Peludo · cuenta",

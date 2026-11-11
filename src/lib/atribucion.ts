@@ -2,10 +2,11 @@
  * Atribución de pauta: de qué anuncio o campaña llegó cada miembro.
  *
  * La agencia (Retorno, desde el 2-nov-2026) configura el píxel y sus eventos
- * por su lado; aquí solo RECIBIMOS el dato: los parámetros `utm_*`, `fbclid` y
- * `gclid` con los que la persona aterrizó, guardados como primer toque (lo que
- * la trajo la primera vez) y último toque (lo que la trajo la vez que se
- * registró), para que ventas vea en el perfil «Anuncio de Meta · campaña X».
+ * por su lado; aquí solo RECIBIMOS el dato: los parámetros `utm_*`, `fbclid`,
+ * `gclid` y `ttclid` (TikTok, 11-nov-2026) con los que la persona aterrizó,
+ * guardados como primer toque (lo que la trajo la primera vez) y último toque (lo que la trajo la vez que se
+ * registró), para que ventas vea en el perfil «Anuncio de Meta · campaña X» (o
+ * «Anuncio de TikTok · campaña X»).
  *
  * CONSENTIMIENTO. La política de cookies (sección 3.C) dice que las cookies de
  * marketing «permiten medir campañas, atribución y conversiones» y que «se
@@ -34,6 +35,9 @@ export const PARAMETROS_DE_CAMPANIA = [
   "utm_term",
   "fbclid",
   "gclid",
+  // Clic en un anuncio de TikTok. Además de mostrarse en el panel, el último
+  // `ttclid` viaja en la API de Eventos de TikTok (src/lib/medicion/tiktok.ts).
+  "ttclid",
 ] as const;
 
 type Parametro = (typeof PARAMETROS_DE_CAMPANIA)[number];
@@ -60,8 +64,8 @@ export type AtribucionGuardada = Atribucion & {
 };
 
 /**
- * Tope por valor. `fbclid` ronda los 60-200 caracteres; nada legítimo pasa de
- * 200, y la cookie entera tiene que caber holgada en 4 KB.
+ * Tope por valor. `fbclid` ronda los 60-200 caracteres (`ttclid`, menos);
+ * nada legítimo pasa de 200, y la cookie entera tiene que caber holgada en 4 KB.
  */
 const MAX_VALOR = 200;
 
@@ -185,6 +189,7 @@ const FUENTES_META = new Set([
   "an", // Audience Network
 ]);
 const FUENTES_GOOGLE = new Set(["google", "google_ads", "adwords", "youtube"]);
+const FUENTES_TIKTOK = new Set(["tiktok", "tiktok_ads", "tt", "tiktokads"]);
 const MEDIOS_PAGADOS = /^(cpc|ppc|cpm|paid|paid_?social|paidsocial|ads?|display|social_?paid|pauta)$/i;
 
 /**
@@ -196,7 +201,13 @@ export function describirToque(t: Toque): string {
   const fuente = (t.utm_source ?? "").toLowerCase();
   const pagado = MEDIOS_PAGADOS.test(t.utm_medium ?? "");
   let origen: string;
-  if (t.fbclid || FUENTES_META.has(fuente)) {
+  // TikTok va primero: un `ttclid` es prueba de clic en SU anuncio aunque la
+  // URL traiga también utm de otra fuente mal etiquetada. `utm_source=tiktok`
+  // sin medio cuenta como anuncio (así se etiqueta la pauta, ver
+  // docs/MEDICION-TIKTOK.md); con un medio no pagado (`bio`) es orgánico.
+  if (t.ttclid || FUENTES_TIKTOK.has(fuente)) {
+    origen = t.ttclid || pagado || !t.utm_medium ? "Anuncio de TikTok" : "TikTok";
+  } else if (t.fbclid || FUENTES_META.has(fuente)) {
     origen = t.fbclid || pagado || !t.utm_source ? "Anuncio de Meta" : "Meta (Facebook/Instagram)";
   } else if (t.gclid || FUENTES_GOOGLE.has(fuente)) {
     origen = t.gclid || pagado ? "Anuncio de Google" : "Google";

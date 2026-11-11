@@ -53,6 +53,12 @@ export type DatosDePersona = {
   agente?: string | null;
   fbp?: string | null;
   fbc?: string | null;
+  /**
+   * Solo para TikTok (`conversiones-servidor.ts`): Meta los ignora —
+   * `datosDeUsuario` solo copia los campos de Meta.
+   */
+  ttp?: string | null;
+  ttclid?: string | null;
 };
 
 export type EventoMeta = {
@@ -130,13 +136,17 @@ export function cookieFbValida(valor: string | null | undefined): string | null 
   return /^fb\.\d\.\d+\.[A-Za-z0-9_.\-]{1,500}$/.test(valor) ? valor : null;
 }
 
-/** Lo que el servidor sabe de la petición en curso, para la CAPI. */
+/** Lo que el servidor sabe de la petición en curso, para la CAPI (y TikTok). */
 export type ContextoDeMedicion = {
   consentido: boolean;
   fbp: string | null;
   fbc: string | null;
   ip: string | null;
   agente: string | null;
+  /** Cookie `_ttp` del píxel de TikTok (validada). */
+  ttp?: string | null;
+  /** Último `ttclid` de la cookie de atribución `pa_origen` (validado). */
+  ttclid?: string | null;
 };
 
 /**
@@ -153,6 +163,8 @@ export function metadataDeMedicion(c: ContextoDeMedicion): Record<string, string
     ...(c.fbc ? { fbc: c.fbc.slice(0, 500) } : {}),
     ...(c.ip ? { cliente_ip: c.ip.slice(0, 100) } : {}),
     ...(c.agente ? { cliente_ua: c.agente.slice(0, 400) } : {}),
+    ...(c.ttp ? { ttp: c.ttp.slice(0, 200) } : {}),
+    ...(c.ttclid ? { ttclid: c.ttclid.slice(0, 200) } : {}),
   };
 }
 

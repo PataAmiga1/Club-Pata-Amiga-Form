@@ -17,12 +17,11 @@ import { notifyTeam } from "@/lib/alerts";
 import { registrarAceptacion } from "@/lib/legal/aceptacion";
 import { after } from "next/server";
 import { idCompraSuscripcion, type MedicionDeEvento } from "@/lib/medicion/eventos";
+import { contextoDeMedicion, urlDelSitio } from "@/lib/medicion/capi-servidor";
 import {
-  capiConfigurada,
-  contextoDeMedicion,
-  enviarEventoMeta,
-  urlDelSitio,
-} from "@/lib/medicion/capi-servidor";
+  enviarConversion,
+  medicionServidorConfigurada,
+} from "@/lib/medicion/conversiones-servidor";
 
 /**
  * Activa la membresía $599 de un peludo con la TARJETA GUARDADA (sección 4).
@@ -158,7 +157,8 @@ export async function activarMembresiaDePeludo(
 
   // Purchase (28-oct-2026): este cobro no pasa por Stripe Checkout, así que
   // no hay webhook de checkout que lo mida. El navegador lo manda con
-  // `medicion` y el servidor por la API de Conversiones, con el mismo id.
+  // `medicion` y el servidor por la API de Conversiones (Meta) y la de Eventos (TikTok),
+  // con el mismo id.
   const factura =
     suscripcion.latest_invoice && typeof suscripcion.latest_invoice !== "string"
       ? suscripcion.latest_invoice
@@ -171,7 +171,7 @@ export async function activarMembresiaDePeludo(
     transaccion: suscripcion.id,
   };
   try {
-    const contexto = capiConfigurada() ? await contextoDeMedicion() : null;
+    const contexto = medicionServidorConfigurada() ? await contextoDeMedicion() : null;
     if (contexto?.consentido) {
       const { data: perfil } = await admin
         .from("profiles")
@@ -179,7 +179,7 @@ export async function activarMembresiaDePeludo(
         .eq("id", user.id)
         .maybeSingle();
       after(() =>
-        enviarEventoMeta({
+        enviarConversion({
           nombre: "Purchase",
           eventoId: medicion.eventoId,
           instante: Date.now() / 1000,
@@ -192,6 +192,8 @@ export async function activarMembresiaDePeludo(
             agente: contexto.agente,
             fbp: contexto.fbp,
             fbc: contexto.fbc,
+            ttp: contexto.ttp,
+            ttclid: contexto.ttclid,
           },
           datos: {
             valor: (medicion.valorCentavos ?? 0) / 100,

@@ -1,4 +1,4 @@
-// Atribución de pauta (utm/fbclid). Correr: node --test tests/medicion/
+// Atribución de pauta (utm/fbclid/gclid/ttclid). Correr: node --test tests/medicion/
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -88,6 +88,29 @@ test('describir: Meta, Google y otras fuentes', () => {
   assert.equal(describirToque({ ts: 'x', utm_source: 'instagram', utm_medium: 'bio' }), 'Meta (Facebook/Instagram)');
   assert.equal(describirToque({ ts: 'x', gclid: 'g' , utm_campaign: 'marca'}), 'Anuncio de Google · campaña marca');
   assert.equal(describirToque({ ts: 'x', utm_source: 'newsletter', utm_medium: 'email' }), 'newsletter (email)');
+});
+
+test('lee ttclid (TikTok) y sobrevive a la cookie', () => {
+  const t = toqueDesdeUrl('?utm_source=tiktok&utm_medium=paid&utm_campaign=buenfin&ttclid=E.C.P.abc-123_x', {
+    ahora: AHORA,
+    pagina: '/buen-fin',
+  });
+  assert.equal(t.ttclid, 'E.C.P.abc-123_x');
+  const a = combinarToques(null, t);
+  assert.equal(leerAtribucion(serializarAtribucion(a)).ultimo.ttclid, 'E.C.P.abc-123_x');
+  assert.equal(leerAtribucionGuardada({ ...a, guardada: AHORA.toISOString() }).primero.ttclid, 'E.C.P.abc-123_x');
+});
+
+test('describir: TikTok por ttclid o por utm_source=tiktok', () => {
+  assert.equal(
+    describirToque({ ts: 'x', utm_source: 'tiktok', utm_medium: 'paid', utm_campaign: 'buenfin' }),
+    'Anuncio de TikTok · campaña buenfin',
+  );
+  assert.equal(describirToque({ ts: 'x', ttclid: 't1' }), 'Anuncio de TikTok');
+  assert.equal(describirToque({ ts: 'x', utm_source: 'TikTok' }), 'Anuncio de TikTok');
+  assert.equal(describirToque({ ts: 'x', utm_source: 'tiktok', utm_medium: 'bio' }), 'TikTok');
+  // Un ttclid manda aunque la utm diga otra cosa (anuncio mal etiquetado).
+  assert.equal(describirToque({ ts: 'x', utm_source: 'facebook', ttclid: 't1' }), 'Anuncio de TikTok');
 });
 
 test('guardada en el perfil: se valida igual y conserva la fecha de guardado', () => {
