@@ -99,3 +99,27 @@ test('la URL del registro se guarda limpia y caduca', () => {
   assert.equal(leerPromoGuardada('no-es-json', ahora), null);
   assert.equal(leerPromoGuardada(null, ahora), null);
 });
+
+test('recordatorio de pago: BUENFIN solo mientras la campaña está activa', async () => {
+  const { avisoDeCodigoParaCorreo, AVISO_DE_CODIGO_GENERICO } = await import(
+    '../../src/lib/campanas/buen-fin.ts'
+  );
+  // 12-nov 23:59 en México: todavía el renglón de siempre, botón sin promo.
+  const antes = avisoDeCodigoParaCorreo(new Date('2026-11-13T05:59:00Z'));
+  assert.equal(antes.avisoCodigo, AVISO_DE_CODIGO_GENERICO);
+  assert.equal(antes.sufijoUrl, '');
+  // Los días de la campaña (el cron sale 16:30 UTC = 10:30 en México).
+  for (const dia of ['13', '15', '17']) {
+    const r = avisoDeCodigoParaCorreo(new Date(`2026-11-${dia}T16:30:00Z`));
+    assert.equal(r.sufijoUrl, '?promo=BUENFIN');
+    assert.match(r.avisoCodigo, /<strong>BUENFIN<\/strong>/);
+    assert.match(r.avisoCodigo, /\$599 de descuento/);
+    assert.match(r.avisoCodigo, /primer mes queda en \$0/);
+    assert.match(r.avisoCodigo, /\$6,013 en lugar de \$6,612/);
+    assert.doesNotMatch(r.avisoCodigo, /seguro|póliza|cobertura|deducible/i);
+  }
+  // 18-nov en México: se acabó.
+  const despues = avisoDeCodigoParaCorreo(new Date('2026-11-18T16:30:00Z'));
+  assert.equal(despues.avisoCodigo, AVISO_DE_CODIGO_GENERICO);
+  assert.equal(despues.sufijoUrl, '');
+});

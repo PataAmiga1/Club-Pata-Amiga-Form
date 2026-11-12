@@ -192,6 +192,40 @@ export function leerPromoGuardada(
   }
 }
 
+// ---------------------------------------------------------------------------
+// El recordatorio «Registro sin pagar» durante la campaña (12-nov-2026).
+// ---------------------------------------------------------------------------
+
+const pesos = (n: number) =>
+  `$${n.toLocaleString("es-MX", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+
+/** El renglón del código de siempre: fuera de la campaña no cambia nada. */
+export const AVISO_DE_CODIGO_GENERICO =
+  "¿Tienes un código de promoción o de una persona embajadora? Escríbelo en <strong>«¿Tienes un código?»</strong> al elegir tu plan.";
+
+/**
+ * Lo que el recordatorio de pago dice del código y cómo arma su botón.
+ * Mientras la campaña está activa, el renglón anuncia BUENFIN con las cifras
+ * de la pauta (las mismas que /buenfin compara contra los precios reales) y el
+ * botón lleva `?promo=BUENFIN`, que el plan aplica solo. Si la PM aún no crea
+ * el cupón, el plan avisa que no está activo y se paga el precio regular.
+ */
+export function avisoDeCodigoParaCorreo(ahora: Date = new Date()): {
+  avisoCodigo: string;
+  sufijoUrl: string;
+} {
+  if (estadoDeLaCampana(ahora) !== "activa")
+    return { avisoCodigo: AVISO_DE_CODIGO_GENERICO, sufijoUrl: "" };
+  const c = CIFRAS_DE_PAUTA;
+  return {
+    avisoCodigo:
+      `<strong>El Buen Fin, ${BUEN_FIN.fechasEnTexto.toLowerCase()}:</strong> con el código <strong>${BUEN_FIN.codigo}</strong> tienes ${pesos(BUEN_FIN.descuentoPesos)} de descuento en tu primer pago. ` +
+      `En mes a mes, tu primer mes queda en ${pesos(c.primerMesPesos)}; en el plan anual pagas ${pesos(c.anualBuenFinPesos)} en lugar de ${pesos(c.anualRegularPesos)}. ` +
+      `Con el botón de abajo el código ya va puesto.`,
+    sufijoUrl: `?promo=${BUEN_FIN.codigo}`,
+  };
+}
+
 /**
  * Las promociones que valen SOLO para el primer peludo de la cuenta. Quien ya
  * es miembro y agrega otro peludo tiene su 15%: el checkout no le aplica estas.

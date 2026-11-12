@@ -44,11 +44,14 @@ const mxn = (n: number) =>
 export function PlanSelector599({
   petName,
   initialCode,
+  promoDelEnlace,
   oferta,
   catalogo,
 }: {
   petName: string;
   initialCode?: string;
+  /** `?promo=` del enlace que trajo aquí (el recordatorio de pago, 12-nov), ya limpio. */
+  promoDelEnlace?: string | null;
   oferta: Oferta599;
   catalogo: GrupoCatalogo[];
 }) {
@@ -57,10 +60,15 @@ export function PlanSelector599({
   // primer peludo: quien ya es miembro y paga otro peludo tiene su 15% y no se
   // le aplica sola ninguna promoción de campaña.
   const crudoCampana = useValorLocal(LLAVE_PROMO_GUARDADA);
-  const campana = useMemo(
-    () => (oferta.nivel === "principal" ? leerPromoGuardada(crudoCampana) : null),
-    [crudoCampana, oferta.nivel],
-  );
+  // El recordatorio de pago (12-nov) llega directo a esta página con
+  // `?promo=`: ese enlace manda sobre lo guardado, y la modalidad guardada se
+  // respeta si la hay.
+  const campana = useMemo((): PromoGuardada | null => {
+    if (oferta.nivel !== "principal") return null;
+    const guardada = leerPromoGuardada(crudoCampana);
+    if (!promoDelEnlace) return guardada;
+    return { promo: promoDelEnlace, modalidad: guardada?.modalidad ?? null, ts: guardada?.ts ?? 0 };
+  }, [crudoCampana, oferta.nivel, promoDelEnlace]);
   // Lo que la persona toca manda; si no ha tocado nada, la modalidad del enlace.
   const [elegido, setSelected] = useState<Plan | null>(null);
   const selected: Plan = elegido ?? (campana?.modalidad === "mensual" ? "monthly" : "annual");
