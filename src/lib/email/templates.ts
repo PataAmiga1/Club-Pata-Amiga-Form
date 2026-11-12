@@ -580,17 +580,21 @@ ${BOTON("{{siteUrl}}/app/perfil", "Completar mi perfil")}`),
       firstName: "Nombre de quien se registró",
       petName: "Nombre de su peludo (o «tu peludo» si aún no lo registra)",
       continuarUrl: "URL para terminar: el plan, o el alta del peludo si le falta",
+      avisoCodigo:
+        "Renglón del código: el de siempre, o el de la campaña activa (El Buen Fin) con su código ya puesto en el botón",
     },
     sample: {
       firstName: "Cipatli",
       petName: "Max",
-      continuarUrl: "https://pataamiga.mx/registro/plan",
+      continuarUrl: "https://pataamiga.mx/registro/plan?promo=BUENFIN",
+      avisoCodigo:
+        "<strong>El Buen Fin, del 13 al 17 de noviembre:</strong> con el código <strong>BUENFIN</strong> tienes $599 de descuento en tu primer pago. En mes a mes, tu primer mes queda en $0; en el plan anual pagas $6,013 en lugar de $6,612. Con el botón de abajo el código ya va puesto.",
     },
     subject: "{{petName}} está a un paso de tener su membresía 🐾",
     html: WRAP(`<h2 style="color:#1E5350">Hola, {{firstName}}</h2>
 <p>Ya creaste tu cuenta en Club Pata Amiga, pero la membresía de <strong>{{petName}}</strong> todavía no está activa: falta elegir tu plan y terminar el pago.</p>
 <p>Al activarla tienes orientación veterinaria 24/7, mantienes a tu veterinario de confianza y tus montos para cuidados cotidianos, emergencia veterinaria y despedida empiezan a correr.</p>
-<p style="background:#E9F7F5;border-radius:12px;padding:12px 16px">¿Tienes un código de promoción o de una persona embajadora? Escríbelo en <strong>«¿Tienes un código?»</strong> al elegir tu plan.</p>
+<p style="background:#E9F7F5;border-radius:12px;padding:12px 16px">{{avisoCodigo}}</p>
 ${BOTON("{{continuarUrl}}", "Terminar mi registro")}
 <p style="font-size:13px;color:#6B7C79">Si ya lo hiciste, ignora este mensaje.</p>`),
   },

@@ -11,18 +11,23 @@ import { ofertaDe599 } from "@/lib/plans/oferta";
 import { leerCatalogo } from "@/lib/catalogo-cuidados";
 import { ESTADOS_VIVOS } from "@/lib/plans/suscripciones";
 import { PlanSelector599 } from "./PlanSelector599";
+import { promoDeLaUrl } from "@/lib/campanas/buen-fin";
 
 export default async function PlanPage({
   searchParams,
 }: {
-  searchParams: Promise<{ codigo?: string }>;
+  searchParams: Promise<{ codigo?: string; promo?: string }>;
 }) {
-  const { codigo } = await searchParams;
+  const { codigo, promo } = await searchParams;
+  // `?promo=` llega del recordatorio de pago durante una campaña (12-nov).
+  const promoDelEnlace = promoDeLaUrl(`promo=${encodeURIComponent(promo ?? "")}`)?.promo ?? null;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/registro");
+  // Sin sesión se va al registro, pero con la promoción: ahí la guarda
+  // `StashPromoCampana` y el plan la aplica después de entrar.
+  if (!user) redirect(promoDelEnlace ? `/registro?promo=${promoDelEnlace}` : "/registro");
 
   // Already a paying member? Plan changes live in Mi cuenta.
   const { data: profile } = await supabase
@@ -86,6 +91,7 @@ export default async function PlanPage({
             <PlanSelector599
               petName={petName}
               initialCode={codigo}
+              promoDelEnlace={promoDelEnlace}
               oferta={oferta}
               catalogo={catalogo}
             />

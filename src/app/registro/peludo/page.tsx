@@ -2,6 +2,7 @@ import { RegistroHeader } from "@/components/registro/Header";
 import { Stepper } from "@/components/registro/Stepper";
 import { PetForm } from "@/components/registro/PetForm";
 import { CuentaCreadaEvent } from "@/components/analytics/CuentaCreadaEvent";
+import { StashPromoCampana } from "@/components/registro/StashPromoCampana";
 import { ALTAS_SON_599 } from "@/lib/plans/planes";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -32,6 +33,8 @@ export default async function PeludoPage() {
     <div className="flex min-h-dvh flex-col bg-cream">
       {user && recienCreada && <CuentaCreadaEvent userId={user.id} metodo={metodo} />}
       <RegistroHeader step={2} />
+      {/* El recordatorio de pago llega aquí con ?promo= si aún no hay peludo. */}
+      <StashPromoCampana />
       <div className="pb-14 pt-4 sm:pt-10">
         <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6 px-5 sm:px-0">
           <Stepper current={2} />

@@ -3,6 +3,7 @@ import { sendTemplatedEmail } from "./send";
 import { destinatarioPermitido } from "@/lib/resend";
 import { datosFaltantesDelPerfil } from "@/lib/perfil-faltantes";
 import { ESTADOS_VIVOS as ESTADOS_DE_COBRO_VIVO } from "@/lib/plans/suscripciones";
+import { avisoDeCodigoParaCorreo } from "@/lib/campanas/buen-fin";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -287,12 +288,21 @@ export async function enviarRecordatoriosDePagoPendiente(admin: Admin): Promise<
     if (!(await apartarAviso(admin, p.id, "pago", numero))) continue;
 
     const peludo = primerPeludo.get(p.id);
-    const ok = await sendTemplatedEmail("pago_pendiente_alta", p.email, {
-      firstName: p.first_name ?? "",
-      // Sin peludo registrado, el correo lo manda a registrarlo primero.
-      petName: peludo ?? "tu peludo",
-      continuarUrl: `${SITE_URL}${peludo ? "/registro/plan" : "/registro/peludo"}`,
-    });
+    // Durante El Buen Fin el renglón del código anuncia BUENFIN y el botón ya
+    // lo lleva puesto; fuera de la campaña es el renglón de siempre.
+    const { avisoCodigo, sufijoUrl } = avisoDeCodigoParaCorreo();
+    const ok = await sendTemplatedEmail(
+      "pago_pendiente_alta",
+      p.email,
+      {
+        firstName: p.first_name ?? "",
+        // Sin peludo registrado, el correo lo manda a registrarlo primero.
+        petName: peludo ?? "tu peludo",
+        continuarUrl: `${SITE_URL}${peludo ? "/registro/plan" : "/registro/peludo"}${sufijoUrl}`,
+        avisoCodigo,
+      },
+      { escapar: ["firstName", "petName"] },
+    );
     if (ok) enviados++;
     else await soltarAviso(admin, p.id, "pago", numero);
   }
